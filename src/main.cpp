@@ -34,6 +34,7 @@ unsigned int g_simple_rectangle_vbo;
 
 int g_ui_text_shader;
 unsigned int g_ui_text_vao;
+unsigned int g_ui_text_vbo;
 
 int g_game_width_px = 1800;
 int g_game_height_px = 900;
@@ -44,6 +45,18 @@ typedef struct {
 	int width;
 	int height;
 } Rectangle2D;
+
+typedef struct {
+	float UV_x0;
+	float UV_y0;
+	float UV_x1;
+	float UV_y1;
+	int width;
+	int height;
+	int x_offset;
+	int y_offset;
+	char character;
+} FontData;
 
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line)
@@ -220,6 +233,52 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(0);
 }
 
+void draw_ui_character(FontData* font_data, int texture_id, const char character, int x, int y)
+{
+	int char_as_int = static_cast<int>(character);
+	int char_index = char_as_int - 32;
+
+	FontData current = font_data[char_index];
+
+	float x0 = normalize_screen_px_to_ndc(x, g_game_width_px);
+	float y0 = normalize_screen_px_to_ndc(y, g_game_height_px);
+
+	float x1 = normalize_screen_px_to_ndc(x + current.width, g_game_width_px);
+	float y1 = normalize_screen_px_to_ndc(y + current.height, g_game_height_px);
+
+	float vertices[] =
+	{
+		// Coords		// UV
+		x0, y0, 0.0f,	current.UV_x0, current.UV_y0, // bottom left
+		x1, y0, 0.0f,	current.UV_x1, current.UV_y0, // bottom right
+		x0, y1, 0.0f,	current.UV_x0, current.UV_y1, // top left
+
+		x0, y1, 0.0f,	current.UV_x0, current.UV_y1, // top left 
+		x1, y1, 0.0f,	current.UV_x1, current.UV_y1, // top right
+		x1, y0, 0.0f,	current.UV_x1, current.UV_y0  // bottom right
+	};
+
+	glUseProgram(g_ui_text_shader);
+	glBindVertexArray(g_ui_text_vao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+
+	glUseProgram(0);
+	glBindVertexArray(0);
+}
+
+float normalize_value(float value, float src_max, float dest_max)
+{
+	// Assume 0.0 is min value
+	float intermediate = value / src_max;
+	float result = dest_max * intermediate;
+	return result;
+}
+
 int main(int argc, char* argv[])
 {
 	char* program_filepath = argv[0];
@@ -245,7 +304,11 @@ int main(int argc, char* argv[])
 
 
 	// Load debug font
+
 	GLuint font_texture;
+	constexpr int starting_char = 32;
+	constexpr int last_char = 128;
+	std::array<FontData, (last_char - starting_char)> char_data = { 0 };
 	{
 		constexpr int ttf_buffer_size = KILOBYTES(1024);
 		unsigned char* ttf_buffer = (unsigned char*)malloc(ttf_buffer_size);
@@ -262,9 +325,6 @@ int main(int argc, char* argv[])
 		float font_scale = stbtt_ScaleForPixelHeight(&font, font_height_px);
 
 		// Iterate fontinfo and get max height / widths for bitmap atlas
-
-		constexpr int starting_char = 98;
-		constexpr int last_char = 117;
 
 		int bitmap_width = 0;
 		int bitmap_height = 0;
@@ -288,8 +348,6 @@ int main(int argc, char* argv[])
 			bitmap_width += glyph_width;
 		}
 
-		bitmap_height = static_cast<float>(bitmap_height) * 2.0f; // increase bitmap height to have room for y offset adjust
-
 		int bitmap_size = bitmap_width * bitmap_height;
 		byte* texture_bitmap = static_cast<byte*>(malloc(bitmap_size));
 		memset(texture_bitmap, 0x00, bitmap_size);
@@ -297,6 +355,7 @@ int main(int argc, char* argv[])
 		// Create bitmap buffer
 
 		int bitmap_x_offset = 0;
+		int char_data_index = 0;
 
 		for (int c = starting_char; c < last_char; c++)
 		{
@@ -306,28 +365,37 @@ int main(int argc, char* argv[])
 			int font_width, font_height, x_offset, y_offset;
 			byte* bitmap = stbtt_GetGlyphBitmap(&font, 0, font_scale, glyph_index, &font_width, &font_height, &x_offset, &y_offset);
 
-			std::cout << (char)character
-				<< " width: " << font_width
-				<< ", height: " << font_height
-				<< ", x offset: " << x_offset
-				<< ", y offset: " << y_offset
-				<< std::endl;
-
-			int used_y_offset = font_height + y_offset;
+			int used_y_offset = (font_height + y_offset) * (-1.0f);
 
 			for (int y = 0; y < font_height; y++)
 			{
 				int src_index = ((font_height - 1) * font_width) - y * font_width;
-				int half_of_bitmap_height = ((static_cast<float>(bitmap_height) / 2) * bitmap_width);
-				int dest_index = y * bitmap_width + bitmap_x_offset + half_of_bitmap_height;
+				int dest_index = y * bitmap_width + bitmap_x_offset;
 				memcpy(&texture_bitmap[dest_index], &bitmap[src_index], font_width);
 			}
 
+			FontData new_char_data = { 0 };
+			new_char_data.character = static_cast<char>(c);
+
+			new_char_data.width = font_width;
+			new_char_data.height = font_height;
+			new_char_data.x_offset = x_offset;
+			new_char_data.y_offset = used_y_offset;
+
+			float atlas_width = static_cast<float>(bitmap_width);
+			float atlas_height = static_cast<float>(bitmap_height);
+
+			new_char_data.UV_x0 = normalize_value(bitmap_x_offset, atlas_width, 1.0f);
+			new_char_data.UV_y0 = normalize_value(0.0f, atlas_height, 1.0f);
+
+			float x1 = bitmap_x_offset + font_width;
+			new_char_data.UV_x1 = normalize_value(x1, atlas_width, 1.0f);
+			new_char_data.UV_y1 = normalize_value(font_height, atlas_height, 1.0f);
+
+			char_data[char_data_index++] = new_char_data;
+
 			bitmap_x_offset += font_width;
 		}
-
-		memset(&texture_bitmap[0], 0x44, bitmap_width);
-		memset(&texture_bitmap[(bitmap_height - 1) * bitmap_width], 0x99, bitmap_width);
 
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
@@ -344,7 +412,7 @@ int main(int argc, char* argv[])
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	}
 
-	// Init simple reactangle shader
+	// Init simple rectangle shader
 	{
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_fs.glsl";
@@ -355,7 +423,7 @@ int main(int argc, char* argv[])
 			glGenBuffers(1, &g_simple_rectangle_vbo);
 			glBindVertexArray(g_simple_rectangle_vao);
 
-			int buffer_size = (6 * 6) * sizeof(float);
+			int buffer_size = (6 * 6) * sizeof(float); // vec3 + vec3 * 6 indicies
 			glBindBuffer(GL_ARRAY_BUFFER, g_simple_rectangle_vbo);
 			glBufferData(GL_ARRAY_BUFFER, buffer_size, NULL, GL_DYNAMIC_DRAW);
 
@@ -382,20 +450,20 @@ int main(int argc, char* argv[])
 				// Coords				// UV
 				-0.9f, -0.0f, 0.0f,		0.0f, 0.0f, // bottom left
 				 0.9f, -0.0f, 0.0f,		1.0f, 0.0f, // bottom right
-				-0.9f,  0.7f, 0.0f,		0.0f, 1.0f, // top left
+				-0.9f,  0.4f, 0.0f,		0.0f, 1.0f, // top left
 
-				-0.9f,  0.7f, 0.0f,		0.0f, 1.0f, // top left 
-				 0.9f,  0.7f, 0.0f,		1.0f, 1.0f, // top right
+				-0.9f,  0.4f, 0.0f,		0.0f, 1.0f, // top left 
+				 0.9f,  0.4f, 0.0f,		1.0f, 1.0f, // top right
 				 0.9f, -0.0f, 0.0f,		1.0f, 0.0f  // bottom right
 			};
 
-			unsigned int VBO;
 			glGenVertexArrays(1, &g_ui_text_vao);
-			glGenBuffers(1, &VBO);
+			glGenBuffers(1, &g_ui_text_vbo);
 			glBindVertexArray(g_ui_text_vao);
 
-			glBindBuffer(GL_ARRAY_BUFFER, VBO);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+			int buffer_size = (5 * 6) * sizeof(float); // vec3 + vec2 * 6 indicies
+			glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
+			glBufferData(GL_ARRAY_BUFFER, buffer_size, NULL, GL_DYNAMIC_DRAW);
 
 			// Coord attribute
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
@@ -422,10 +490,16 @@ int main(int argc, char* argv[])
 
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		glUseProgram(g_ui_text_shader);
-		glBindVertexArray(g_ui_text_vao);
-		glBindTexture(GL_TEXTURE_2D, font_texture);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		Rectangle2D rect1 = { 0 };
+		rect1.bot_left_x = 50;
+		rect1.bot_left_y = 50;
+		rect1.height = 700;
+		rect1.width = 1100;
+
+		draw_simple_reactangle(rect1, 1.0f, 0.2f, 0.2f);
+
+		draw_ui_character(char_data.data(), font_texture, 'p', 100, 150);
+		draw_ui_character(char_data.data(), font_texture, 'u', 160, 150);
 
 		glfwSwapBuffers(window);
 	}
