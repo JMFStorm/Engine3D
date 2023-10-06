@@ -18,7 +18,6 @@
 
 typedef unsigned char byte;
 
-
 std::mutex global_log_mutex;
 std::ofstream global_log_file_output;
 std::filesystem::path global_log_file_path = {};
@@ -26,7 +25,6 @@ constexpr const char* GLOBAL_LOG_FILE_NAME = "Engine3D_mylog.txt";
 
 constexpr size_t GLOBAL_STRING_POOL_SIZE = 2048;
 std::array<char, GLOBAL_STRING_POOL_SIZE> g_string_pool = {0}; 
-
 
 int g_simple_rectangle_shader;
 unsigned int g_simple_rectangle_vao;
@@ -46,7 +44,7 @@ typedef struct {
 	int height;
 } Rectangle2D;
 
-typedef struct {
+typedef struct CharData {
 	float UV_x0;
 	float UV_y0;
 	float UV_x1;
@@ -56,8 +54,16 @@ typedef struct {
 	int x_offset;
 	int y_offset;
 	char character;
+} CharData;
+
+typedef struct FontData {
+	std::array<CharData, 96> char_data = { 0 };
+	int texture_id;
+	float font_scale;
+	int font_height_px;
 } FontData;
 
+FontData g_debug_font = { 0 };
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line)
 {
@@ -89,36 +95,6 @@ bool read_file_to_global_string_pool(const char* file_path, char** str_pointer)
 	*str_pointer = g_string_pool.data();
 
 	return true;
-}
-
-bool game_log_init(char* executable_filepath)
-{
-	std::filesystem::path executable_dir = std::filesystem::path(executable_filepath).parent_path();
-	global_log_file_path = executable_dir / GLOBAL_LOG_FILE_NAME;
-
-	global_log_file_output.open(global_log_file_path, std::ios::trunc);
-
-	if (!global_log_file_output.is_open())
-	{
-		std::cerr << "Error: Could not open the log file (" << global_log_file_path << ")." << std::endl;
-		return false;
-	}
-
-	return true;
-}
-
-void game_log(const char* message)
-{
-	if (global_log_file_output.is_open())
-	{
-		global_log_file_output << message << "\n";
-	}
-}
-
-void game_log_flush_and_end()
-{
-	global_log_file_output.flush();
-	global_log_file_output.close();
 }
 
 int compile_shader(const char* vertex_shader_path, const char* fragment_shader_path)
@@ -192,9 +168,7 @@ int load_image_into_texture(const char* image_path)
 float normalize_screen_px_to_ndc(int value, int max)
 {
 	float this1 = static_cast<float>(value) / static_cast<float>(max);
-
 	float this2 = 2.0f * this1;
-
 	float res = -1.0f + this2;
 	return res;
 }
@@ -233,12 +207,74 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(0);
 }
 
-void draw_ui_character(FontData* font_data, int texture_id, const char character, int x, int y)
+void draw_ui_text(FontData* font_data, char* text, int x, int y)
+{
+	float* text_vertex_buffer = (float*)malloc(KILOBYTES(10));
+	auto chars = font_data->char_data.data();
+	char* text_string = text;
+
+	int text_offset_x = 0;
+	int buffer_size = 0;
+	int draw_indicies = 0;
+	int length = strlen(text);
+
+	for(int i = 0; i < length; i++)
+	{
+		char current_char = *text_string++;
+		int char_index = static_cast<int>(current_char) - 32;
+		CharData current = chars[char_index];
+
+		int x_start = x + text_offset_x;
+		int y_start = y + current.y_offset;
+
+		float x0 = normalize_screen_px_to_ndc(x_start, g_game_width_px);
+		float y0 = normalize_screen_px_to_ndc(y_start, g_game_height_px);
+
+		float x1 = normalize_screen_px_to_ndc(x_start + current.width, g_game_width_px);
+		float y1 = normalize_screen_px_to_ndc(y_start + current.height, g_game_height_px);
+
+		float vertices[] =
+		{
+			// Coords			// UV
+			x0, y0, 0.0f,		current.UV_x0, current.UV_y0, // bottom left
+			x1, y0, 0.0f,		current.UV_x1, current.UV_y0, // bottom right
+			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left
+
+			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left 
+			x1, y1, 0.0f,		current.UV_x1, current.UV_y1, // top right
+			x1, y0, 0.0f,		current.UV_x1, current.UV_y0  // bottom right
+		};
+
+		memcpy(&text_vertex_buffer[draw_indicies], vertices, sizeof(vertices));
+
+		buffer_size += sizeof(vertices);
+		draw_indicies += 30;
+		text_offset_x += current.width + current.x_offset;
+
+		text++;
+	} 
+
+	glUseProgram(g_ui_text_shader);
+	glBindVertexArray(g_ui_text_vao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
+	glBufferData(GL_ARRAY_BUFFER, buffer_size, text_vertex_buffer, GL_DYNAMIC_DRAW);
+
+	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
+	glDrawArrays(GL_TRIANGLES, 0, draw_indicies);
+
+	glUseProgram(0);
+	glBindVertexArray(0);
+
+	free(text_vertex_buffer);
+}
+
+void draw_ui_character(FontData* font_data, const char character, int x, int y)
 {
 	int char_as_int = static_cast<int>(character);
 	int char_index = char_as_int - 32;
 
-	FontData current = font_data[char_index];
+	CharData current = font_data->char_data.data()[char_index];
 
 	float x0 = normalize_screen_px_to_ndc(x, g_game_width_px);
 	float y0 = normalize_screen_px_to_ndc(y, g_game_height_px);
@@ -264,7 +300,7 @@ void draw_ui_character(FontData* font_data, int texture_id, const char character
 	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 
-	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	glUseProgram(0);
@@ -281,53 +317,48 @@ float normalize_value(float value, float src_max, float dest_max)
 
 int main(int argc, char* argv[])
 {
-	char* program_filepath = argv[0];
+	// Init window and context
+	GLFWwindow* window;
+	{
+		int glfw_init_result = glfwInit();
+		ASSERT_TRUE(glfw_init_result == GLFW_TRUE, "glfw init");
 
-	bool init_logger_success = game_log_init(program_filepath);
-	ASSERT_TRUE(init_logger_success, "Game logger init");
+		window = glfwCreateWindow(g_game_width_px, g_game_height_px, "My Window", NULL, NULL);
+		ASSERT_TRUE(window, "window creation");
 
-	game_log("Game started.");
+		glfwMakeContextCurrent(window);
+		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-
-	int glfw_init_result = glfwInit();
-	ASSERT_TRUE(glfw_init_result == GLFW_TRUE, "glfw init");
-
-	GLFWwindow* window = glfwCreateWindow(g_game_width_px, g_game_height_px, "My Window", NULL, NULL);
-	ASSERT_TRUE(window, "window creation");
-
-	glfwMakeContextCurrent(window);
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-
-	int glew_init_result = glewInit();
-	ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
-
+		int glew_init_result = glewInit();
+		ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
+	}
 
 	// Load debug font
-
-	GLuint font_texture;
-	constexpr int starting_char = 32;
-	constexpr int last_char = 128;
-	std::array<FontData, (last_char - starting_char)> char_data = { 0 };
 	{
 		constexpr int ttf_buffer_size = KILOBYTES(1024);
 		unsigned char* ttf_buffer = (unsigned char*)malloc(ttf_buffer_size);
 
 		FILE* file;
-		fopen_s(&file, "G:/projects/game/Engine3D/resources/fonts/Roboto-Medium.ttf", "rb");
+		fopen_s(&file, "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf", "rb");
 		fread(ttf_buffer, 1, ttf_buffer_size, file);
 
 		stbtt_fontinfo font;
 		int font_offset = stbtt_GetFontOffsetForIndex(ttf_buffer, 0);
 		stbtt_InitFont(&font, ttf_buffer, font_offset);
 
-		float font_height_px = 128;
+		float font_height_px = 32;
 		float font_scale = stbtt_ScaleForPixelHeight(&font, font_height_px);
+		
+		g_debug_font.font_height_px = font_height_px;
+		g_debug_font.font_height_px = font_scale;
 
 		// Iterate fontinfo and get max height / widths for bitmap atlas
 
 		int bitmap_width = 0;
 		int bitmap_height = 0;
+
+		constexpr int starting_char = 32;
+		constexpr int last_char = 128;
 
 		for (int c = starting_char; c < last_char; c++)
 		{
@@ -374,7 +405,7 @@ int main(int argc, char* argv[])
 				memcpy(&texture_bitmap[dest_index], &bitmap[src_index], font_width);
 			}
 
-			FontData new_char_data = { 0 };
+			CharData new_char_data = { 0 };
 			new_char_data.character = static_cast<char>(c);
 
 			new_char_data.width = font_width;
@@ -392,15 +423,24 @@ int main(int argc, char* argv[])
 			new_char_data.UV_x1 = normalize_value(x1, atlas_width, 1.0f);
 			new_char_data.UV_y1 = normalize_value(font_height, atlas_height, 1.0f);
 
-			char_data[char_data_index++] = new_char_data;
+			g_debug_font.char_data[char_data_index++] = new_char_data;
 
 			bitmap_x_offset += font_width;
 		}
 
+		CharData new_char_data = { 0 };
+		new_char_data.character = static_cast<char>(' ');
+		new_char_data.width = font_height_px / 4;
+		new_char_data.height = font_height_px;
+		g_debug_font.char_data[0] = new_char_data; // Add spacebar
+
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-		glGenTextures(1, &font_texture);
-		glBindTexture(GL_TEXTURE_2D, font_texture);
+		GLuint texture;
+		glGenTextures(1, &texture);
+
+		g_debug_font.texture_id = static_cast<int>(texture);
+		glBindTexture(GL_TEXTURE_2D, g_debug_font.texture_id);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -445,18 +485,6 @@ int main(int argc, char* argv[])
 		g_ui_text_shader = compile_shader(vertex_shader_path, fragment_shader_path);
 
 		{
-			float vertices[] =
-			{
-				// Coords				// UV
-				-0.9f, -0.0f, 0.0f,		0.0f, 0.0f, // bottom left
-				 0.9f, -0.0f, 0.0f,		1.0f, 0.0f, // bottom right
-				-0.9f,  0.4f, 0.0f,		0.0f, 1.0f, // top left
-
-				-0.9f,  0.4f, 0.0f,		0.0f, 1.0f, // top left 
-				 0.9f,  0.4f, 0.0f,		1.0f, 1.0f, // top right
-				 0.9f, -0.0f, 0.0f,		1.0f, 0.0f  // bottom right
-			};
-
 			glGenVertexArrays(1, &g_ui_text_vao);
 			glGenBuffers(1, &g_ui_text_vbo);
 			glBindVertexArray(g_ui_text_vao);
@@ -478,7 +506,6 @@ int main(int argc, char* argv[])
 	const char* image_path = "G:/projects/game/Engine3D/resources/images/debug_img_01.png";
 	unsigned int debug_texture = load_image_into_texture(image_path);
 
-
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -486,8 +513,12 @@ int main(int argc, char* argv[])
 
 	while (!glfwWindowShouldClose(window))
 	{
+		// Input
+
 		glfwPollEvents();
 
+		// Draw
+		
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		Rectangle2D rect1 = { 0 };
@@ -498,18 +529,13 @@ int main(int argc, char* argv[])
 
 		draw_simple_reactangle(rect1, 1.0f, 0.2f, 0.2f);
 
-		draw_ui_character(char_data.data(), font_texture, 'p', 100, 150);
-		draw_ui_character(char_data.data(), font_texture, 'u', 160, 150);
+		const char* my_text = "FPS: 166Hz - Delta: 6.667msHimiaaa";
+		draw_ui_text(&g_debug_font, const_cast<char*>(my_text), 25, 700);
 
 		glfwSwapBuffers(window);
 	}
 
-
-	game_log("Game ended.");
-
-	game_log_flush_and_end(); // Make sure files are written to disk
-
-	glfwTerminate(); // @Perf: Unnecessary slowdown
+	glfwTerminate(); // @Performance: Unnecessary slowdown
 
 	return 0;
 }
