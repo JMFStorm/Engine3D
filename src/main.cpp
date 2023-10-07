@@ -56,6 +56,7 @@ typedef struct CharData {
 	int height;
 	int x_offset;
 	int y_offset;
+	int advance;
 	char character;
 } CharData;
 
@@ -233,17 +234,33 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(0);
 }
 
-void draw_ui_text(FontData* font_data, char* text, int x, int y)
+inline float vw_into_screen_px(float value)
 {
-	float* text_vertex_buffer = (float*)malloc(KILOBYTES(10));
+	return (float)(g_game_width_px) * value * 0.01f;
+}
+
+inline float vh_into_screen_px(float value)
+{
+	return (float)(g_game_height_px) * value * 0.01f;
+}
+
+void draw_ui_text(FontData* font_data, char* text, float font_height_vh, float pos_x_vw, float pos_y_vh)
+{
+	float* text_vertex_buffer = (float*)malloc(KILOBYTES(200));
 	auto chars = font_data->char_data.data();
 	char* text_string = text;
 
-	int text_offset_x = 0;
-	int text_offset_y = 0;
 	int buffer_size = 0;
 	int draw_indicies = 0;
 	int length = strlen(text);
+
+	float font_scale = vh_into_screen_px(font_height_vh) / (float)font_data->font_height_px;
+
+	int text_offset_x_px = 0;
+	int text_offset_y_px = 0;
+	int line_height_px = vh_into_screen_px(font_height_vh);
+
+	// Assume font start position is top left corner
 
 	for(int i = 0; i < length; i++)
 	{
@@ -251,22 +268,26 @@ void draw_ui_text(FontData* font_data, char* text, int x, int y)
 
 		if (current_char == '\n')
 		{
-			text_offset_y -= font_data->font_height_px;
-			text_offset_x = 0;
+			text_offset_y_px -= line_height_px;
+			text_offset_x_px = 0;
 			continue;
 		}
 
 		int char_index = static_cast<int>(current_char) - 32;
 		CharData current = chars[char_index];
 
-		int x_start = x + text_offset_x;
-		int y_start = y + current.y_offset + text_offset_y;
+		int char_height_px = current.height * font_scale;
+		int char_width_px = current.width * font_scale;
+
+		int x_start = vw_into_screen_px(pos_x_vw) + text_offset_x_px;
+		int char_y_offset = current.y_offset * font_scale;
+		int y_start = vh_into_screen_px(pos_y_vh) + text_offset_y_px - line_height_px + char_y_offset;
 
 		float x0 = normalize_screen_px_to_ndc(x_start, g_game_width_px);
 		float y0 = normalize_screen_px_to_ndc(y_start, g_game_height_px);
 
-		float x1 = normalize_screen_px_to_ndc(x_start + current.width, g_game_width_px);
-		float y1 = normalize_screen_px_to_ndc(y_start + current.height, g_game_height_px);
+		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px, g_game_width_px);
+		float y1 = normalize_screen_px_to_ndc(y_start + char_height_px, g_game_height_px);
 
 		float vertices[] =
 		{
@@ -284,7 +305,7 @@ void draw_ui_text(FontData* font_data, char* text, int x, int y)
 
 		buffer_size += sizeof(vertices);
 		draw_indicies += 30;
-		text_offset_x += current.width + current.x_offset;
+		text_offset_x_px = text_offset_x_px + char_width_px + (current.x_offset * font_scale);
 
 		text++;
 	} 
@@ -381,7 +402,7 @@ int main(int argc, char* argv[])
 		int font_offset = stbtt_GetFontOffsetForIndex(ttf_buffer, 0);
 		stbtt_InitFont(&font, ttf_buffer, font_offset);
 
-		float font_height_px = 32;
+		float font_height_px = 64;
 		float font_scale = stbtt_ScaleForPixelHeight(&font, font_height_px);
 		
 		g_debug_font.font_height_px = font_height_px;
@@ -431,6 +452,9 @@ int main(int argc, char* argv[])
 			int font_width, font_height, x_offset, y_offset;
 			byte* bitmap = stbtt_GetGlyphBitmap(&font, 0, font_scale, glyph_index, &font_width, &font_height, &x_offset, &y_offset);
 
+			int advance, lsb;
+			stbtt_GetCodepointHMetrics(&font, glyph_index, &advance, &lsb);
+
 			int used_y_offset = (font_height + y_offset) * (-1.0f);
 
 			for (int y = 0; y < font_height; y++)
@@ -438,6 +462,9 @@ int main(int argc, char* argv[])
 				int src_index = ((font_height - 1) * font_width) - y * font_width;
 				int dest_index = y * bitmap_width + bitmap_x_offset;
 				memcpy(&texture_bitmap[dest_index], &bitmap[src_index], font_width);
+
+				// texture_bitmap[dest_index] = 255;
+				// texture_bitmap[dest_index + (font_width - 1)] = 255;
 			}
 
 			CharData new_char_data = { 0 };
@@ -447,6 +474,7 @@ int main(int argc, char* argv[])
 			new_char_data.height = font_height;
 			new_char_data.x_offset = x_offset;
 			new_char_data.y_offset = used_y_offset;
+			new_char_data.advance = (float)lsb * font_scale;
 
 			float atlas_width = static_cast<float>(bitmap_width);
 			float atlas_height = static_cast<float>(bitmap_height);
@@ -479,7 +507,7 @@ int main(int argc, char* argv[])
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap_width, bitmap_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, texture_bitmap);
@@ -562,14 +590,12 @@ int main(int argc, char* argv[])
 		rect1.height = g_game_height_px;
 		rect1.width = g_game_width_px;
 
-		draw_simple_reactangle(rect1, 0.3f, 0.5f, 0.55f);
+		draw_simple_reactangle(rect1, 0.9f, 0.9f, 0.9f);
 
-		const char* my_text = 
-			"FPS: 166Hz\n"
-			"Delta: 6.667ms\n"
-			"Himiaaa";
+		const char* my_text =
+			"Lorem ipsum is simply dummy text\n";
 
-		draw_ui_text(&g_debug_font, const_cast<char*>(my_text), 25, 700);
+		draw_ui_text(&g_debug_font, const_cast<char*>(my_text), 5.0f, 1.0f, 100.0f);
 
 		glfwSwapBuffers(window);
 	}
