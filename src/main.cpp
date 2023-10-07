@@ -34,8 +34,11 @@ int g_ui_text_shader;
 unsigned int g_ui_text_vao;
 unsigned int g_ui_text_vbo;
 
-int g_game_width_px = 1800;
-int g_game_height_px = 900;
+int g_game_width_px = 1600;
+int g_game_height_px = 1200;
+
+int g_game_aspect_ratio_x = 4;
+int g_game_aspect_ratio_y = 3;
 
 typedef struct {
 	int bot_left_x;
@@ -130,9 +133,32 @@ int compile_shader(const char* vertex_shader_path, const char* fragment_shader_p
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-	g_game_width_px = width;
-	g_game_height_px = height;
-	glViewport(0, 0, width, height);
+	float screen_x = (float)width;
+	float screen_y = (float)height;
+
+	float x_aspect = screen_x / (float)g_game_aspect_ratio_x;
+	float y_aspect = screen_y / (float)g_game_aspect_ratio_y;
+
+	bool is_wider_for_aspect = y_aspect < x_aspect;
+
+	if (is_wider_for_aspect)
+	{
+		int new_width = (screen_y / (float)g_game_aspect_ratio_y) * g_game_aspect_ratio_x;
+		g_game_width_px = new_width;
+		g_game_height_px = height;
+
+		int x_start = (screen_x / 2) - ((float)g_game_width_px / 2);
+		glViewport(x_start, 0, new_width, height);
+	}
+	else
+	{
+		int new_height = (screen_x / (float)g_game_aspect_ratio_x) * g_game_aspect_ratio_y;
+		g_game_width_px = width;
+		g_game_height_px = new_height;
+
+		int y_start = (screen_y / 2) - ((float)g_game_height_px / 2);
+		glViewport(0, y_start, width, new_height);
+	}
 }
 
 int load_image_into_texture(const char* image_path)
@@ -214,6 +240,7 @@ void draw_ui_text(FontData* font_data, char* text, int x, int y)
 	char* text_string = text;
 
 	int text_offset_x = 0;
+	int text_offset_y = 0;
 	int buffer_size = 0;
 	int draw_indicies = 0;
 	int length = strlen(text);
@@ -221,11 +248,19 @@ void draw_ui_text(FontData* font_data, char* text, int x, int y)
 	for(int i = 0; i < length; i++)
 	{
 		char current_char = *text_string++;
+
+		if (current_char == '\n')
+		{
+			text_offset_y -= font_data->font_height_px;
+			text_offset_x = 0;
+			continue;
+		}
+
 		int char_index = static_cast<int>(current_char) - 32;
 		CharData current = chars[char_index];
 
 		int x_start = x + text_offset_x;
-		int y_start = y + current.y_offset;
+		int y_start = y + current.y_offset + text_offset_y;
 
 		float x0 = normalize_screen_px_to_ndc(x_start, g_game_width_px);
 		float y0 = normalize_screen_px_to_ndc(y_start, g_game_height_px);
@@ -350,7 +385,7 @@ int main(int argc, char* argv[])
 		float font_scale = stbtt_ScaleForPixelHeight(&font, font_height_px);
 		
 		g_debug_font.font_height_px = font_height_px;
-		g_debug_font.font_height_px = font_scale;
+		g_debug_font.font_scale = font_scale;
 
 		// Iterate fontinfo and get max height / widths for bitmap atlas
 
@@ -509,7 +544,7 @@ int main(int argc, char* argv[])
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	glClearColor(0.4f, 0.8f, 0.6f, 1.0f);
+	glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -522,14 +557,18 @@ int main(int argc, char* argv[])
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		Rectangle2D rect1 = { 0 };
-		rect1.bot_left_x = 50;
-		rect1.bot_left_y = 50;
-		rect1.height = 700;
-		rect1.width = 1100;
+		rect1.bot_left_x = 0;
+		rect1.bot_left_y = 0;
+		rect1.height = g_game_height_px;
+		rect1.width = g_game_width_px;
 
-		draw_simple_reactangle(rect1, 1.0f, 0.2f, 0.2f);
+		draw_simple_reactangle(rect1, 0.3f, 0.5f, 0.55f);
 
-		const char* my_text = "FPS: 166Hz - Delta: 6.667msHimiaaa";
+		const char* my_text = 
+			"FPS: 166Hz\n"
+			"Delta: 6.667ms\n"
+			"Himiaaa";
+
 		draw_ui_text(&g_debug_font, const_cast<char*>(my_text), 25, 700);
 
 		glfwSwapBuffers(window);
