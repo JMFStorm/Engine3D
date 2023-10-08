@@ -4,8 +4,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
+#include <ft2build.h>
+#include FT_FREETYPE_H  
 
 #include <array>
 #include <iostream>
@@ -262,7 +262,7 @@ void draw_ui_text(FontData* font_data, char* text, float font_height_vh, float p
 
 	// Assume font start position is top left corner
 
-	for(int i = 0; i < length; i++)
+	for (int i = 0; i < length; i++)
 	{
 		char current_char = *text_string++;
 
@@ -305,7 +305,9 @@ void draw_ui_text(FontData* font_data, char* text, float font_height_vh, float p
 
 		buffer_size += sizeof(vertices);
 		draw_indicies += 30;
-		text_offset_x_px = text_offset_x_px + char_width_px + (current.x_offset * font_scale);
+
+		int advance = (current.width + current.x_offset) * font_scale; // (current.advance >> 6) * font_scale;
+		text_offset_x_px += advance;
 
 		text++;
 	} 
@@ -391,41 +393,37 @@ int main(int argc, char* argv[])
 
 	// Load debug font
 	{
-		constexpr int ttf_buffer_size = KILOBYTES(1024);
-		unsigned char* ttf_buffer = (unsigned char*)malloc(ttf_buffer_size);
+		FT_Library ft_lib;
+		FT_Face ft_face;
 
-		FILE* file;
-		fopen_s(&file, "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf", "rb");
-		fread(ttf_buffer, 1, ttf_buffer_size, file);
+		FT_Error init_ft_err = FT_Init_FreeType(&ft_lib);
+		ASSERT_TRUE(init_ft_err == 0, "Init FreeType Library");
 
-		stbtt_fontinfo font;
-		int font_offset = stbtt_GetFontOffsetForIndex(ttf_buffer, 0);
-		stbtt_InitFont(&font, ttf_buffer, font_offset);
+		FT_Error new_face_err = FT_New_Face(ft_lib, "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf", 0, &ft_face);
+		ASSERT_TRUE(new_face_err == 0, "Load FreeType font face");
 
 		float font_height_px = 64;
-		float font_scale = stbtt_ScaleForPixelHeight(&font, font_height_px);
-		
+		FT_Set_Pixel_Sizes(ft_face, 0, font_height_px);
+
 		g_debug_font.font_height_px = font_height_px;
-		g_debug_font.font_scale = font_scale;
 
 		// Iterate fontinfo and get max height / widths for bitmap atlas
 
-		int bitmap_width = 0;
-		int bitmap_height = 0;
+		unsigned int bitmap_width = 0;
+		unsigned int bitmap_height = 0;
 
 		constexpr int starting_char = 32;
 		constexpr int last_char = 128;
 
 		for (int c = starting_char; c < last_char; c++)
 		{
-			int character = c;
-			int glyph_index = stbtt_FindGlyphIndex(&font, character);
+			char character = static_cast<char>(c);
 
-			int x0, y0, x1, y1;
-			stbtt_GetGlyphBitmapBox(&font, glyph_index, font_scale, font_scale, &x0, &y0, &x1, &y1);
+			FT_Error load_char_err = FT_Load_Char(ft_face, character, FT_LOAD_RENDER);
+			ASSERT_TRUE(load_char_err == 0, "Load FreeType Glyph");
 
-			int glyph_width = x1 - x0;
-			int glyph_height = y1 - y0;
+			unsigned int glyph_width = ft_face->glyph->bitmap.width;
+			unsigned int glyph_height = ft_face->glyph->bitmap.rows;
 
 			if (bitmap_height < glyph_height)
 			{
@@ -447,34 +445,32 @@ int main(int argc, char* argv[])
 		for (int c = starting_char; c < last_char; c++)
 		{
 			int character = c;
-			int glyph_index = stbtt_FindGlyphIndex(&font, character);
 
-			int font_width, font_height, x_offset, y_offset;
-			byte* bitmap = stbtt_GetGlyphBitmap(&font, 0, font_scale, glyph_index, &font_width, &font_height, &x_offset, &y_offset);
+			FT_Error load_char_err = FT_Load_Char(ft_face, character, FT_LOAD_RENDER);
+			ASSERT_TRUE(load_char_err == 0, "Load FreeType Glyph");
 
-			int advance, lsb;
-			stbtt_GetCodepointHMetrics(&font, glyph_index, &advance, &lsb);
+			unsigned int glyph_width = ft_face->glyph->bitmap.width;
+			unsigned int glyph_height = ft_face->glyph->bitmap.rows;
 
-			int used_y_offset = (font_height + y_offset) * (-1.0f);
+			int x_offset = ft_face->glyph->bitmap_left;
+			int y_offset = ft_face->glyph->bitmap_top - ft_face->glyph->bitmap.rows;
+			auto x_advance = ft_face->glyph->advance.x;
 
-			for (int y = 0; y < font_height; y++)
+			for (int y = 0; y < glyph_height; y++)
 			{
-				int src_index = ((font_height - 1) * font_width) - y * font_width;
+				int src_index = ((glyph_height - 1) * glyph_width) - y * glyph_width;
 				int dest_index = y * bitmap_width + bitmap_x_offset;
-				memcpy(&texture_bitmap[dest_index], &bitmap[src_index], font_width);
-
-				// texture_bitmap[dest_index] = 255;
-				// texture_bitmap[dest_index + (font_width - 1)] = 255;
+				memcpy(&texture_bitmap[dest_index], &ft_face->glyph->bitmap.buffer[src_index], glyph_width);
 			}
 
 			CharData new_char_data = { 0 };
 			new_char_data.character = static_cast<char>(c);
 
-			new_char_data.width = font_width;
-			new_char_data.height = font_height;
+			new_char_data.width = glyph_width;
+			new_char_data.height = glyph_height;
 			new_char_data.x_offset = x_offset;
-			new_char_data.y_offset = used_y_offset;
-			new_char_data.advance = (float)lsb * font_scale;
+			new_char_data.y_offset = y_offset;
+			new_char_data.advance = x_advance;
 
 			float atlas_width = static_cast<float>(bitmap_width);
 			float atlas_height = static_cast<float>(bitmap_height);
@@ -482,13 +478,13 @@ int main(int argc, char* argv[])
 			new_char_data.UV_x0 = normalize_value(bitmap_x_offset, atlas_width, 1.0f);
 			new_char_data.UV_y0 = normalize_value(0.0f, atlas_height, 1.0f);
 
-			float x1 = bitmap_x_offset + font_width;
+			float x1 = bitmap_x_offset + glyph_width;
 			new_char_data.UV_x1 = normalize_value(x1, atlas_width, 1.0f);
-			new_char_data.UV_y1 = normalize_value(font_height, atlas_height, 1.0f);
+			new_char_data.UV_y1 = normalize_value(glyph_height, atlas_height, 1.0f);
 
 			g_debug_font.char_data[char_data_index++] = new_char_data;
 
-			bitmap_x_offset += font_width;
+			bitmap_x_offset += glyph_width;
 		}
 
 		CharData new_char_data = { 0 };
@@ -590,10 +586,12 @@ int main(int argc, char* argv[])
 		rect1.height = g_game_height_px;
 		rect1.width = g_game_width_px;
 
-		draw_simple_reactangle(rect1, 0.9f, 0.9f, 0.9f);
+		draw_simple_reactangle(rect1, 0.5f, 0.5f, 0.5f);
 
 		const char* my_text =
-			"Lorem ipsum is simply dummy text\n";
+			"Low\n"
+			"Life\n"
+			"Hail hilter!\n";
 
 		draw_ui_text(&g_debug_font, const_cast<char*>(my_text), 5.0f, 1.0f, 100.0f);
 
