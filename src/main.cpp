@@ -10,21 +10,8 @@
 #include <array>
 #include <iostream>
 #include <fstream>
-#include <thread>
-#include <filesystem>
-#include <mutex>
 
-#define KILOBYTES(x) (x * 1024)
-
-typedef unsigned char byte;
-
-std::mutex global_log_mutex;
-std::ofstream global_log_file_output;
-std::filesystem::path global_log_file_path = {};
-constexpr const char* GLOBAL_LOG_FILE_NAME = "Engine3D_mylog.txt";
-
-constexpr size_t GLOBAL_STRING_POOL_SIZE = 2048;
-std::array<char, GLOBAL_STRING_POOL_SIZE> g_string_pool = {0}; 
+#include "utils.h"
 
 int g_simple_rectangle_shader;
 unsigned int g_simple_rectangle_vao;
@@ -67,38 +54,21 @@ typedef struct FontData {
 	int font_height_px;
 } FontData;
 
-FontData g_debug_font_12_px = { 0 };
+MemoryArena g_game_memory = { 0 };
 
-void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line)
-{
-	if (!assertion)
-	{
-		std::cerr << "ERROR: Assertion (" << assertion_title << ") failed in: " << file << " at function: " << func << "(), line: " << line << "." << std::endl;
-		exit(1);
-	}
-}
-
-#define ASSERT_TRUE(assertion, assertion_title) assert_true(assertion, assertion_title, __FILE__, __func__, __LINE__)
-
-
-bool read_file_to_global_string_pool(const char* file_path, char** str_pointer)
+MemoryArena read_file_to_memory(const char* file_path)
 {
 	std::ifstream file_stream(file_path);
+	ASSERT_TRUE(file_stream.is_open(), "Open file");
 
-	if (!file_stream.is_open())
-	{
-		std::cerr << "Failed to open file: " << file_path << std::endl;
-		return false;
-	}
+	constexpr int read_file_bytes = KILOBYTES(5);
+	MemoryArena file_memory = memory_arena_create_subsection(&g_game_memory, read_file_bytes);
 
-	g_string_pool = { 0 }; // Reset global string pool to 0
-
-	file_stream.read(g_string_pool.data(), GLOBAL_STRING_POOL_SIZE);
+	char* read_pointer = (char*)file_memory.memory;
+	file_stream.read(read_pointer, g_game_memory.free_space());
 	file_stream.close();
 
-	*str_pointer = g_string_pool.data();
-
-	return true;
+	return file_memory;
 }
 
 int compile_shader(const char* vertex_shader_path, const char* fragment_shader_path)
@@ -107,18 +77,18 @@ int compile_shader(const char* vertex_shader_path, const char* fragment_shader_p
 	char* vertex_shader_code = nullptr;
 	char* fragment_shader_code = nullptr;
 
-	bool read_vertex_success = read_file_to_global_string_pool(vertex_shader_path, &vertex_shader_code);
-	ASSERT_TRUE(read_vertex_success, "Read vertex shader");
+	MemoryArena vertex_memory = read_file_to_memory(vertex_shader_path);
+	auto vertex_code = (char*)vertex_memory.memory;
 
 	int vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertex_shader, 1, &vertex_shader_code, NULL);
+	glShaderSource(vertex_shader, 1, &vertex_code, NULL);
 	glCompileShader(vertex_shader);
 
-	bool read_fragment_success = read_file_to_global_string_pool(fragment_shader_path, &fragment_shader_code);
-	ASSERT_TRUE(read_fragment_success, "Read fragment shader");
+	MemoryArena fragment_memory = read_file_to_memory(fragment_shader_path);
+	auto fragment_code = (char*)fragment_memory.memory;
 
 	int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragment_shader, 1, &fragment_shader_code, NULL);
+	glShaderSource(fragment_shader, 1, &fragment_code, NULL);
 	glCompileShader(fragment_shader);
 
 	shader_result = glCreateProgram();
@@ -186,18 +156,8 @@ int load_image_into_texture(const char* image_path)
 		: GL_RGBA;
 
 	glTexImage2D(GL_TEXTURE_2D, 0, use_format, x, y, 0, use_format, GL_UNSIGNED_BYTE, data);
-
 	stbi_image_free(data);
-
 	return texture;
-}
-
-float normalize_screen_px_to_ndc(int value, int max)
-{
-	float this1 = static_cast<float>(value) / static_cast<float>(max);
-	float this2 = 2.0f * this1;
-	float res = -1.0f + this2;
-	return res;
 }
 
 void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
@@ -234,16 +194,6 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(0);
 }
 
-inline float vw_into_screen_px(float value)
-{
-	return (float)(g_game_width_px) * value * 0.01f;
-}
-
-inline float vh_into_screen_px(float value)
-{
-	return (float)(g_game_height_px) * value * 0.01f;
-}
-
 void draw_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh, float red, float green, float blue)
 {
 	float* text_vertex_buffer = (float*)malloc(KILOBYTES(200));
@@ -277,9 +227,9 @@ void draw_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_v
 		int char_height_px = current.height;
 		int char_width_px = current.width;
 
-		int x_start = vw_into_screen_px(pos_x_vw) + text_offset_x_px;
+		int x_start = vw_into_screen_px(pos_x_vw, g_game_width_px) + text_offset_x_px;
 		int char_y_offset = current.y_offset;
-		int y_start = vh_into_screen_px(pos_y_vh) + text_offset_y_px - line_height_px + char_y_offset;
+		int y_start = vh_into_screen_px(pos_y_vh, g_game_height_px) + text_offset_y_px - line_height_px + char_y_offset;
 
 		float x0 = normalize_screen_px_to_ndc(x_start, g_game_width_px);
 		float y0 = normalize_screen_px_to_ndc(y_start, g_game_height_px);
@@ -304,7 +254,7 @@ void draw_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_v
 		buffer_size += sizeof(vertices);
 		draw_indicies += 30;
 
-		int advance = current.width + current.x_offset;
+		int advance = char_width_px + current.x_offset;
 		text_offset_x_px += advance;
 
 		text++;
@@ -366,16 +316,125 @@ void draw_ui_character(FontData* font_data, const char character, int x, int y)
 	glBindVertexArray(0);
 }
 
-float normalize_value(float value, float src_max, float dest_max)
+void load_font(FontData* font_data, int font_height_px)
 {
-	// Assume 0.0 is min value
-	float intermediate = value / src_max;
-	float result = dest_max * intermediate;
-	return result;
+	FT_Library ft_lib;
+	FT_Face ft_face;
+
+	FT_Error init_ft_err = FT_Init_FreeType(&ft_lib);
+	ASSERT_TRUE(init_ft_err == 0, "Init FreeType Library");
+
+	FT_Error new_face_err = FT_New_Face(ft_lib, "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf", 0, &ft_face);
+	ASSERT_TRUE(new_face_err == 0, "Load FreeType font face");
+
+	FT_Set_Pixel_Sizes(ft_face, 0, font_height_px);
+	font_data->font_height_px = font_height_px;
+
+	unsigned int bitmap_width = 0;
+	unsigned int bitmap_height = 0;
+
+	constexpr int starting_char = 32;
+	constexpr int last_char = 128;
+
+	for (int c = starting_char; c < last_char; c++)
+	{
+		char character = static_cast<char>(c);
+
+		FT_Error load_char_err = FT_Load_Char(ft_face, character, FT_LOAD_RENDER);
+		ASSERT_TRUE(load_char_err == 0, "Load FreeType Glyph");
+
+		unsigned int glyph_width = ft_face->glyph->bitmap.width;
+		unsigned int glyph_height = ft_face->glyph->bitmap.rows;
+
+		if (bitmap_height < glyph_height)
+		{
+			bitmap_height = glyph_height;
+		}
+
+		bitmap_width += glyph_width;
+	}
+
+	int bitmap_size = bitmap_width * bitmap_height;
+	byte* texture_bitmap = static_cast<byte*>(malloc(bitmap_size));
+	memset(texture_bitmap, 0x00, bitmap_size);
+
+	int bitmap_x_offset = 0;
+	int char_data_index = 0;
+
+	for (int c = starting_char; c < last_char; c++)
+	{
+		int character = c;
+
+		FT_Error load_char_err = FT_Load_Char(ft_face, character, FT_LOAD_RENDER);
+		ASSERT_TRUE(load_char_err == 0, "Load FreeType Glyph");
+
+		unsigned int glyph_width = ft_face->glyph->bitmap.width;
+		unsigned int glyph_height = ft_face->glyph->bitmap.rows;
+
+		int x_offset = ft_face->glyph->bitmap_left;
+		int y_offset = ft_face->glyph->bitmap_top - ft_face->glyph->bitmap.rows;
+		auto x_advance = ft_face->glyph->advance.x;
+
+		for (int y = 0; y < glyph_height; y++)
+		{
+			int src_index = ((glyph_height - 1) * glyph_width) - y * glyph_width;
+			int dest_index = y * bitmap_width + bitmap_x_offset;
+			memcpy(&texture_bitmap[dest_index], &ft_face->glyph->bitmap.buffer[src_index], glyph_width);
+		}
+
+		CharData new_char_data = { 0 };
+		new_char_data.character = static_cast<char>(c);
+
+		new_char_data.width = glyph_width;
+		new_char_data.height = glyph_height;
+		new_char_data.x_offset = x_offset;
+		new_char_data.y_offset = y_offset;
+		new_char_data.advance = x_advance;
+
+		float atlas_width = static_cast<float>(bitmap_width);
+		float atlas_height = static_cast<float>(bitmap_height);
+
+		new_char_data.UV_x0 = normalize_value(bitmap_x_offset, atlas_width, 1.0f);
+		new_char_data.UV_y0 = normalize_value(0.0f, atlas_height, 1.0f);
+
+		float x1 = bitmap_x_offset + glyph_width;
+		new_char_data.UV_x1 = normalize_value(x1, atlas_width, 1.0f);
+		new_char_data.UV_y1 = normalize_value(glyph_height, atlas_height, 1.0f);
+
+		font_data->char_data[char_data_index++] = new_char_data;
+
+		bitmap_x_offset += glyph_width;
+	}
+
+	CharData new_char_data = { 0 };
+	new_char_data.character = static_cast<char>(' ');
+	new_char_data.width = font_height_px / 4;
+	new_char_data.height = font_height_px;
+	font_data->char_data[0] = new_char_data; // Add spacebar
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	GLuint texture;
+	glGenTextures(1, &texture);
+
+	font_data->texture_id = static_cast<int>(texture);
+	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap_width, bitmap_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, texture_bitmap);
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 }
 
 int main(int argc, char* argv[])
 {
+	unsigned long memory_size = MEGABYTES(5);
+	memory_arena_init(&g_game_memory, memory_size);
+
 	// Init window and context
 	GLFWwindow* window;
 	{
@@ -390,126 +449,6 @@ int main(int argc, char* argv[])
 
 		int glew_init_result = glewInit();
 		ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
-	}
-
-	// Load debug font
-	{
-		FT_Library ft_lib;
-		FT_Face ft_face;
-
-		FT_Error init_ft_err = FT_Init_FreeType(&ft_lib);
-		ASSERT_TRUE(init_ft_err == 0, "Init FreeType Library");
-
-		FT_Error new_face_err = FT_New_Face(ft_lib, "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf", 0, &ft_face);
-		ASSERT_TRUE(new_face_err == 0, "Load FreeType font face");
-
-		float font_height_px = 12;
-		FT_Set_Pixel_Sizes(ft_face, 0, font_height_px);
-
-		g_debug_font_12_px.font_height_px = font_height_px;
-
-		// Iterate fontinfo and get max height / widths for bitmap atlas
-
-		unsigned int bitmap_width = 0;
-		unsigned int bitmap_height = 0;
-
-		constexpr int starting_char = 32;
-		constexpr int last_char = 128;
-
-		for (int c = starting_char; c < last_char; c++)
-		{
-			char character = static_cast<char>(c);
-
-			FT_Error load_char_err = FT_Load_Char(ft_face, character, FT_LOAD_RENDER);
-			ASSERT_TRUE(load_char_err == 0, "Load FreeType Glyph");
-
-			unsigned int glyph_width = ft_face->glyph->bitmap.width;
-			unsigned int glyph_height = ft_face->glyph->bitmap.rows;
-
-			if (bitmap_height < glyph_height)
-			{
-				bitmap_height = glyph_height;
-			}
-
-			bitmap_width += glyph_width;
-		}
-
-		int bitmap_size = bitmap_width * bitmap_height;
-		byte* texture_bitmap = static_cast<byte*>(malloc(bitmap_size));
-		memset(texture_bitmap, 0x00, bitmap_size);
-
-		// Create bitmap buffer
-
-		int bitmap_x_offset = 0;
-		int char_data_index = 0;
-
-		for (int c = starting_char; c < last_char; c++)
-		{
-			int character = c;
-
-			FT_Error load_char_err = FT_Load_Char(ft_face, character, FT_LOAD_RENDER);
-			ASSERT_TRUE(load_char_err == 0, "Load FreeType Glyph");
-
-			unsigned int glyph_width = ft_face->glyph->bitmap.width;
-			unsigned int glyph_height = ft_face->glyph->bitmap.rows;
-
-			int x_offset = ft_face->glyph->bitmap_left;
-			int y_offset = ft_face->glyph->bitmap_top - ft_face->glyph->bitmap.rows;
-			auto x_advance = ft_face->glyph->advance.x;
-
-			for (int y = 0; y < glyph_height; y++)
-			{
-				int src_index = ((glyph_height - 1) * glyph_width) - y * glyph_width;
-				int dest_index = y * bitmap_width + bitmap_x_offset;
-				memcpy(&texture_bitmap[dest_index], &ft_face->glyph->bitmap.buffer[src_index], glyph_width);
-			}
-
-			CharData new_char_data = { 0 };
-			new_char_data.character = static_cast<char>(c);
-
-			new_char_data.width = glyph_width;
-			new_char_data.height = glyph_height;
-			new_char_data.x_offset = x_offset;
-			new_char_data.y_offset = y_offset;
-			new_char_data.advance = x_advance;
-
-			float atlas_width = static_cast<float>(bitmap_width);
-			float atlas_height = static_cast<float>(bitmap_height);
-
-			new_char_data.UV_x0 = normalize_value(bitmap_x_offset, atlas_width, 1.0f);
-			new_char_data.UV_y0 = normalize_value(0.0f, atlas_height, 1.0f);
-
-			float x1 = bitmap_x_offset + glyph_width;
-			new_char_data.UV_x1 = normalize_value(x1, atlas_width, 1.0f);
-			new_char_data.UV_y1 = normalize_value(glyph_height, atlas_height, 1.0f);
-
-			g_debug_font_12_px.char_data[char_data_index++] = new_char_data;
-
-			bitmap_x_offset += glyph_width;
-		}
-
-		CharData new_char_data = { 0 };
-		new_char_data.character = static_cast<char>(' ');
-		new_char_data.width = font_height_px / 4;
-		new_char_data.height = font_height_px;
-		g_debug_font_12_px.char_data[0] = new_char_data; // Add spacebar
-
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-		GLuint texture;
-		glGenTextures(1, &texture);
-
-		g_debug_font_12_px.texture_id = static_cast<int>(texture);
-		glBindTexture(GL_TEXTURE_2D, g_debug_font_12_px.texture_id);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap_width, bitmap_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, texture_bitmap);
-
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	}
 
 	// Init simple rectangle shader
@@ -563,8 +502,15 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	memory_arena_clear(&g_game_memory);
+
 	const char* image_path = "G:/projects/game/Engine3D/resources/images/debug_img_01.png";
 	unsigned int debug_texture = load_image_into_texture(image_path);
+
+	FontData debug_font;
+	load_font(&debug_font, 24);
+
+	memory_arena_free(&g_game_memory);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -587,14 +533,17 @@ int main(int argc, char* argv[])
 		rect1.height = g_game_height_px;
 		rect1.width = g_game_width_px;
 
-		draw_simple_reactangle(rect1, 0.5f, 0.5f, 0.5f);
+		draw_simple_reactangle(rect1, 0.9f, 0.9f, 0.9f);
 
 		const char* my_text =
 			"My name YEFF\n"
 			"Low\n"
-			"Life\n";
+			"Life\n"
+			"Since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.\n"
+			"It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.\n"
+			"It was popularised in the 1960s with the release of Letraset sheets containing";
 
-		draw_ui_text(&g_debug_font_12_px, const_cast<char*>(my_text), 1.0f, 100.0f, 0.0f, 1.0f, 1.0f);
+		draw_ui_text(&debug_font, const_cast<char*>(my_text), 1.0f, 100.0f, 0.1f, 0.1f, 0.1f);
 
 		glfwSwapBuffers(window);
 	}
