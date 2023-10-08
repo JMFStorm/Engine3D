@@ -5,8 +5,9 @@ in vec2 texCoord;
 out vec4 fragOutput;
 
 uniform sampler2D ourTexture;
+uniform vec3 textColor;
 
 void main()
 {
-    fragOutput = vec4(0.7, 0.5, 0.5, texture(ourTexture, texCoord).a);
+    fragOutput = vec4(textColor.r, textColor.g, textColor.b, texture(ourTexture, texCoord).a);
 }

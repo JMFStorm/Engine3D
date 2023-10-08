@@ -67,7 +67,7 @@ typedef struct FontData {
 	int font_height_px;
 } FontData;
 
-FontData g_debug_font = { 0 };
+FontData g_debug_font_12_px = { 0 };
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line)
 {
@@ -244,7 +244,7 @@ inline float vh_into_screen_px(float value)
 	return (float)(g_game_height_px) * value * 0.01f;
 }
 
-void draw_ui_text(FontData* font_data, char* text, float font_height_vh, float pos_x_vw, float pos_y_vh)
+void draw_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh, float red, float green, float blue)
 {
 	float* text_vertex_buffer = (float*)malloc(KILOBYTES(200));
 	auto chars = font_data->char_data.data();
@@ -254,11 +254,9 @@ void draw_ui_text(FontData* font_data, char* text, float font_height_vh, float p
 	int draw_indicies = 0;
 	int length = strlen(text);
 
-	float font_scale = vh_into_screen_px(font_height_vh) / (float)font_data->font_height_px;
-
 	int text_offset_x_px = 0;
 	int text_offset_y_px = 0;
-	int line_height_px = vh_into_screen_px(font_height_vh);
+	int line_height_px = font_data->font_height_px;
 
 	// Assume font start position is top left corner
 
@@ -276,11 +274,11 @@ void draw_ui_text(FontData* font_data, char* text, float font_height_vh, float p
 		int char_index = static_cast<int>(current_char) - 32;
 		CharData current = chars[char_index];
 
-		int char_height_px = current.height * font_scale;
-		int char_width_px = current.width * font_scale;
+		int char_height_px = current.height;
+		int char_width_px = current.width;
 
 		int x_start = vw_into_screen_px(pos_x_vw) + text_offset_x_px;
-		int char_y_offset = current.y_offset * font_scale;
+		int char_y_offset = current.y_offset;
 		int y_start = vh_into_screen_px(pos_y_vh) + text_offset_y_px - line_height_px + char_y_offset;
 
 		float x0 = normalize_screen_px_to_ndc(x_start, g_game_width_px);
@@ -306,7 +304,7 @@ void draw_ui_text(FontData* font_data, char* text, float font_height_vh, float p
 		buffer_size += sizeof(vertices);
 		draw_indicies += 30;
 
-		int advance = (current.width + current.x_offset) * font_scale; // (current.advance >> 6) * font_scale;
+		int advance = current.width + current.x_offset;
 		text_offset_x_px += advance;
 
 		text++;
@@ -314,6 +312,9 @@ void draw_ui_text(FontData* font_data, char* text, float font_height_vh, float p
 
 	glUseProgram(g_ui_text_shader);
 	glBindVertexArray(g_ui_text_vao);
+
+	int color_uniform = glGetUniformLocation(g_ui_text_shader, "textColor");
+	glUniform3f(color_uniform, red, green, blue);
 
 	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
 	glBufferData(GL_ARRAY_BUFFER, buffer_size, text_vertex_buffer, GL_DYNAMIC_DRAW);
@@ -402,10 +403,10 @@ int main(int argc, char* argv[])
 		FT_Error new_face_err = FT_New_Face(ft_lib, "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf", 0, &ft_face);
 		ASSERT_TRUE(new_face_err == 0, "Load FreeType font face");
 
-		float font_height_px = 64;
+		float font_height_px = 12;
 		FT_Set_Pixel_Sizes(ft_face, 0, font_height_px);
 
-		g_debug_font.font_height_px = font_height_px;
+		g_debug_font_12_px.font_height_px = font_height_px;
 
 		// Iterate fontinfo and get max height / widths for bitmap atlas
 
@@ -482,7 +483,7 @@ int main(int argc, char* argv[])
 			new_char_data.UV_x1 = normalize_value(x1, atlas_width, 1.0f);
 			new_char_data.UV_y1 = normalize_value(glyph_height, atlas_height, 1.0f);
 
-			g_debug_font.char_data[char_data_index++] = new_char_data;
+			g_debug_font_12_px.char_data[char_data_index++] = new_char_data;
 
 			bitmap_x_offset += glyph_width;
 		}
@@ -491,19 +492,19 @@ int main(int argc, char* argv[])
 		new_char_data.character = static_cast<char>(' ');
 		new_char_data.width = font_height_px / 4;
 		new_char_data.height = font_height_px;
-		g_debug_font.char_data[0] = new_char_data; // Add spacebar
+		g_debug_font_12_px.char_data[0] = new_char_data; // Add spacebar
 
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 		GLuint texture;
 		glGenTextures(1, &texture);
 
-		g_debug_font.texture_id = static_cast<int>(texture);
-		glBindTexture(GL_TEXTURE_2D, g_debug_font.texture_id);
+		g_debug_font_12_px.texture_id = static_cast<int>(texture);
+		glBindTexture(GL_TEXTURE_2D, g_debug_font_12_px.texture_id);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap_width, bitmap_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, texture_bitmap);
@@ -568,7 +569,7 @@ int main(int argc, char* argv[])
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -589,11 +590,11 @@ int main(int argc, char* argv[])
 		draw_simple_reactangle(rect1, 0.5f, 0.5f, 0.5f);
 
 		const char* my_text =
+			"My name YEFF\n"
 			"Low\n"
-			"Life\n"
-			"Hail hilter!\n";
+			"Life\n";
 
-		draw_ui_text(&g_debug_font, const_cast<char*>(my_text), 5.0f, 1.0f, 100.0f);
+		draw_ui_text(&g_debug_font_12_px, const_cast<char*>(my_text), 1.0f, 100.0f, 0.0f, 1.0f, 1.0f);
 
 		glfwSwapBuffers(window);
 	}
