@@ -21,6 +21,12 @@ int g_ui_text_shader;
 unsigned int g_ui_text_vao;
 unsigned int g_ui_text_vbo;
 
+typedef struct KeyState {
+	int key;
+	bool pressed;
+	bool is_down;
+} KeyState;
+
 typedef struct GameMetrics {
 	unsigned long frames;
 	int game_width_px;
@@ -61,6 +67,8 @@ typedef struct FontData {
 
 MemoryArena g_game_memory = { 0 };
 GameMetrics g_game_metrics = { 0 };
+
+FontData g_debug_font;
 
 MemoryArena read_file_to_memory(const char* file_path)
 {
@@ -452,6 +460,8 @@ int main(int argc, char* argv[])
 		int glfw_init_result = glfwInit();
 		ASSERT_TRUE(glfw_init_result == GLFW_TRUE, "glfw init");
 
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
 		window = glfwCreateWindow(g_game_metrics.game_width_px, g_game_metrics.game_height_px, "My Window", NULL, NULL);
 		ASSERT_TRUE(window, "window creation");
 
@@ -461,6 +471,9 @@ int main(int argc, char* argv[])
 		int glew_init_result = glewInit();
 		ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
 	}
+
+	KeyState debug_key = { 0 };
+	debug_key.key = GLFW_KEY_A;
 
 	// Init simple rectangle shader
 	{
@@ -518,8 +531,8 @@ int main(int argc, char* argv[])
 	const char* image_path = "G:/projects/game/Engine3D/resources/images/debug_img_01.png";
 	unsigned int debug_texture = load_image_into_texture(image_path);
 
-	FontData debug_font;
-	load_font(&debug_font, 24);
+	int font_height_px = normalize_value(1.5f, 100.0f, g_game_metrics.game_height_px);
+	load_font(&g_debug_font, font_height_px);
 
 	memory_arena_free(&g_game_memory);
 
@@ -528,11 +541,17 @@ int main(int argc, char* argv[])
 
 	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
+	bool show_debug = false;
+
 	while (!glfwWindowShouldClose(window))
 	{
-		// Input logic
+		// Input
 
 		glfwPollEvents();
+
+		int key_state = glfwGetKey(window, debug_key.key);
+		debug_key.pressed = !debug_key.is_down && key_state == GLFW_PRESS;
+		debug_key.is_down = key_state == GLFW_PRESS;
 
 		// Logic
 
@@ -561,7 +580,7 @@ int main(int argc, char* argv[])
 				g_game_metrics.deltatime,
 				g_game_metrics.frames);
 
-			draw_ui_text(&debug_font, debug_str, 1.0f, 100.0f, 0.1f, 0.1f, 0.1f);
+			draw_ui_text(&g_debug_font, debug_str, 1.0f, 100.0f, 0.1f, 0.1f, 0.1f);
 		}
 
 		glfwSwapBuffers(window);
