@@ -25,6 +25,11 @@ MemoryArena g_ui_text_vertex_buffer = {0};
 int g_text_buffer_size = 0;
 int g_text_indicies = 0;
 
+typedef struct FrameData {
+	int draw_calls;
+	float deltatime;
+} FrameData;
+
 typedef struct KeyState {
 	int key;
 	bool pressed;
@@ -37,9 +42,11 @@ typedef struct GameMetrics {
 	int game_height_px;
 	int game_aspect_ratio_x;
 	int game_aspect_ratio_y;
-	float deltatime;
 	double game_time;
 	double prev_frame_game_time;
+	int fps;
+	int fps_frames;
+	int fps_prev_second;
 } GameMetrics;
 
 typedef struct {
@@ -71,7 +78,10 @@ typedef struct FontData {
 
 GameMetrics g_game_metrics = { 0 };
 
+float debug_font_vh = 1.0f;
 FontData g_debug_font;
+
+FrameData g_frame_data = { 0 };
 
 void read_file_to_memory(const char* file_path, MemoryArena* memory_arena)
 {
@@ -176,6 +186,7 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	g_frame_data.draw_calls++;
 
 	glUseProgram(0);
 	glBindVertexArray(0);
@@ -265,6 +276,7 @@ void draw_ui_text(FontData* font_data, float red, float green, float blue)
 
 	g_text_buffer_size = 0;
 	g_text_indicies = 0;
+	g_frame_data.draw_calls++;
 }
 
 void draw_ui_character(FontData* font_data, const char character, int x, int y)
@@ -300,6 +312,8 @@ void draw_ui_character(FontData* font_data, const char character, int x, int y)
 
 	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+
+	g_frame_data.draw_calls++;
 
 	glUseProgram(0);
 	glBindVertexArray(0);
@@ -448,9 +462,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 		glViewport(0, y_start, width, new_height);
 	}
 
-	std::cout << "Resize! " << height << std::endl;
-
-	int font_height_px = normalize_value(1.5f, 100.0f, g_game_metrics.game_height_px);
+	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px);
 }
 
@@ -547,7 +559,7 @@ int main(int argc, char* argv[])
 	const char* image_path = "G:/projects/game/Engine3D/resources/images/debug_img_01.png";
 	unsigned int debug_texture = load_image_into_texture(image_path);
 
-	int font_height_px = normalize_value(1.5f, 100.0f, g_game_metrics.game_height_px);
+	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px);
 
 	glEnable(GL_BLEND);
@@ -582,7 +594,16 @@ int main(int argc, char* argv[])
 
 		g_game_metrics.prev_frame_game_time = g_game_metrics.game_time;
 		g_game_metrics.game_time = glfwGetTime();
-		g_game_metrics.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time) * 1000;
+		g_frame_data.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time) * 1000;
+
+		int current_game_second = (int)g_game_metrics.game_time;
+
+		if (current_game_second - g_game_metrics.fps_prev_second > 0)
+		{
+			g_game_metrics.fps = g_game_metrics.fps_frames;
+			g_game_metrics.fps_frames = 0;
+			g_game_metrics.fps_prev_second = current_game_second;
+		}
 
 		if (plus_key.pressed)
 		{
@@ -607,19 +628,27 @@ int main(int argc, char* argv[])
 
 		// Print debug info
 		{
-			char debug_str[1024];
-			const char* debug_str_format = "Delta: %.2fms Frames: %lu";
+			char debug_str[512];
 
-			sprintf_s(debug_str, debug_str_format,
-				g_game_metrics.deltatime,
-				g_game_metrics.frames);
+			const char* fps_debug_str_format = "FPS: %d";
+			sprintf_s(debug_str, fps_debug_str_format, g_game_metrics.fps);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
 
-			append_ui_text(&g_debug_font, debug_str, 1.0f, 100.0f);
+			const char* frames_debug_str_format = "Frames: %lu";
+			sprintf_s(debug_str, frames_debug_str_format, g_game_metrics.frames);
+			append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
+
+			const char* draw_calls_debug_str_format = "Draw calls: %d";
+			sprintf_s(debug_str, draw_calls_debug_str_format, ++g_frame_data.draw_calls);
+			append_ui_text(&g_debug_font, debug_str, 11.5f, 100.0f);
+
 			draw_ui_text(&g_debug_font, 0.1f, 0.1f, 0.1f);
 		}
 
 		glfwSwapBuffers(window);
 		g_game_metrics.frames++;
+		g_game_metrics.fps_frames++;
+		g_frame_data.draw_calls = 0;
 	}
 
 	glfwTerminate(); // @Performance: Unnecessary slowdown
