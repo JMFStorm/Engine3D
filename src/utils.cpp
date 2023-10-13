@@ -36,6 +36,8 @@ void memory_arena_init(MemoryArena* arena, unsigned long size_in_bytes)
 	memset(arena->memory, 0x00, size_in_bytes);
 	arena->max_size = size_in_bytes;
 	arena->used = 0;
+
+	std::cout << "Memory arena init with " << size_in_bytes << " bytes." << std::endl;
 }
 
 MemoryArena memory_arena_create_subsection(MemoryArena* arena, unsigned long size_in_bytes)
@@ -52,10 +54,22 @@ MemoryArena memory_arena_create_subsection(MemoryArena* arena, unsigned long siz
 	unsigned long arena_pointer_index = arena->used;
 	subsection.memory = &arena->memory[arena_pointer_index];
 	arena->used += size_in_bytes;
+
+	std::cout 
+		<< "Memory arena subsection created with " 
+		<< size_in_bytes << " bytes, " 
+		<< space_left - size_in_bytes << " remaining."
+		<< std::endl;
+
 	return subsection;
 }
 
-void memory_arena_clear(MemoryArena* arena)
+void memory_arena_reset(MemoryArena* arena)
+{
+	arena->used = 0;
+}
+
+void memory_arena_wipe(MemoryArena* arena)
 {
 	memset(arena->memory, 0x00, arena->used);
 	arena->used = 0;
@@ -67,4 +81,6 @@ void memory_arena_free(MemoryArena* arena)
 	arena->max_size = 0;
 	arena->used = 0;
 	arena->memory = nullptr;
+
+	std::cout << "Memory arena freed." << std::endl;
 }

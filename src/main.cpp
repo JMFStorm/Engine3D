@@ -70,37 +70,38 @@ GameMetrics g_game_metrics = { 0 };
 
 FontData g_debug_font;
 
-MemoryArena read_file_to_memory(const char* file_path)
+void read_file_to_memory(const char* file_path, MemoryArena* memory_arena)
 {
-	std::ifstream file_stream(file_path);
+	std::ifstream file_stream(file_path, std::ios::binary | std::ios::ate);
 	ASSERT_TRUE(file_stream.is_open(), "Open file");
 
-	constexpr int read_file_bytes = KILOBYTES(5);
-	MemoryArena file_memory = memory_arena_create_subsection(&g_game_memory, read_file_bytes);
+	int free_space_bytes = memory_arena->free_space();
+	std::streampos file_size = file_stream.tellg();
+	ASSERT_TRUE(file_size <= free_space_bytes, "File size fits buffer");
 
-	char* read_pointer = (char*)file_memory.memory;
-	file_stream.read(read_pointer, g_game_memory.free_space());
+	file_stream.seekg(0, std::ios::beg);
+
+	char* read_pointer = (char*)memory_arena->memory;
+	file_stream.read(read_pointer, file_size);
 	file_stream.close();
 
-	return file_memory;
+	null_terminate_string(read_pointer, file_size);
 }
 
-int compile_shader(const char* vertex_shader_path, const char* fragment_shader_path)
+int compile_shader(const char* vertex_shader_path, const char* fragment_shader_path, MemoryArena* memory_arena)
 {
 	int shader_result = -1;
 	char* vertex_shader_code = nullptr;
 	char* fragment_shader_code = nullptr;
 
-	MemoryArena vertex_memory = read_file_to_memory(vertex_shader_path);
-	auto vertex_code = (char*)vertex_memory.memory;
-
+	read_file_to_memory(vertex_shader_path, memory_arena);
+	auto vertex_code = (char*)memory_arena->memory;
 	int vertex_shader = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vertex_shader, 1, &vertex_code, NULL);
 	glCompileShader(vertex_shader);
 
-	MemoryArena fragment_memory = read_file_to_memory(fragment_shader_path);
-	auto fragment_code = (char*)fragment_memory.memory;
-
+	read_file_to_memory(fragment_shader_path, memory_arena);
+	auto fragment_code = (char*)memory_arena->memory;
 	int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 	glShaderSource(fragment_shader, 1, &fragment_code, NULL);
 	glCompileShader(fragment_shader);
@@ -114,36 +115,6 @@ int compile_shader(const char* vertex_shader_path, const char* fragment_shader_p
 	glDeleteShader(fragment_shader);
 
 	return shader_result;
-}
-
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-	float screen_x = (float)width;
-	float screen_y = (float)height;
-
-	float x_aspect = screen_x / (float)g_game_metrics.game_aspect_ratio_x;
-	float y_aspect = screen_y / (float)g_game_metrics.game_aspect_ratio_y;
-
-	bool is_wider_for_aspect = y_aspect < x_aspect;
-
-	if (is_wider_for_aspect)
-	{
-		int new_width = (screen_y / (float)g_game_metrics.game_aspect_ratio_y) * g_game_metrics.game_aspect_ratio_x;
-		g_game_metrics.game_width_px = new_width;
-		g_game_metrics.game_height_px = height;
-
-		int x_start = (screen_x / 2) - ((float)g_game_metrics.game_width_px / 2);
-		glViewport(x_start, 0, new_width, height);
-	}
-	else
-	{
-		int new_height = (screen_x / (float)g_game_metrics.game_aspect_ratio_x) * g_game_metrics.game_aspect_ratio_y;
-		g_game_metrics.game_width_px = width;
-		g_game_metrics.game_height_px = new_height;
-
-		int y_start = (screen_y / 2) - ((float)g_game_metrics.game_height_px / 2);
-		glViewport(0, y_start, width, new_height);
-	}
 }
 
 int load_image_into_texture(const char* image_path)
@@ -268,7 +239,7 @@ void draw_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_v
 		buffer_size += sizeof(vertices);
 		draw_indicies += 30;
 
-		int advance = char_width_px + current.x_offset;
+		int advance = char_width_px + (current.x_offset == 0 ? 1 : current.x_offset);
 		text_offset_x_px += advance;
 
 		text++;
@@ -444,10 +415,44 @@ void load_font(FontData* font_data, int font_height_px)
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 }
 
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+	float screen_x = (float)width;
+	float screen_y = (float)height;
+
+	float x_aspect = screen_x / (float)g_game_metrics.game_aspect_ratio_x;
+	float y_aspect = screen_y / (float)g_game_metrics.game_aspect_ratio_y;
+
+	bool is_wider_for_aspect = y_aspect < x_aspect;
+
+	if (is_wider_for_aspect)
+	{
+		int new_width = (screen_y / (float)g_game_metrics.game_aspect_ratio_y) * g_game_metrics.game_aspect_ratio_x;
+		g_game_metrics.game_width_px = new_width;
+		g_game_metrics.game_height_px = height;
+
+		int x_start = (screen_x / 2) - ((float)g_game_metrics.game_width_px / 2);
+		glViewport(x_start, 0, new_width, height);
+	}
+	else
+	{
+		int new_height = (screen_x / (float)g_game_metrics.game_aspect_ratio_x) * g_game_metrics.game_aspect_ratio_y;
+		g_game_metrics.game_width_px = width;
+		g_game_metrics.game_height_px = new_height;
+
+		int y_start = (screen_y / 2) - ((float)g_game_metrics.game_height_px / 2);
+		glViewport(0, y_start, width, new_height);
+	}
+
+	std::cout << "Resize! " << height << std::endl;
+
+	int font_height_px = normalize_value(1.5f, 100.0f, g_game_metrics.game_height_px);
+	load_font(&g_debug_font, font_height_px);
+}
+
 int main(int argc, char* argv[])
 {
-	unsigned long memory_size = MEGABYTES(5);
-	memory_arena_init(&g_game_memory, memory_size);
+	memory_arena_init(&g_game_memory, KILOBYTES(100));
 
 	g_game_metrics.game_aspect_ratio_x = 4;
 	g_game_metrics.game_aspect_ratio_y = 3;
@@ -475,12 +480,20 @@ int main(int argc, char* argv[])
 	KeyState debug_key = { 0 };
 	debug_key.key = GLFW_KEY_A;
 
+	KeyState plus_key = { 0 };
+	plus_key.key = GLFW_KEY_KP_ADD;
+
+	KeyState minus_key = { 0 };
+	minus_key.key = GLFW_KEY_KP_SUBTRACT;
+
+	MemoryArena shader_read_buffer = memory_arena_create_subsection(&g_game_memory, KILOBYTES(5));
+
 	// Init simple rectangle shader
 	{
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_fs.glsl";
-
-		g_simple_rectangle_shader = compile_shader(vertex_shader_path, fragment_shader_path);
+		
+		g_simple_rectangle_shader = compile_shader(vertex_shader_path, fragment_shader_path, &shader_read_buffer);
 		{
 			glGenVertexArrays(1, &g_simple_rectangle_vao);
 			glGenBuffers(1, &g_simple_rectangle_vbo);
@@ -505,7 +518,7 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_fs.glsl";
 
-		g_ui_text_shader = compile_shader(vertex_shader_path, fragment_shader_path);
+		g_ui_text_shader = compile_shader(vertex_shader_path, fragment_shader_path, &shader_read_buffer);
 
 		{
 			glGenVertexArrays(1, &g_ui_text_vao);
@@ -526,7 +539,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	memory_arena_clear(&g_game_memory);
+	memory_arena_wipe(&g_game_memory);
 
 	const char* image_path = "G:/projects/game/Engine3D/resources/images/debug_img_01.png";
 	unsigned int debug_texture = load_image_into_texture(image_path);
@@ -549,15 +562,36 @@ int main(int argc, char* argv[])
 
 		glfwPollEvents();
 
-		int key_state = glfwGetKey(window, debug_key.key);
-		debug_key.pressed = !debug_key.is_down && key_state == GLFW_PRESS;
-		debug_key.is_down = key_state == GLFW_PRESS;
+		{
+			int key_state;
+
+			key_state = glfwGetKey(window, debug_key.key);
+			debug_key.pressed = !debug_key.is_down && key_state == GLFW_PRESS;
+			debug_key.is_down = key_state == GLFW_PRESS;
+
+			key_state = glfwGetKey(window, minus_key.key);
+			minus_key.pressed = !minus_key.is_down && key_state == GLFW_PRESS;
+			minus_key.is_down = key_state == GLFW_PRESS;
+
+			key_state = glfwGetKey(window, plus_key.key);
+			plus_key.pressed = !plus_key.is_down && key_state == GLFW_PRESS;
+			plus_key.is_down = key_state == GLFW_PRESS;
+		}
 
 		// Logic
 
 		g_game_metrics.prev_frame_game_time = g_game_metrics.game_time;
 		g_game_metrics.game_time = glfwGetTime();
 		g_game_metrics.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time) * 1000;
+
+		if (plus_key.pressed)
+		{
+			glfwSetWindowSize(window, g_game_metrics.game_width_px + 100, g_game_metrics.game_height_px + 100);
+		}
+		else if (minus_key.pressed)
+		{
+			glfwSetWindowSize(window, g_game_metrics.game_width_px - 100, g_game_metrics.game_height_px - 100);
+		}
 
 		// Draw
 		

@@ -31,10 +31,17 @@ inline float vh_into_screen_px(float value, float screen_height_px)
 	return (float)screen_height_px * value * 0.01f;
 }
 
+inline void null_terminate_string(char* string, int str_length)
+{
+	string[str_length + 1] = '\0';
+}
+
 void memory_arena_init(MemoryArena* arena, unsigned long size_in_bytes);
 
 MemoryArena memory_arena_create_subsection(MemoryArena* arena, unsigned long size_in_bytes);
 
-void memory_arena_clear(MemoryArena* arena);
+void memory_arena_reset(MemoryArena* arena);
+
+void memory_arena_wipe(MemoryArena* arena);
 
 void memory_arena_free(MemoryArena* arena);
