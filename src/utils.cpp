@@ -29,59 +29,25 @@ float normalize_value(float value, float src_max, float dest_max)
 
 void memory_arena_init(MemoryArena* arena, unsigned long size_in_bytes)
 {
-	ASSERT_TRUE(arena->max_size == 0, "Arena is not already allocated");
-	ASSERT_TRUE(arena->used		== 0, "Arena is not already allocated");
+	ASSERT_TRUE(arena->size == 0, "Arena is not already allocated");
 
 	arena->memory = (byte*)malloc(size_in_bytes);
 	memset(arena->memory, 0x00, size_in_bytes);
-	arena->max_size = size_in_bytes;
-	arena->used = 0;
+	arena->size = size_in_bytes;
 
-	std::cout << "Memory arena init with " << size_in_bytes << " bytes." << std::endl;
-}
-
-MemoryArena memory_arena_create_subsection(MemoryArena* arena, unsigned long size_in_bytes)
-{
-	ASSERT_TRUE(0 < size_in_bytes, "Arena is allocating bytes");
-
-	unsigned long space_left = arena->free_space();
-	ASSERT_TRUE(size_in_bytes <= space_left, "Arena has space left");
-
-	MemoryArena subsection = { 0 };
-	subsection.max_size = size_in_bytes; 
-	subsection.used = 0;
-
-	unsigned long arena_pointer_index = arena->used;
-	subsection.memory = &arena->memory[arena_pointer_index];
-	arena->used += size_in_bytes;
-
-	std::cout 
-		<< "Memory arena subsection created with " 
-		<< size_in_bytes << " bytes, " 
-		<< space_left - size_in_bytes << " remaining."
-		<< std::endl;
-
-	return subsection;
-}
-
-void memory_arena_reset(MemoryArena* arena)
-{
-	arena->used = 0;
+	std::cout << "Memory arena init with " << (size_in_bytes / 1024) << " kilobytes." << std::endl;
 }
 
 void memory_arena_wipe(MemoryArena* arena)
 {
-	memset(arena->memory, 0x00, arena->used);
-	arena->used = 0;
-
+	memset(arena->memory, 0x00, arena->size);
 	std::cout << "Memory arena wiped." << std::endl;
 }
 
 void memory_arena_free(MemoryArena* arena)
 {
 	free(arena->memory);
-	arena->max_size = 0;
-	arena->used = 0;
+	arena->size = 0;
 	arena->memory = nullptr;
 
 	std::cout << "Memory arena freed." << std::endl;

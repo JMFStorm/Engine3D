@@ -21,6 +21,10 @@ int g_ui_text_shader;
 unsigned int g_ui_text_vao;
 unsigned int g_ui_text_vbo;
 
+MemoryArena g_ui_text_vertex_buffer = {0};
+int g_text_buffer_size = 0;
+int g_text_indicies = 0;
+
 typedef struct KeyState {
 	int key;
 	bool pressed;
@@ -74,9 +78,8 @@ void read_file_to_memory(const char* file_path, MemoryArena* memory_arena)
 	std::ifstream file_stream(file_path, std::ios::binary | std::ios::ate);
 	ASSERT_TRUE(file_stream.is_open(), "Open file");
 
-	int free_space_bytes = memory_arena->free_space();
 	std::streampos file_size = file_stream.tellg();
-	ASSERT_TRUE(file_size <= free_space_bytes, "File size fits buffer");
+	ASSERT_TRUE(file_size <= memory_arena->size, "File size fits buffer");
 
 	file_stream.seekg(0, std::ios::beg);
 
@@ -170,7 +173,7 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(g_simple_rectangle_vao);
 
 	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rectangle_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -178,19 +181,17 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(0);
 }
 
-void draw_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh, float red, float green, float blue)
+void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh)
 {
-	float* text_vertex_buffer = (float*)malloc(KILOBYTES(200));
 	auto chars = font_data->char_data.data();
 	char* text_string = text;
-
-	int buffer_size = 0;
-	int draw_indicies = 0;
 	int length = strlen(text);
 
 	int text_offset_x_px = 0;
 	int text_offset_y_px = 0;
 	int line_height_px = font_data->font_height_px;
+
+	float* memory_location = (float*)g_ui_text_vertex_buffer.memory;
 
 	// Assume font start position is top left corner
 
@@ -233,17 +234,20 @@ void draw_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_v
 			x1, y0, 0.0f,		current.UV_x1, current.UV_y0  // bottom right
 		};
 
-		memcpy(&text_vertex_buffer[draw_indicies], vertices, sizeof(vertices));
+		memcpy(&memory_location[g_text_indicies], vertices, sizeof(vertices));
 
-		buffer_size += sizeof(vertices);
-		draw_indicies += 30;
+		g_text_buffer_size += sizeof(vertices);
+		g_text_indicies += 30;
 
 		int advance = char_width_px + (current.x_offset == 0 ? 1 : current.x_offset);
 		text_offset_x_px += advance;
 
 		text++;
-	} 
+	}
+}
 
+void draw_ui_text(FontData* font_data, float red, float green, float blue)
+{
 	glUseProgram(g_ui_text_shader);
 	glBindVertexArray(g_ui_text_vao);
 
@@ -251,15 +255,16 @@ void draw_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_v
 	glUniform3f(color_uniform, red, green, blue);
 
 	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
-	glBufferData(GL_ARRAY_BUFFER, buffer_size, text_vertex_buffer, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, g_text_buffer_size, g_ui_text_vertex_buffer.memory, GL_DYNAMIC_DRAW);
 
 	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
-	glDrawArrays(GL_TRIANGLES, 0, draw_indicies);
+	glDrawArrays(GL_TRIANGLES, 0, g_text_buffer_size);
 
 	glUseProgram(0);
 	glBindVertexArray(0);
 
-	free(text_vertex_buffer);
+	g_text_buffer_size = 0;
+	g_text_indicies = 0;
 }
 
 void draw_ui_character(FontData* font_data, const char character, int x, int y)
@@ -451,10 +456,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 int main(int argc, char* argv[])
 {
-	MemoryArena game_memory = { 0 };
 	MemoryArena file_memory = { 0 };
-
-	memory_arena_init(&game_memory, MEGABYTES(10));
 	memory_arena_init(&file_memory, MEGABYTES(1));
 
 	g_game_metrics.game_aspect_ratio_x = 4;
@@ -499,11 +501,9 @@ int main(int argc, char* argv[])
 		{
 			glGenVertexArrays(1, &g_simple_rectangle_vao);
 			glGenBuffers(1, &g_simple_rectangle_vbo);
-			glBindVertexArray(g_simple_rectangle_vao);
 
-			int buffer_size = (6 * 6) * sizeof(float); // vec3 + vec3 * 6 indicies
+			glBindVertexArray(g_simple_rectangle_vao);
 			glBindBuffer(GL_ARRAY_BUFFER, g_simple_rectangle_vbo);
-			glBufferData(GL_ARRAY_BUFFER, buffer_size, NULL, GL_DYNAMIC_DRAW);
 
 			// Coord attribute
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
@@ -521,15 +521,12 @@ int main(int argc, char* argv[])
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_fs.glsl";
 
 		g_ui_text_shader = compile_shader(vertex_shader_path, fragment_shader_path, &file_memory);
-
 		{
 			glGenVertexArrays(1, &g_ui_text_vao);
 			glGenBuffers(1, &g_ui_text_vbo);
-			glBindVertexArray(g_ui_text_vao);
 
-			int buffer_size = (5 * 6) * sizeof(float); // vec3 + vec2 * 6 indicies
+			glBindVertexArray(g_ui_text_vao);
 			glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
-			glBufferData(GL_ARRAY_BUFFER, buffer_size, NULL, GL_DYNAMIC_DRAW);
 
 			// Coord attribute
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
@@ -538,6 +535,12 @@ int main(int argc, char* argv[])
 			// UV attribute
 			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 			glEnableVertexAttribArray(1);
+
+			// Reserve vertex array
+			int max_chars = 1000;
+			int vertex_data_for_char = 120;
+			int text_buffer_size = vertex_data_for_char * max_chars;
+			memory_arena_init(&g_ui_text_vertex_buffer, text_buffer_size);
 		}
 	}
 
@@ -546,8 +549,6 @@ int main(int argc, char* argv[])
 
 	int font_height_px = normalize_value(1.5f, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px);
-
-	memory_arena_wipe(&file_memory);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -613,7 +614,8 @@ int main(int argc, char* argv[])
 				g_game_metrics.deltatime,
 				g_game_metrics.frames);
 
-			draw_ui_text(&g_debug_font, debug_str, 1.0f, 100.0f, 0.1f, 0.1f, 0.1f);
+			append_ui_text(&g_debug_font, debug_str, 1.0f, 100.0f);
+			draw_ui_text(&g_debug_font, 0.1f, 0.1f, 0.1f);
 		}
 
 		glfwSwapBuffers(window);

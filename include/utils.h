@@ -4,13 +4,8 @@
 typedef unsigned char byte;
 
 typedef struct MemoryArena {
-	unsigned long max_size;
-	unsigned long used;
+	unsigned long size;
 	byte* memory;
-	unsigned long free_space()
-	{
-		return max_size - used;
-	}
 } MemoryArena;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
@@ -37,10 +32,6 @@ inline void null_terminate_string(char* string, int str_length)
 }
 
 void memory_arena_init(MemoryArena* arena, unsigned long size_in_bytes);
-
-MemoryArena memory_arena_create_subsection(MemoryArena* arena, unsigned long size_in_bytes);
-
-void memory_arena_reset(MemoryArena* arena);
 
 void memory_arena_wipe(MemoryArena* arena);
 
