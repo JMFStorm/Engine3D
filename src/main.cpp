@@ -65,7 +65,6 @@ typedef struct FontData {
 	int font_height_px;
 } FontData;
 
-MemoryArena g_game_memory = { 0 };
 GameMetrics g_game_metrics = { 0 };
 
 FontData g_debug_font;
@@ -452,7 +451,11 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 int main(int argc, char* argv[])
 {
-	memory_arena_init(&g_game_memory, KILOBYTES(100));
+	MemoryArena game_memory = { 0 };
+	MemoryArena file_memory = { 0 };
+
+	memory_arena_init(&game_memory, MEGABYTES(10));
+	memory_arena_init(&file_memory, MEGABYTES(1));
 
 	g_game_metrics.game_aspect_ratio_x = 4;
 	g_game_metrics.game_aspect_ratio_y = 3;
@@ -486,14 +489,13 @@ int main(int argc, char* argv[])
 	KeyState minus_key = { 0 };
 	minus_key.key = GLFW_KEY_KP_SUBTRACT;
 
-	MemoryArena shader_read_buffer = memory_arena_create_subsection(&g_game_memory, KILOBYTES(5));
 
 	// Init simple rectangle shader
 	{
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_fs.glsl";
 		
-		g_simple_rectangle_shader = compile_shader(vertex_shader_path, fragment_shader_path, &shader_read_buffer);
+		g_simple_rectangle_shader = compile_shader(vertex_shader_path, fragment_shader_path, &file_memory);
 		{
 			glGenVertexArrays(1, &g_simple_rectangle_vao);
 			glGenBuffers(1, &g_simple_rectangle_vbo);
@@ -518,7 +520,7 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_fs.glsl";
 
-		g_ui_text_shader = compile_shader(vertex_shader_path, fragment_shader_path, &shader_read_buffer);
+		g_ui_text_shader = compile_shader(vertex_shader_path, fragment_shader_path, &file_memory);
 
 		{
 			glGenVertexArrays(1, &g_ui_text_vao);
@@ -539,19 +541,16 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	memory_arena_wipe(&g_game_memory);
-
 	const char* image_path = "G:/projects/game/Engine3D/resources/images/debug_img_01.png";
 	unsigned int debug_texture = load_image_into_texture(image_path);
 
 	int font_height_px = normalize_value(1.5f, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px);
 
-	memory_arena_free(&g_game_memory);
+	memory_arena_wipe(&file_memory);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
 	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
 	bool show_debug = false;

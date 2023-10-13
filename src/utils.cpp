@@ -73,6 +73,8 @@ void memory_arena_wipe(MemoryArena* arena)
 {
 	memset(arena->memory, 0x00, arena->used);
 	arena->used = 0;
+
+	std::cout << "Memory arena wiped." << std::endl;
 }
 
 void memory_arena_free(MemoryArena* arena)
