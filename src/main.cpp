@@ -21,7 +21,6 @@ int g_ui_text_shader;
 unsigned int g_ui_text_vao;
 unsigned int g_ui_text_vbo;
 
-MemoryArena g_ui_text_vertex_buffer = {0};
 int g_text_buffer_size = 0;
 int g_text_indicies = 0;
 
@@ -83,37 +82,40 @@ FontData g_debug_font;
 
 FrameData g_frame_data = { 0 };
 
-void read_file_to_memory(const char* file_path, MemoryArena* memory_arena)
+MemoryBuffer g_temp_memory = { 0 };
+MemoryBuffer g_ui_text_vertex_buffer = { 0 };
+
+void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
 	std::ifstream file_stream(file_path, std::ios::binary | std::ios::ate);
 	ASSERT_TRUE(file_stream.is_open(), "Open file");
 
 	std::streampos file_size = file_stream.tellg();
-	ASSERT_TRUE(file_size <= memory_arena->size, "File size fits buffer");
+	ASSERT_TRUE(file_size <= buffer->size, "File size fits buffer");
 
 	file_stream.seekg(0, std::ios::beg);
 
-	char* read_pointer = (char*)memory_arena->memory;
+	char* read_pointer = (char*)buffer->memory;
 	file_stream.read(read_pointer, file_size);
 	file_stream.close();
 
 	null_terminate_string(read_pointer, file_size);
 }
 
-int compile_shader(const char* vertex_shader_path, const char* fragment_shader_path, MemoryArena* memory_arena)
+int compile_shader(const char* vertex_shader_path, const char* fragment_shader_path, MemoryBuffer* buffer)
 {
 	int shader_result = -1;
 	char* vertex_shader_code = nullptr;
 	char* fragment_shader_code = nullptr;
 
-	read_file_to_memory(vertex_shader_path, memory_arena);
-	auto vertex_code = (char*)memory_arena->memory;
+	read_file_to_memory(vertex_shader_path, buffer);
+	auto vertex_code = (char*)buffer->memory;
 	int vertex_shader = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vertex_shader, 1, &vertex_code, NULL);
 	glCompileShader(vertex_shader);
 
-	read_file_to_memory(fragment_shader_path, memory_arena);
-	auto fragment_code = (char*)memory_arena->memory;
+	read_file_to_memory(fragment_shader_path, buffer);
+	auto fragment_code = (char*)buffer->memory;
 	int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 	glShaderSource(fragment_shader, 1, &fragment_code, NULL);
 	glCompileShader(fragment_shader);
@@ -358,11 +360,12 @@ void load_font(FontData* font_data, int font_height_px)
 	}
 
 	int bitmap_size = bitmap_width * bitmap_height;
-	byte* texture_bitmap = static_cast<byte*>(malloc(bitmap_size));
-	memset(texture_bitmap, 0x00, bitmap_size);
+	ASSERT_TRUE(bitmap_size < g_temp_memory.size, "Font bitmap buffer fits");
 
 	int bitmap_x_offset = 0;
 	int char_data_index = 0;
+
+	byte* bitmap_memory = g_temp_memory.memory;
 
 	for (int c = starting_char; c < last_char; c++)
 	{
@@ -382,7 +385,7 @@ void load_font(FontData* font_data, int font_height_px)
 		{
 			int src_index = ((glyph_height - 1) * glyph_width) - y * glyph_width;
 			int dest_index = y * bitmap_width + bitmap_x_offset;
-			memcpy(&texture_bitmap[dest_index], &ft_face->glyph->bitmap.buffer[src_index], glyph_width);
+			memcpy(&bitmap_memory[dest_index], &ft_face->glyph->bitmap.buffer[src_index], glyph_width);
 		}
 
 		CharData new_char_data = { 0 };
@@ -417,10 +420,13 @@ void load_font(FontData* font_data, int font_height_px)
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-	GLuint texture;
-	glGenTextures(1, &texture);
+	GLuint prev_texture = font_data->texture_id;
+	glDeleteTextures(1, &prev_texture);
 
-	font_data->texture_id = static_cast<int>(texture);
+	GLuint new_texture;
+	glGenTextures(1, &new_texture);
+
+	font_data->texture_id = static_cast<int>(new_texture);
 	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -428,7 +434,7 @@ void load_font(FontData* font_data, int font_height_px)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap_width, bitmap_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, texture_bitmap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap_width, bitmap_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, bitmap_memory);
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 }
@@ -468,8 +474,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 int main(int argc, char* argv[])
 {
-	MemoryArena file_memory = { 0 };
-	memory_arena_init(&file_memory, MEGABYTES(1));
+	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
 
 	g_game_metrics.game_aspect_ratio_x = 4;
 	g_game_metrics.game_aspect_ratio_y = 3;
@@ -509,7 +514,7 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_fs.glsl";
 		
-		g_simple_rectangle_shader = compile_shader(vertex_shader_path, fragment_shader_path, &file_memory);
+		g_simple_rectangle_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 		{
 			glGenVertexArrays(1, &g_simple_rectangle_vao);
 			glGenBuffers(1, &g_simple_rectangle_vbo);
@@ -532,7 +537,7 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_fs.glsl";
 
-		g_ui_text_shader = compile_shader(vertex_shader_path, fragment_shader_path, &file_memory);
+		g_ui_text_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 		{
 			glGenVertexArrays(1, &g_ui_text_vao);
 			glGenBuffers(1, &g_ui_text_vbo);
@@ -552,7 +557,7 @@ int main(int argc, char* argv[])
 			int max_chars = 1000;
 			int vertex_data_for_char = 120;
 			int text_buffer_size = vertex_data_for_char * max_chars;
-			memory_arena_init(&g_ui_text_vertex_buffer, text_buffer_size);
+			memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text verticies"));
 		}
 	}
 

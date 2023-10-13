@@ -3,10 +3,11 @@
 
 typedef unsigned char byte;
 
-typedef struct MemoryArena {
+typedef struct MemoryBuffer {
 	unsigned long size;
 	byte* memory;
-} MemoryArena;
+	char name[32];
+} MemoryBuffer;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
 
@@ -31,8 +32,8 @@ inline void null_terminate_string(char* string, int str_length)
 	string[str_length + 1] = '\0';
 }
 
-void memory_arena_init(MemoryArena* arena, unsigned long size_in_bytes);
+void memory_buffer_mallocate(MemoryBuffer* buffer, unsigned long size_in_bytes, char* name);
 
-void memory_arena_wipe(MemoryArena* arena);
+void memory_buffer_wipe(MemoryBuffer* buffer);
 
-void memory_arena_free(MemoryArena* arena);
+void memory_buffer_free(MemoryBuffer* buffer);

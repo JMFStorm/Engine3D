@@ -6,7 +6,13 @@ void assert_true(bool assertion, const char* assertion_title, const char* file, 
 {
 	if (!assertion)
 	{
-		std::cerr << "ERROR: Assertion (" << assertion_title << ") failed in: " << file << " at function: " << func << "(), line: " << line << "." << std::endl;
+		std::cerr 
+			<< "ERROR: Assertion (" << assertion_title 
+			<< ") failed in: " << file 
+			<< " at function: " << func 
+			<< "(), line: " << line 
+			<< "." << std::endl;
+
 		exit(1);
 	}
 }
@@ -27,28 +33,31 @@ float normalize_value(float value, float src_max, float dest_max)
 	return result;
 }
 
-void memory_arena_init(MemoryArena* arena, unsigned long size_in_bytes)
+void memory_buffer_mallocate(MemoryBuffer* buffer, unsigned long size_in_bytes, char* name)
 {
-	ASSERT_TRUE(arena->size == 0, "Arena is not already allocated");
+	ASSERT_TRUE(buffer->size == 0, "Arena is not already allocated");
 
-	arena->memory = (byte*)malloc(size_in_bytes);
-	memset(arena->memory, 0x00, size_in_bytes);
-	arena->size = size_in_bytes;
+	buffer->memory = (byte*)malloc(size_in_bytes);
+	memset(buffer->memory, 0x00, size_in_bytes);
+	buffer->size = size_in_bytes;
+	strcpy_s(buffer->name, name);
 
-	std::cout << "Memory arena init with " << (size_in_bytes / 1024) << " kilobytes." << std::endl;
+	std::cout 
+		<< "Buffer '" << name << "' mallocated with " 
+		<< (size_in_bytes / 1024) << " kilobytes." << std::endl;
 }
 
-void memory_arena_wipe(MemoryArena* arena)
+void memory_buffer_wipe(MemoryBuffer* buffer)
 {
-	memset(arena->memory, 0x00, arena->size);
-	std::cout << "Memory arena wiped." << std::endl;
+	memset(buffer->memory, 0x00, buffer->size);
+	std::cout << "Buffer " << buffer->name << " wiped to zero." << std::endl;
 }
 
-void memory_arena_free(MemoryArena* arena)
+void memory_buffer_free(MemoryBuffer* buffer)
 {
-	free(arena->memory);
-	arena->size = 0;
-	arena->memory = nullptr;
+	free(buffer->memory);
+	buffer->size = 0;
+	buffer->memory = nullptr;
 
-	std::cout << "Memory arena freed." << std::endl;
+	std::cout << "Buffer " << buffer->name << " freed." << std::endl;
 }
