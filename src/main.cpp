@@ -21,11 +21,16 @@ int g_ui_text_shader;
 unsigned int g_ui_text_vao;
 unsigned int g_ui_text_vbo;
 
-int g_game_width_px = 1600;
-int g_game_height_px = 1200;
-
-int g_game_aspect_ratio_x = 4;
-int g_game_aspect_ratio_y = 3;
+typedef struct GameMetrics {
+	unsigned long frames;
+	int game_width_px;
+	int game_height_px;
+	int game_aspect_ratio_x;
+	int game_aspect_ratio_y;
+	float deltatime;
+	double game_time;
+	double prev_frame_game_time;
+} GameMetrics;
 
 typedef struct {
 	int bot_left_x;
@@ -55,6 +60,7 @@ typedef struct FontData {
 } FontData;
 
 MemoryArena g_game_memory = { 0 };
+GameMetrics g_game_metrics = { 0 };
 
 MemoryArena read_file_to_memory(const char* file_path)
 {
@@ -107,27 +113,27 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	float screen_x = (float)width;
 	float screen_y = (float)height;
 
-	float x_aspect = screen_x / (float)g_game_aspect_ratio_x;
-	float y_aspect = screen_y / (float)g_game_aspect_ratio_y;
+	float x_aspect = screen_x / (float)g_game_metrics.game_aspect_ratio_x;
+	float y_aspect = screen_y / (float)g_game_metrics.game_aspect_ratio_y;
 
 	bool is_wider_for_aspect = y_aspect < x_aspect;
 
 	if (is_wider_for_aspect)
 	{
-		int new_width = (screen_y / (float)g_game_aspect_ratio_y) * g_game_aspect_ratio_x;
-		g_game_width_px = new_width;
-		g_game_height_px = height;
+		int new_width = (screen_y / (float)g_game_metrics.game_aspect_ratio_y) * g_game_metrics.game_aspect_ratio_x;
+		g_game_metrics.game_width_px = new_width;
+		g_game_metrics.game_height_px = height;
 
-		int x_start = (screen_x / 2) - ((float)g_game_width_px / 2);
+		int x_start = (screen_x / 2) - ((float)g_game_metrics.game_width_px / 2);
 		glViewport(x_start, 0, new_width, height);
 	}
 	else
 	{
-		int new_height = (screen_x / (float)g_game_aspect_ratio_x) * g_game_aspect_ratio_y;
-		g_game_width_px = width;
-		g_game_height_px = new_height;
+		int new_height = (screen_x / (float)g_game_metrics.game_aspect_ratio_x) * g_game_metrics.game_aspect_ratio_y;
+		g_game_metrics.game_width_px = width;
+		g_game_metrics.game_height_px = new_height;
 
-		int y_start = (screen_y / 2) - ((float)g_game_height_px / 2);
+		int y_start = (screen_y / 2) - ((float)g_game_metrics.game_height_px / 2);
 		glViewport(0, y_start, width, new_height);
 	}
 }
@@ -165,11 +171,11 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glUseProgram(g_simple_rectangle_shader);
 	glBindVertexArray(g_simple_rectangle_vao);
 
-	float x0 = normalize_screen_px_to_ndc(rect.bot_left_x, g_game_width_px);
-	float y0 = normalize_screen_px_to_ndc(rect.bot_left_y, g_game_height_px);
+	float x0 = normalize_screen_px_to_ndc(rect.bot_left_x, g_game_metrics.game_width_px);
+	float y0 = normalize_screen_px_to_ndc(rect.bot_left_y, g_game_metrics.game_height_px);
 
-	float x1 = normalize_screen_px_to_ndc(rect.bot_left_x + rect.width, g_game_width_px);
-	float y1 = normalize_screen_px_to_ndc(rect.bot_left_y + rect.height, g_game_height_px);
+	float x1 = normalize_screen_px_to_ndc(rect.bot_left_x + rect.width, g_game_metrics.game_width_px);
+	float y1 = normalize_screen_px_to_ndc(rect.bot_left_y + rect.height, g_game_metrics.game_height_px);
 
 	float vertices[] =
 	{
@@ -227,15 +233,15 @@ void draw_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_v
 		int char_height_px = current.height;
 		int char_width_px = current.width;
 
-		int x_start = vw_into_screen_px(pos_x_vw, g_game_width_px) + text_offset_x_px;
+		int x_start = vw_into_screen_px(pos_x_vw, g_game_metrics.game_width_px) + text_offset_x_px;
 		int char_y_offset = current.y_offset;
-		int y_start = vh_into_screen_px(pos_y_vh, g_game_height_px) + text_offset_y_px - line_height_px + char_y_offset;
+		int y_start = vh_into_screen_px(pos_y_vh, g_game_metrics.game_height_px) + text_offset_y_px - line_height_px + char_y_offset;
 
-		float x0 = normalize_screen_px_to_ndc(x_start, g_game_width_px);
-		float y0 = normalize_screen_px_to_ndc(y_start, g_game_height_px);
+		float x0 = normalize_screen_px_to_ndc(x_start, g_game_metrics.game_width_px);
+		float y0 = normalize_screen_px_to_ndc(y_start, g_game_metrics.game_height_px);
 
-		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px, g_game_width_px);
-		float y1 = normalize_screen_px_to_ndc(y_start + char_height_px, g_game_height_px);
+		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px, g_game_metrics.game_width_px);
+		float y1 = normalize_screen_px_to_ndc(y_start + char_height_px, g_game_metrics.game_height_px);
 
 		float vertices[] =
 		{
@@ -285,11 +291,11 @@ void draw_ui_character(FontData* font_data, const char character, int x, int y)
 
 	CharData current = font_data->char_data.data()[char_index];
 
-	float x0 = normalize_screen_px_to_ndc(x, g_game_width_px);
-	float y0 = normalize_screen_px_to_ndc(y, g_game_height_px);
+	float x0 = normalize_screen_px_to_ndc(x, g_game_metrics.game_width_px);
+	float y0 = normalize_screen_px_to_ndc(y, g_game_metrics.game_height_px);
 
-	float x1 = normalize_screen_px_to_ndc(x + current.width, g_game_width_px);
-	float y1 = normalize_screen_px_to_ndc(y + current.height, g_game_height_px);
+	float x1 = normalize_screen_px_to_ndc(x + current.width, g_game_metrics.game_width_px);
+	float y1 = normalize_screen_px_to_ndc(y + current.height, g_game_metrics.game_height_px);
 
 	float vertices[] =
 	{
@@ -435,13 +441,18 @@ int main(int argc, char* argv[])
 	unsigned long memory_size = MEGABYTES(5);
 	memory_arena_init(&g_game_memory, memory_size);
 
+	g_game_metrics.game_aspect_ratio_x = 4;
+	g_game_metrics.game_aspect_ratio_y = 3;
+	g_game_metrics.game_width_px = 1600;
+	g_game_metrics.game_height_px = 1200;
+
 	// Init window and context
 	GLFWwindow* window;
 	{
 		int glfw_init_result = glfwInit();
 		ASSERT_TRUE(glfw_init_result == GLFW_TRUE, "glfw init");
 
-		window = glfwCreateWindow(g_game_width_px, g_game_height_px, "My Window", NULL, NULL);
+		window = glfwCreateWindow(g_game_metrics.game_width_px, g_game_metrics.game_height_px, "My Window", NULL, NULL);
 		ASSERT_TRUE(window, "window creation");
 
 		glfwMakeContextCurrent(window);
@@ -519,9 +530,15 @@ int main(int argc, char* argv[])
 
 	while (!glfwWindowShouldClose(window))
 	{
-		// Input
+		// Input logic
 
 		glfwPollEvents();
+
+		// Logic
+
+		g_game_metrics.prev_frame_game_time = g_game_metrics.game_time;
+		g_game_metrics.game_time = glfwGetTime();
+		g_game_metrics.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time) * 1000;
 
 		// Draw
 		
@@ -530,22 +547,25 @@ int main(int argc, char* argv[])
 		Rectangle2D rect1 = { 0 };
 		rect1.bot_left_x = 0;
 		rect1.bot_left_y = 0;
-		rect1.height = g_game_height_px;
-		rect1.width = g_game_width_px;
+		rect1.height = g_game_metrics.game_height_px;
+		rect1.width = g_game_metrics.game_width_px;
 
 		draw_simple_reactangle(rect1, 0.9f, 0.9f, 0.9f);
 
-		const char* my_text =
-			"My name YEFF\n"
-			"Low\n"
-			"Life\n"
-			"Since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.\n"
-			"It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.\n"
-			"It was popularised in the 1960s with the release of Letraset sheets containing";
+		// Print debug info
+		{
+			char debug_str[1024];
+			const char* debug_str_format = "Delta: %.2fms Frames: %lu";
 
-		draw_ui_text(&debug_font, const_cast<char*>(my_text), 1.0f, 100.0f, 0.1f, 0.1f, 0.1f);
+			sprintf_s(debug_str, debug_str_format,
+				g_game_metrics.deltatime,
+				g_game_metrics.frames);
+
+			draw_ui_text(&debug_font, debug_str, 1.0f, 100.0f, 0.1f, 0.1f, 0.1f);
+		}
 
 		glfwSwapBuffers(window);
+		g_game_metrics.frames++;
 	}
 
 	glfwTerminate(); // @Performance: Unnecessary slowdown

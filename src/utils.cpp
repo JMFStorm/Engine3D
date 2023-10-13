@@ -40,6 +40,8 @@ void memory_arena_init(MemoryArena* arena, unsigned long size_in_bytes)
 
 MemoryArena memory_arena_create_subsection(MemoryArena* arena, unsigned long size_in_bytes)
 {
+	ASSERT_TRUE(0 < size_in_bytes, "Arena is allocating bytes");
+
 	unsigned long space_left = arena->free_space();
 	ASSERT_TRUE(size_in_bytes <= space_left, "Arena has space left");
 
@@ -55,7 +57,7 @@ MemoryArena memory_arena_create_subsection(MemoryArena* arena, unsigned long siz
 
 void memory_arena_clear(MemoryArena* arena)
 {
-	memset(arena->memory, 0x00, arena->max_size);
+	memset(arena->memory, 0x00, arena->used);
 	arena->used = 0;
 }
 
