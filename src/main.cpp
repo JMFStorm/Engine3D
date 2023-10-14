@@ -37,11 +37,33 @@ typedef struct FrameData {
 	float deltatime;
 } FrameData;
 
-typedef struct KeyState {
+typedef struct ButtonState {
 	int key;
 	bool pressed;
 	bool is_down;
-} KeyState;
+} ButtonState;
+
+typedef struct GameInputs {
+	ButtonState mouse1;
+	ButtonState mouse2;
+	ButtonState q;
+	ButtonState w;
+	ButtonState e;
+	ButtonState r;
+	ButtonState a;
+	ButtonState s;
+	ButtonState d;
+	ButtonState f;
+	ButtonState z;
+	ButtonState x;
+	ButtonState c;
+	ButtonState v;
+	ButtonState esc;
+	ButtonState plus;
+	ButtonState minus;
+} GameInputs;
+
+GameInputs g_game_inputs = {};
 
 typedef struct GameMetrics {
 	unsigned long frames;
@@ -90,6 +112,8 @@ FontData g_debug_font;
 
 FrameData g_frame_data = { 0 };
 
+int g_max_UI_chars = 1000;
+
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
@@ -98,8 +122,6 @@ typedef struct GameCamera {
 	glm::vec3 front_vec;
 	glm::vec3 up_vec;
 	float yaw = -90.0f;	
-	// yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing 
-	// to the right so we initially rotate a bit to the left.
 	float pitch = 0.0f;
 	float fov = 45.0f;
 	float look_sensitivity = 0.1f;
@@ -616,14 +638,27 @@ int main(int argc, char* argv[])
 		ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
 	}
 
-	KeyState debug_key = { 0 };
-	debug_key.key = GLFW_KEY_A;
+	// Init game inputs
+	{
+		g_game_inputs.mouse1 = ButtonState { .key = GLFW_MOUSE_BUTTON_1 };
+		g_game_inputs.mouse2 = ButtonState { .key = GLFW_MOUSE_BUTTON_2 };
 
-	KeyState plus_key = { 0 };
-	plus_key.key = GLFW_KEY_KP_ADD;
-
-	KeyState minus_key = { 0 };
-	minus_key.key = GLFW_KEY_KP_SUBTRACT;
+		g_game_inputs.q = ButtonState { .key = GLFW_KEY_Q };
+		g_game_inputs.w = ButtonState { .key = GLFW_KEY_W };
+		g_game_inputs.e = ButtonState { .key = GLFW_KEY_E };
+		g_game_inputs.r = ButtonState { .key = GLFW_KEY_R };
+		g_game_inputs.a = ButtonState { .key = GLFW_KEY_A };
+		g_game_inputs.s = ButtonState { .key = GLFW_KEY_S };
+		g_game_inputs.d = ButtonState { .key = GLFW_KEY_D };
+		g_game_inputs.f = ButtonState { .key = GLFW_KEY_F };
+		g_game_inputs.z = ButtonState { .key = GLFW_KEY_Z };
+		g_game_inputs.x = ButtonState { .key = GLFW_KEY_X };
+		g_game_inputs.c = ButtonState { .key = GLFW_KEY_C };
+		g_game_inputs.v = ButtonState { .key = GLFW_KEY_V };
+		g_game_inputs.esc = ButtonState { .key = GLFW_KEY_ESCAPE };
+		g_game_inputs.plus = ButtonState { .key = GLFW_KEY_KP_ADD };
+		g_game_inputs.minus = ButtonState { .key = GLFW_KEY_KP_SUBTRACT };
+	}
 
 	// Init simple rectangle shader
 	{
@@ -670,9 +705,8 @@ int main(int argc, char* argv[])
 			glEnableVertexAttribArray(1);
 
 			// Reserve vertex array
-			int max_chars = 1000;
 			int vertex_data_for_char = 120;
-			int text_buffer_size = vertex_data_for_char * max_chars;
+			int text_buffer_size = vertex_data_for_char * g_max_UI_chars;
 			memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text verticies"));
 		}
 	}
@@ -737,19 +771,28 @@ int main(int argc, char* argv[])
 		glfwPollEvents();
 
 		{
+			if (glfwGetKey(window, g_game_inputs.esc.key) == GLFW_PRESS)
+			{
+				glfwSetWindowShouldClose(window, true);
+			}
+
 			int key_state;
 
-			key_state = glfwGetKey(window, debug_key.key);
-			debug_key.pressed = !debug_key.is_down && key_state == GLFW_PRESS;
-			debug_key.is_down = key_state == GLFW_PRESS;
+			key_state = glfwGetMouseButton(window, g_game_inputs.mouse2.key);
+			g_game_inputs.mouse2.pressed = !g_game_inputs.mouse2.is_down && key_state == GLFW_PRESS;
+			g_game_inputs.mouse2.is_down = key_state == GLFW_PRESS;
 
-			key_state = glfwGetKey(window, minus_key.key);
-			minus_key.pressed = !minus_key.is_down && key_state == GLFW_PRESS;
-			minus_key.is_down = key_state == GLFW_PRESS;
+			key_state = glfwGetKey(window, g_game_inputs.esc.key);
+			g_game_inputs.esc.pressed = !g_game_inputs.esc.is_down && key_state == GLFW_PRESS;
+			g_game_inputs.esc.is_down = key_state == GLFW_PRESS;
 
-			key_state = glfwGetKey(window, plus_key.key);
-			plus_key.pressed = !plus_key.is_down && key_state == GLFW_PRESS;
-			plus_key.is_down = key_state == GLFW_PRESS;
+			key_state = glfwGetKey(window, g_game_inputs.minus.key);
+			g_game_inputs.minus.pressed = !g_game_inputs.minus.is_down && key_state == GLFW_PRESS;
+			g_game_inputs.minus.is_down = key_state == GLFW_PRESS;
+
+			key_state = glfwGetKey(window, g_game_inputs.plus.key);
+			g_game_inputs.plus.pressed = !g_game_inputs.plus.is_down && key_state == GLFW_PRESS;
+			g_game_inputs.plus.is_down = key_state == GLFW_PRESS;
 		}
 
 		// Logic
@@ -767,17 +810,19 @@ int main(int argc, char* argv[])
 			g_game_metrics.fps_prev_second = current_game_second;
 		}
 
-		if (plus_key.pressed)
+		if (g_game_inputs.plus.pressed)
 		{
 			glfwSetWindowSize(window, g_game_metrics.game_width_px + 100, g_game_metrics.game_height_px + 100);
 		}
-		else if (minus_key.pressed)
+		else if (g_game_inputs.minus.pressed)
 		{
 			glfwSetWindowSize(window, g_game_metrics.game_width_px - 100, g_game_metrics.game_height_px - 100);
 		}
 
-		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+		if (g_game_inputs.mouse2.is_down)
 		{
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
 			g_mouse_movement_x *= g_game_camera.look_sensitivity;
 			g_mouse_movement_y *= g_game_camera.look_sensitivity;
 
@@ -799,6 +844,10 @@ int main(int argc, char* argv[])
 			new_camera_front.z = sin(glm::radians(g_game_camera.yaw)) * cos(glm::radians(g_game_camera.pitch));
 
 			g_game_camera.front_vec = glm::normalize(new_camera_front);
+		}
+		else
+		{
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 
 		float camera_speed = 2.5f * g_frame_data.deltatime;
