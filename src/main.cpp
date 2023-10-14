@@ -11,11 +11,19 @@
 #include <iostream>
 #include <fstream>
 
+#include <glm.hpp>
+#include <gtc/matrix_transform.hpp>
+#include <gtc/type_ptr.hpp>
+
 #include "utils.h"
 
 int g_simple_rectangle_shader;
 unsigned int g_simple_rectangle_vao;
 unsigned int g_simple_rectangle_vbo;
+
+int g_mesh_shader;
+unsigned int g_mesh_vao;
+unsigned int g_mesh_vbo;
 
 int g_ui_text_shader;
 unsigned int g_ui_text_vao;
@@ -102,9 +110,51 @@ void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 	null_terminate_string(read_pointer, file_size);
 }
 
+bool check_shader_compile_error(GLuint shader)
+{
+	GLint success;
+	constexpr int length = 512;
+	GLchar infoLog[length];
+
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+
+	if (!success)
+	{
+		glGetShaderInfoLog(shader, length, NULL, infoLog);
+		std::cout 
+			<< "ERROR::SHADER_COMPILATION_ERROR: "
+			<< infoLog << std::endl;
+
+		return false;
+	}
+
+	return true; // Returns success
+}
+
+bool check_shader_link_error(GLuint shader)
+{
+	GLint success;
+	constexpr int length = 512;
+	GLchar infoLog[length];
+
+	glGetProgramiv(shader, GL_LINK_STATUS, &success);
+
+	if (!success)
+	{
+		glGetProgramInfoLog(shader, length, NULL, infoLog);
+		std::cout 
+			<< "ERROR::PROGRAM_LINKING_ERROR: "
+			<< infoLog << std::endl;
+
+		return false;
+	}
+
+	return true; // Returns success
+}
+
 int compile_shader(const char* vertex_shader_path, const char* fragment_shader_path, MemoryBuffer* buffer)
 {
-	int shader_result = -1;
+	int shader_id;
 	char* vertex_shader_code = nullptr;
 	char* fragment_shader_code = nullptr;
 
@@ -114,21 +164,30 @@ int compile_shader(const char* vertex_shader_path, const char* fragment_shader_p
 	glShaderSource(vertex_shader, 1, &vertex_code, NULL);
 	glCompileShader(vertex_shader);
 
+	bool vs_compile_success = check_shader_compile_error(vertex_shader);
+	ASSERT_TRUE(vs_compile_success, "Vertex shader compile");
+
 	read_file_to_memory(fragment_shader_path, buffer);
 	auto fragment_code = (char*)buffer->memory;
 	int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 	glShaderSource(fragment_shader, 1, &fragment_code, NULL);
 	glCompileShader(fragment_shader);
 
-	shader_result = glCreateProgram();
-	glAttachShader(shader_result, vertex_shader);
-	glAttachShader(shader_result, fragment_shader);
-	glLinkProgram(shader_result);
+	bool fs_compile_success = check_shader_compile_error(fragment_shader);
+	ASSERT_TRUE(fs_compile_success, "Fragment shader compile");
+
+	shader_id = glCreateProgram();
+	glAttachShader(shader_id, vertex_shader);
+	glAttachShader(shader_id, fragment_shader);
+	glLinkProgram(shader_id);
+
+	bool link_success = check_shader_link_error(shader_id);
+	ASSERT_TRUE(link_success, "Shader program link");
 
 	glDeleteShader(vertex_shader);
 	glDeleteShader(fragment_shader);
 
-	return shader_result;
+	return shader_id;
 }
 
 int load_image_into_texture(const char* image_path)
@@ -182,11 +241,35 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 		x1, y0, 0.0f,	r, g, b  // bottom right
 	};
 
-	glBindVertexArray(g_simple_rectangle_vao);
-
 	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rectangle_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	g_frame_data.draw_calls++;
+
+	glUseProgram(0);
+	glBindVertexArray(0);
+}
+
+void draw_mesh(int texture_id)
+{
+	glUseProgram(g_mesh_shader);
+	glBindVertexArray(g_mesh_vao);
+
+	glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
+	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)4 / (float)3, 0.1f, 100.0f);
+
+	unsigned int model_loc = glGetUniformLocation(g_mesh_shader, "model");
+	unsigned int view_loc = glGetUniformLocation(g_mesh_shader, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader, "projection");
+
+	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	g_frame_data.draw_calls++;
 
@@ -508,7 +591,6 @@ int main(int argc, char* argv[])
 	KeyState minus_key = { 0 };
 	minus_key.key = GLFW_KEY_KP_SUBTRACT;
 
-
 	// Init simple rectangle shader
 	{
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_vs.glsl";
@@ -558,6 +640,43 @@ int main(int argc, char* argv[])
 			int vertex_data_for_char = 120;
 			int text_buffer_size = vertex_data_for_char * max_chars;
 			memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text verticies"));
+		}
+	}
+
+	// Init mesh shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_fs.glsl";
+
+		g_mesh_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		{
+			glGenVertexArrays(1, &g_mesh_vao);
+			glGenBuffers(1, &g_mesh_vbo);
+
+			glBindVertexArray(g_mesh_vao);
+			glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
+
+			float vertices[] =
+			{
+				// Coords				// UV
+				-0.5f, -0.5f, 0.0f,		0.0f, 0.0f, // bottom left
+				 0.5f, -0.5f, 0.0f,		1.0f, 0.0f, // bottom right
+				-0.5f,  0.5f, 0.0f,		0.0f, 1.0f, // top left
+
+				-0.5f,  0.5f, 0.0f,		0.0f, 1.0f, // top left 
+				 0.5f,  0.5f, 0.0f,		1.0f, 1.0f, // top right
+				 0.5f, -0.5f, 0.0f,		1.0f, 0.0f  // bottom right
+			};
+
+			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+			// Coord attribute
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+			glEnableVertexAttribArray(0);
+
+			// UV attribute
+			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+			glEnableVertexAttribArray(1);
 		}
 	}
 
@@ -630,6 +749,8 @@ int main(int argc, char* argv[])
 		rect1.width = g_game_metrics.game_width_px;
 
 		draw_simple_reactangle(rect1, 0.9f, 0.9f, 0.9f);
+
+		draw_mesh(debug_texture);
 
 		// Print debug info
 		{

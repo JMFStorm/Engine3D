@@ -29,7 +29,7 @@ inline float vh_into_screen_px(float value, float screen_height_px)
 
 inline void null_terminate_string(char* string, int str_length)
 {
-	string[str_length + 1] = '\0';
+	string[str_length] = '\0';
 }
 
 void memory_buffer_mallocate(MemoryBuffer* buffer, unsigned long size_in_bytes, char* name);
