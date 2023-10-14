@@ -97,9 +97,18 @@ typedef struct GameCamera {
 	glm::vec3 position;
 	glm::vec3 front_vec;
 	glm::vec3 up_vec;
+	float yaw = -90.0f;	
+	// yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing 
+	// to the right so we initially rotate a bit to the left.
+	float pitch = 0.0f;
+	float fov = 45.0f;
+	float look_sensitivity = 0.1f;
 } GameCamera;
 
 GameCamera g_game_camera = {};
+
+float g_mouse_movement_x = 0;
+float g_mouse_movement_y = 0;
 
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
@@ -265,7 +274,7 @@ void draw_mesh(int texture_id)
 	glBindVertexArray(g_mesh_vao);
 
 	glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)4 / (float)3, 0.1f, 100.0f);
+	glm::mat4 projection = glm::perspective(glm::radians(g_game_camera.fov), (float)4 / (float)3, 0.1f, 100.0f);
 
 	auto new_mat_4 = g_game_camera.position + g_game_camera.front_vec;
 	glm::mat4 view = glm::lookAt(g_game_camera.position, new_mat_4, g_game_camera.up_vec);
@@ -565,6 +574,20 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	load_font(&g_debug_font, font_height_px);
 }
 
+float lastX = 0;
+float lastY = 0;
+
+void mouse_move_callback(GLFWwindow* window, double xposIn, double yposIn)
+{
+	float xpos = static_cast<float>(xposIn);
+	float ypos = static_cast<float>(yposIn);
+
+	g_mouse_movement_x = xpos - lastX;
+	g_mouse_movement_y = lastY - ypos;
+	lastX = xpos;
+	lastY = ypos;
+}
+
 int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
@@ -587,6 +610,7 @@ int main(int argc, char* argv[])
 
 		glfwMakeContextCurrent(window);
 		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+		glfwSetCursorPosCallback(window, mouse_move_callback);
 
 		int glew_init_result = glewInit();
 		ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
@@ -732,7 +756,7 @@ int main(int argc, char* argv[])
 
 		g_game_metrics.prev_frame_game_time = g_game_metrics.game_time;
 		g_game_metrics.game_time = glfwGetTime();
-		g_frame_data.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time) * 1000;
+		g_frame_data.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time);
 
 		int current_game_second = (int)g_game_metrics.game_time;
 
@@ -752,7 +776,32 @@ int main(int argc, char* argv[])
 			glfwSetWindowSize(window, g_game_metrics.game_width_px - 100, g_game_metrics.game_height_px - 100);
 		}
 
-		float camera_speed = 2.5f * g_frame_data.deltatime * 0.001f;
+		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+		{
+			g_mouse_movement_x *= g_game_camera.look_sensitivity;
+			g_mouse_movement_y *= g_game_camera.look_sensitivity;
+
+			g_game_camera.yaw += g_mouse_movement_x;
+			g_game_camera.pitch += g_mouse_movement_y;
+
+			if (g_game_camera.pitch > 89.0f)
+			{
+				g_game_camera.pitch = 89.0f;
+			}
+			else if (g_game_camera.pitch < -89.0f)
+			{
+				g_game_camera.pitch = -89.0f;
+			}
+
+			glm::vec3 new_camera_front;
+			new_camera_front.x = cos(glm::radians(g_game_camera.yaw)) * cos(glm::radians(g_game_camera.pitch));
+			new_camera_front.y = sin(glm::radians(g_game_camera.pitch));
+			new_camera_front.z = sin(glm::radians(g_game_camera.yaw)) * cos(glm::radians(g_game_camera.pitch));
+
+			g_game_camera.front_vec = glm::normalize(new_camera_front);
+		}
+
+		float camera_speed = 2.5f * g_frame_data.deltatime;
 
 		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 		{
@@ -789,17 +838,18 @@ int main(int argc, char* argv[])
 		{
 			char debug_str[512];
 
-			const char* fps_debug_str_format = "FPS: %d";
-			sprintf_s(debug_str, fps_debug_str_format, g_game_metrics.fps);
+			const char* fps_debug_str_format = "FPS: %d Delta: %.2fms";
+			float display_deltatime = g_frame_data.deltatime * 1000;
+			sprintf_s(debug_str, fps_debug_str_format, g_game_metrics.fps, display_deltatime);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
 
 			const char* frames_debug_str_format = "Frames: %lu";
 			sprintf_s(debug_str, frames_debug_str_format, g_game_metrics.frames);
-			append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
+			append_ui_text(&g_debug_font, debug_str, 10.0f, 100.0f);
 
 			const char* draw_calls_debug_str_format = "Draw calls: %d";
 			sprintf_s(debug_str, draw_calls_debug_str_format, ++g_frame_data.draw_calls);
-			append_ui_text(&g_debug_font, debug_str, 11.5f, 100.0f);
+			append_ui_text(&g_debug_font, debug_str, 17.0f, 100.0f);
 
 			const char* camera_pos_debug_str_format = "Camera X=%.2f Y=%.2f Z=%.2f";
 			sprintf_s(debug_str, camera_pos_debug_str_format, g_game_camera.position.x, g_game_camera.position.y, g_game_camera.position.z);
