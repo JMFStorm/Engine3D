@@ -93,6 +93,14 @@ FrameData g_frame_data = { 0 };
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
+typedef struct GameCamera {
+	glm::vec3 position;
+	glm::vec3 front_vec;
+	glm::vec3 up_vec;
+} GameCamera;
+
+GameCamera g_game_camera = {};
+
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
 	std::ifstream file_stream(file_path, std::ios::binary | std::ios::ate);
@@ -257,9 +265,11 @@ void draw_mesh(int texture_id)
 	glBindVertexArray(g_mesh_vao);
 
 	glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
 	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)4 / (float)3, 0.1f, 100.0f);
 
+	auto new_mat_4 = g_game_camera.position + g_game_camera.front_vec;
+	glm::mat4 view = glm::lookAt(g_game_camera.position, new_mat_4, g_game_camera.up_vec);
+	
 	unsigned int model_loc = glGetUniformLocation(g_mesh_shader, "model");
 	unsigned int view_loc = glGetUniformLocation(g_mesh_shader, "view");
 	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader, "projection");
@@ -692,6 +702,10 @@ int main(int argc, char* argv[])
 
 	bool show_debug = false;
 
+	g_game_camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
+	g_game_camera.front_vec = glm::vec3(0.0f, 0.0f, -1.0f);
+	g_game_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
+
 	while (!glfwWindowShouldClose(window))
 	{
 		// Input
@@ -738,6 +752,25 @@ int main(int argc, char* argv[])
 			glfwSetWindowSize(window, g_game_metrics.game_width_px - 100, g_game_metrics.game_height_px - 100);
 		}
 
+		float camera_speed = 2.5f * g_frame_data.deltatime * 0.001f;
+
+		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		{
+			g_game_camera.position += camera_speed * g_game_camera.front_vec;
+		}
+		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		{
+			g_game_camera.position -= camera_speed * g_game_camera.front_vec;
+		}
+		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		{
+			g_game_camera.position -= glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * camera_speed;
+		}
+		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		{
+			g_game_camera.position += glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * camera_speed;
+		}
+
 		// Draw
 		
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -767,6 +800,10 @@ int main(int argc, char* argv[])
 			const char* draw_calls_debug_str_format = "Draw calls: %d";
 			sprintf_s(debug_str, draw_calls_debug_str_format, ++g_frame_data.draw_calls);
 			append_ui_text(&g_debug_font, debug_str, 11.5f, 100.0f);
+
+			const char* camera_pos_debug_str_format = "Camera X=%.2f Y=%.2f Z=%.2f";
+			sprintf_s(debug_str, camera_pos_debug_str_format, g_game_camera.position.x, g_game_camera.position.y, g_game_camera.position.z);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
 
 			draw_ui_text(&g_debug_font, 0.1f, 0.1f, 0.1f);
 		}
