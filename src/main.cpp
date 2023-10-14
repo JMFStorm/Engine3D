@@ -15,6 +15,7 @@
 #include <gtc/matrix_transform.hpp>
 #include <gtc/type_ptr.hpp>
 
+#include "intermediate_ui.h"
 #include "utils.h"
 
 int g_simple_rectangle_shader;
@@ -35,6 +36,9 @@ int g_text_indicies = 0;
 typedef struct FrameData {
 	int draw_calls;
 	float deltatime;
+	bool mouse_clicked;
+	int mouse_click_x;
+	int mouse_click_y;
 } FrameData;
 
 typedef struct ButtonState {
@@ -606,6 +610,7 @@ void mouse_move_callback(GLFWwindow* window, double xposIn, double yposIn)
 
 	g_mouse_movement_x = xpos - lastX;
 	g_mouse_movement_y = lastY - ypos;
+
 	lastX = xpos;
 	lastY = ypos;
 }
@@ -758,25 +763,37 @@ int main(int argc, char* argv[])
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
-	bool show_debug = false;
-
 	g_game_camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
 	g_game_camera.front_vec = glm::vec3(0.0f, 0.0f, -1.0f);
 	g_game_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
 
+	UIButton test_button = {
+		.click_event = []() { std::cout << "Hello" << std::endl; },
+		.pos_x_vw = 30.0f,
+		.pos_y_vh = 10.0f,
+		.width_vw = 12.0f,
+		.height_vh = 6.0f,
+		.text = "alala"
+	};
+
 	while (!glfwWindowShouldClose(window))
 	{
-		// Input
-
 		glfwPollEvents();
 
+		// Register inputs
 		{
+			g_frame_data.mouse_clicked = false;
+
 			if (glfwGetKey(window, g_game_inputs.esc.key) == GLFW_PRESS)
 			{
 				glfwSetWindowShouldClose(window, true);
 			}
 
 			int key_state;
+
+			key_state = glfwGetMouseButton(window, g_game_inputs.mouse1.key);
+			g_game_inputs.mouse1.pressed = !g_game_inputs.mouse1.is_down && key_state == GLFW_PRESS;
+			g_game_inputs.mouse1.is_down = key_state == GLFW_PRESS;
 
 			key_state = glfwGetMouseButton(window, g_game_inputs.mouse2.key);
 			g_game_inputs.mouse2.pressed = !g_game_inputs.mouse2.is_down && key_state == GLFW_PRESS;
@@ -817,6 +834,27 @@ int main(int argc, char* argv[])
 		else if (g_game_inputs.minus.pressed)
 		{
 			glfwSetWindowSize(window, g_game_metrics.game_width_px - 100, g_game_metrics.game_height_px - 100);
+		}
+
+		if (g_game_inputs.mouse1.pressed)
+		{
+			double xpos, ypos;
+			glfwGetCursorPos(window, &xpos, &ypos);
+
+			g_frame_data.mouse_clicked = true;
+			g_frame_data.mouse_click_x = xpos;
+			g_frame_data.mouse_click_y = g_game_metrics.game_height_px - ypos;
+
+			int bot_left_x = vh_into_screen_px(test_button.pos_x_vw, g_game_metrics.game_width_px);
+			int bot_left_y = vh_into_screen_px(test_button.pos_y_vh, g_game_metrics.game_height_px);
+			int height = vh_into_screen_px(test_button.height_vh, g_game_metrics.game_width_px);
+			int width = vh_into_screen_px(test_button.width_vw, g_game_metrics.game_height_px);
+
+			if (bot_left_x <= g_frame_data.mouse_click_x && g_frame_data.mouse_click_x <= bot_left_x + width
+				&& bot_left_y <= g_frame_data.mouse_click_y && g_frame_data.mouse_click_y <= bot_left_y + height)
+			{
+				test_button.click_event();
+			}
 		}
 
 		if (g_game_inputs.mouse2.is_down)
@@ -882,6 +920,22 @@ int main(int argc, char* argv[])
 		draw_simple_reactangle(rect1, 0.9f, 0.9f, 0.9f);
 
 		draw_mesh(debug_texture);
+
+		// Draw UI buttons
+		{
+			Rectangle2D rect_button = { 0 };
+			rect_button.bot_left_x = vh_into_screen_px(test_button.pos_x_vw, g_game_metrics.game_width_px);
+			rect_button.bot_left_y = vh_into_screen_px(test_button.pos_y_vh, g_game_metrics.game_height_px);
+			rect_button.height = vh_into_screen_px(test_button.height_vh, g_game_metrics.game_width_px);
+			rect_button.width = vh_into_screen_px(test_button.width_vw, g_game_metrics.game_height_px);
+
+			draw_simple_reactangle(rect_button, 0.8f, 0.8f, 0.8f);
+
+			float text_x = test_button.pos_x_vw + (float)test_button.width_vw / 2;
+			float text_y = test_button.pos_y_vh + (float)test_button.height_vh / 2;
+			append_ui_text(&g_debug_font, test_button.text, text_x, text_y);
+			draw_ui_text(&g_debug_font, 0.1f, 0.1f, 0.1f);
+		}
 
 		// Print debug info
 		{
