@@ -115,7 +115,10 @@ typedef struct FontData {
 GameMetrics g_game_metrics = { 0 };
 
 float debug_font_vh = 1.0f;
+const char* g_debug_font_path = "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf";
+
 FontData g_debug_font;
+FontData g_game_menu_font;
 
 FrameData g_frame_data = { 0 };
 
@@ -238,7 +241,7 @@ int compile_shader(const char* vertex_shader_path, const char* fragment_shader_p
 	return shader_id;
 }
 
-int load_image_into_texture(const char* image_path)
+int load_image_into_texture(const char* image_path, bool use_nearest)
 {
 	unsigned int texture;
 	int x, y, n;
@@ -250,10 +253,12 @@ int load_image_into_texture(const char* image_path)
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 
+	GLint texture_mode = use_nearest ? GL_NEAREST : GL_LINEAR;
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texture_mode);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texture_mode);
 
 	ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
 
@@ -385,7 +390,7 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 		g_text_buffer_size += sizeof(vertices);
 		g_text_indicies += 30;
 
-		int advance = char_width_px + (current.x_offset == 0 ? 1 : current.x_offset);
+		int advance = char_width_px + (current.x_offset < 1 ? 1 : current.x_offset);
 		text_offset_x_px += advance;
 
 		text++;
@@ -454,7 +459,7 @@ void draw_ui_character(FontData* font_data, const char character, int x, int y)
 	glBindVertexArray(0);
 }
 
-void load_font(FontData* font_data, int font_height_px)
+void load_font(FontData* font_data, int font_height_px, const char* font_path)
 {
 	FT_Library ft_lib;
 	FT_Face ft_face;
@@ -462,7 +467,7 @@ void load_font(FontData* font_data, int font_height_px)
 	FT_Error init_ft_err = FT_Init_FreeType(&ft_lib);
 	ASSERT_TRUE(init_ft_err == 0, "Init FreeType Library");
 
-	FT_Error new_face_err = FT_New_Face(ft_lib, "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf", 0, &ft_face);
+	FT_Error new_face_err = FT_New_Face(ft_lib, font_path, 0, &ft_face);
 	ASSERT_TRUE(new_face_err == 0, "Load FreeType font face");
 
 	FT_Set_Pixel_Sizes(ft_face, 0, font_height_px);
@@ -471,8 +476,13 @@ void load_font(FontData* font_data, int font_height_px)
 	unsigned int bitmap_width = 0;
 	unsigned int bitmap_height = 0;
 
-	constexpr int starting_char = 32;
+	constexpr int starting_char = 33; // ('!')
 	constexpr int last_char = 128;
+
+	int spacebar_width = font_height_px / 4;
+
+	// Add spacebar
+	bitmap_width += spacebar_width;
 
 	for (int c = starting_char; c < last_char; c++)
 	{
@@ -495,10 +505,30 @@ void load_font(FontData* font_data, int font_height_px)
 	int bitmap_size = bitmap_width * bitmap_height;
 	ASSERT_TRUE(bitmap_size < g_temp_memory.size, "Font bitmap buffer fits");
 
-	int bitmap_x_offset = 0;
-	int char_data_index = 0;
-
 	byte* bitmap_memory = g_temp_memory.memory;
+
+	// Add spacebar
+	{
+		for (int y = 0; y < bitmap_height; y++)
+		{
+			int src_index = ((bitmap_height - 1) * spacebar_width) - y * spacebar_width;
+			int dest_index = y * bitmap_width;
+			memset(&bitmap_memory[dest_index], 0x00, spacebar_width);
+		}
+
+		CharData new_char_data = { 0 };
+		new_char_data.character = static_cast<char>(' ');
+		new_char_data.width = spacebar_width;
+		new_char_data.height = font_height_px;
+		new_char_data.UV_x0 = 0.0f;
+		new_char_data.UV_y0 = 1.0f;
+		new_char_data.UV_x1 = normalize_value(spacebar_width, bitmap_width, 1.0f);
+		new_char_data.UV_y1 = 1.0f;
+		font_data->char_data[0] = new_char_data;
+	}
+
+	int bitmap_x_offset = spacebar_width;
+	int char_data_index = 1;
 
 	for (int c = starting_char; c < last_char; c++)
 	{
@@ -545,12 +575,6 @@ void load_font(FontData* font_data, int font_height_px)
 		bitmap_x_offset += glyph_width;
 	}
 
-	CharData new_char_data = { 0 };
-	new_char_data.character = static_cast<char>(' ');
-	new_char_data.width = font_height_px / 4;
-	new_char_data.height = font_height_px;
-	font_data->char_data[0] = new_char_data; // Add spacebar
-
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	GLuint prev_texture = font_data->texture_id;
@@ -564,8 +588,8 @@ void load_font(FontData* font_data, int font_height_px)
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap_width, bitmap_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, bitmap_memory);
 
@@ -602,7 +626,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	}
 
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
-	load_font(&g_debug_font, font_height_px);
+	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 }
 
 float lastX = 0;
@@ -770,10 +794,14 @@ int main(int argc, char* argv[])
 	}
 
 	const char* image_path = "G:/projects/game/Engine3D/resources/images/debug_img_01.png";
-	unsigned int debug_texture = load_image_into_texture(image_path);
+	unsigned int debug_texture = load_image_into_texture(image_path, true);
 
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
-	load_font(&g_debug_font, font_height_px);
+	load_font(&g_debug_font, font_height_px, g_debug_font_path);
+
+	int font_height_px2 = normalize_value(debug_font_vh * 2.5f, 100.0f, g_game_metrics.game_height_px);
+	const char* game_menu_font_path = "G:/projects/game/Engine3D/resources/fonts/Almarai-Regular.ttf";
+	load_font(&g_game_menu_font, font_height_px2, game_menu_font_path);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -964,6 +992,11 @@ int main(int argc, char* argv[])
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
 
 			draw_ui_text(&g_debug_font, 0.1f, 0.1f, 0.1f);
+
+
+			const char* text1 = "The choice of method depends on factors such as the type of game you're developing, the level of detail and\nquality you require for text rendering, and the platforms you're targeting. In general, using a font texture atlas is a practical\nand efficient choice for many 2D games, but exploring alternative methods may be necessary for more complex requirements or\nspecific artistic styles.";
+			append_ui_text(&g_game_menu_font, const_cast<char*>(text1), 2.0f, 40.0f);
+			draw_ui_text(&g_game_menu_font, 0.1f, 0.1f, 0.1f);
 		}
 
 		ImGui::Render();
