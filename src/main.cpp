@@ -139,6 +139,8 @@ GameCamera g_game_camera = {};
 float g_mouse_movement_x = 0;
 float g_mouse_movement_y = 0;
 
+float mesh_rotation = 0;
+
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
 	std::ifstream file_stream(file_path, std::ios::binary | std::ios::ate);
@@ -302,7 +304,7 @@ void draw_mesh(int texture_id)
 	glUseProgram(g_mesh_shader);
 	glBindVertexArray(g_mesh_vao);
 
-	glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(mesh_rotation), glm::vec3(1.0f, 0.0f, 0.0f));
 	glm::mat4 projection = glm::perspective(glm::radians(g_game_camera.fov), (float)4 / (float)3, 0.1f, 100.0f);
 
 	auto new_mat_4 = g_game_camera.position + g_game_camera.front_vec;
@@ -793,12 +795,13 @@ int main(int argc, char* argv[])
 
 			// Right hand panel
 			{
-				ImGui::SetNextWindowSize(ImVec2(200, -1));
-				ImGui::SetNextWindowPos(ImVec2(g_game_metrics.game_width_px - 200, 0));
+				ImGui::SetNextWindowSize(ImVec2(300, -1));
+				ImGui::SetNextWindowPos(ImVec2(g_game_metrics.game_width_px - 300, 0));
 
 				ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
 
 				ImGui::Begin("Right Panel", nullptr, flags);
+				ImGui::InputFloat("Float Value", &mesh_rotation, 0.0f, 0.0f, "%.2f");
 				ImGui::Text("This is a fixed panel on the right side");
 				ImGui::End();
 			}
@@ -868,6 +871,11 @@ int main(int argc, char* argv[])
 			g_frame_data.mouse_clicked = true;
 			g_frame_data.mouse_click_x = xpos;
 			g_frame_data.mouse_click_y = g_game_metrics.game_height_px - ypos;
+
+			std::cout 
+				<< "Mouse click - x:" << g_frame_data.mouse_click_x 
+				<< " y:" << g_frame_data.mouse_click_y 
+				<< std::endl;
 		}
 
 		if (g_game_inputs.mouse2.is_down)
