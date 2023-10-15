@@ -15,7 +15,10 @@
 #include <gtc/matrix_transform.hpp>
 #include <gtc/type_ptr.hpp>
 
-#include "intermediate_ui.h"
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_glfw.h>
+#include <imgui/imgui_impl_opengl3.h>
+
 #include "utils.h"
 
 int g_simple_rectangle_shader;
@@ -643,6 +646,17 @@ int main(int argc, char* argv[])
 		ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
 	}
 
+	// Init ImGui
+	{
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO();
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+		ImGui_ImplGlfw_InitForOpenGL(window, true);
+		ImGui_ImplOpenGL3_Init("#version 330 core");
+	}
+
 	// Init game inputs
 	{
 		g_game_inputs.mouse1 = ButtonState { .key = GLFW_MOUSE_BUTTON_1 };
@@ -767,18 +781,28 @@ int main(int argc, char* argv[])
 	g_game_camera.front_vec = glm::vec3(0.0f, 0.0f, -1.0f);
 	g_game_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
 
-	UIButton test_button = {
-		.click_event = []() { std::cout << "Hello" << std::endl; },
-		.pos_x_vw = 30.0f,
-		.pos_y_vh = 10.0f,
-		.width_vw = 12.0f,
-		.height_vh = 6.0f,
-		.text = "alala"
-	};
-
 	while (!glfwWindowShouldClose(window))
 	{
 		glfwPollEvents();
+
+		// ImGui logic
+		{
+			ImGui_ImplGlfw_NewFrame();
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui::NewFrame();
+
+			// Right hand panel
+			{
+				ImGui::SetNextWindowSize(ImVec2(200, -1));
+				ImGui::SetNextWindowPos(ImVec2(g_game_metrics.game_width_px - 200, 0));
+
+				ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
+
+				ImGui::Begin("Right Panel", nullptr, flags);
+				ImGui::Text("This is a fixed panel on the right side");
+				ImGui::End();
+			}
+		}
 
 		// Register inputs
 		{
@@ -844,17 +868,6 @@ int main(int argc, char* argv[])
 			g_frame_data.mouse_clicked = true;
 			g_frame_data.mouse_click_x = xpos;
 			g_frame_data.mouse_click_y = g_game_metrics.game_height_px - ypos;
-
-			int bot_left_x = vh_into_screen_px(test_button.pos_x_vw, g_game_metrics.game_width_px);
-			int bot_left_y = vh_into_screen_px(test_button.pos_y_vh, g_game_metrics.game_height_px);
-			int height = vh_into_screen_px(test_button.height_vh, g_game_metrics.game_width_px);
-			int width = vh_into_screen_px(test_button.width_vw, g_game_metrics.game_height_px);
-
-			if (bot_left_x <= g_frame_data.mouse_click_x && g_frame_data.mouse_click_x <= bot_left_x + width
-				&& bot_left_y <= g_frame_data.mouse_click_y && g_frame_data.mouse_click_y <= bot_left_y + height)
-			{
-				test_button.click_event();
-			}
 		}
 
 		if (g_game_inputs.mouse2.is_down)
@@ -921,22 +934,6 @@ int main(int argc, char* argv[])
 
 		draw_mesh(debug_texture);
 
-		// Draw UI buttons
-		{
-			Rectangle2D rect_button = { 0 };
-			rect_button.bot_left_x = vh_into_screen_px(test_button.pos_x_vw, g_game_metrics.game_width_px);
-			rect_button.bot_left_y = vh_into_screen_px(test_button.pos_y_vh, g_game_metrics.game_height_px);
-			rect_button.height = vh_into_screen_px(test_button.height_vh, g_game_metrics.game_width_px);
-			rect_button.width = vh_into_screen_px(test_button.width_vw, g_game_metrics.game_height_px);
-
-			draw_simple_reactangle(rect_button, 0.8f, 0.8f, 0.8f);
-
-			float text_x = test_button.pos_x_vw + (float)test_button.width_vw / 2;
-			float text_y = test_button.pos_y_vh + (float)test_button.height_vh / 2;
-			append_ui_text(&g_debug_font, test_button.text, text_x, text_y);
-			draw_ui_text(&g_debug_font, 0.1f, 0.1f, 0.1f);
-		}
-
 		// Print debug info
 		{
 			char debug_str[512];
@@ -960,6 +957,9 @@ int main(int argc, char* argv[])
 
 			draw_ui_text(&g_debug_font, 0.1f, 0.1f, 0.1f);
 		}
+
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 		glfwSwapBuffers(window);
 		g_game_metrics.frames++;
