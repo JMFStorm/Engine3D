@@ -118,7 +118,6 @@ float debug_font_vh = 1.0f;
 const char* g_debug_font_path = "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf";
 
 FontData g_debug_font;
-FontData g_game_menu_font;
 
 FrameData g_frame_data = { 0 };
 
@@ -363,7 +362,7 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 		int char_height_px = current.height;
 		int char_width_px = current.width;
 
-		int x_start = vw_into_screen_px(pos_x_vw, g_game_metrics.game_width_px) + text_offset_x_px;
+		int x_start = vw_into_screen_px(pos_x_vw, g_game_metrics.game_width_px) + current.x_offset + text_offset_x_px;
 		int char_y_offset = current.y_offset;
 		int y_start = vh_into_screen_px(pos_y_vh, g_game_metrics.game_height_px) + text_offset_y_px - line_height_px + char_y_offset;
 
@@ -390,9 +389,7 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 		g_text_buffer_size += sizeof(vertices);
 		g_text_indicies += 30;
 
-		int advance = char_width_px + (current.x_offset < 1 ? 1 : current.x_offset);
-		text_offset_x_px += advance;
-
+		text_offset_x_px += current.advance;
 		text++;
 	}
 }
@@ -519,6 +516,7 @@ void load_font(FontData* font_data, int font_height_px, const char* font_path)
 		CharData new_char_data = { 0 };
 		new_char_data.character = static_cast<char>(' ');
 		new_char_data.width = spacebar_width;
+		new_char_data.advance = spacebar_width;
 		new_char_data.height = font_height_px;
 		new_char_data.UV_x0 = 0.0f;
 		new_char_data.UV_y0 = 1.0f;
@@ -542,7 +540,6 @@ void load_font(FontData* font_data, int font_height_px, const char* font_path)
 
 		int x_offset = ft_face->glyph->bitmap_left;
 		int y_offset = ft_face->glyph->bitmap_top - ft_face->glyph->bitmap.rows;
-		auto x_advance = ft_face->glyph->advance.x;
 
 		for (int y = 0; y < glyph_height; y++)
 		{
@@ -551,6 +548,12 @@ void load_font(FontData* font_data, int font_height_px, const char* font_path)
 			memcpy(&bitmap_memory[dest_index], &ft_face->glyph->bitmap.buffer[src_index], glyph_width);
 		}
 
+		// To advance cursors for next glyph
+		// bitshift by 6 to get value in pixels
+		// (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
+		// (note that advance is number of 1/64 pixels)
+		int advance = (ft_face->glyph->advance.x >> 6);
+
 		CharData new_char_data = { 0 };
 		new_char_data.character = static_cast<char>(c);
 
@@ -558,7 +561,7 @@ void load_font(FontData* font_data, int font_height_px, const char* font_path)
 		new_char_data.height = glyph_height;
 		new_char_data.x_offset = x_offset;
 		new_char_data.y_offset = y_offset;
-		new_char_data.advance = x_advance;
+		new_char_data.advance = advance;
 
 		float atlas_width = static_cast<float>(bitmap_width);
 		float atlas_height = static_cast<float>(bitmap_height);
@@ -799,10 +802,6 @@ int main(int argc, char* argv[])
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 
-	int font_height_px2 = normalize_value(debug_font_vh * 2.5f, 100.0f, g_game_metrics.game_height_px);
-	const char* game_menu_font_path = "G:/projects/game/Engine3D/resources/fonts/Almarai-Regular.ttf";
-	load_font(&g_game_menu_font, font_height_px2, game_menu_font_path);
-
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
@@ -992,11 +991,6 @@ int main(int argc, char* argv[])
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
 
 			draw_ui_text(&g_debug_font, 0.1f, 0.1f, 0.1f);
-
-
-			const char* text1 = "The choice of method depends on factors such as the type of game you're developing, the level of detail and\nquality you require for text rendering, and the platforms you're targeting. In general, using a font texture atlas is a practical\nand efficient choice for many 2D games, but exploring alternative methods may be necessary for more complex requirements or\nspecific artistic styles.";
-			append_ui_text(&g_game_menu_font, const_cast<char*>(text1), 2.0f, 40.0f);
-			draw_ui_text(&g_game_menu_font, 0.1f, 0.1f, 0.1f);
 		}
 
 		ImGui::Render();
