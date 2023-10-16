@@ -838,9 +838,9 @@ int main(int argc, char* argv[])
 				ImGui::Begin("Properties", nullptr, 0);
 
 				Plane* selected_plane;
-				int current_planes_count = g_scene_planes.size();
+				int planes_last_index = g_scene_planes.size() - 1;
 
-				if (0 <= g_selected_plane_index && g_selected_plane_index <= current_planes_count - 1)
+				if (0 <= g_selected_plane_index && g_selected_plane_index <= planes_last_index)
 				{
 					selected_plane = &g_scene_planes[g_selected_plane_index];
 				}
@@ -859,19 +859,28 @@ int main(int argc, char* argv[])
 					};
 
 					g_scene_planes.push_back(new_plane);
+					g_selected_plane_index = ++planes_last_index;
 				}
 
 				ImGui::Text("Mesh properties");
 				ImGui::InputInt("Plane id", &g_selected_plane_index);
 
-				if (g_selected_plane_index < 0) g_selected_plane_index = 0;
-				if (g_selected_plane_index > current_planes_count - 1) g_selected_plane_index = current_planes_count - 1;
+				if (g_selected_plane_index < -1) g_selected_plane_index = -1;
+				if (g_selected_plane_index > planes_last_index) g_selected_plane_index = planes_last_index;
 
 				if (selected_plane)
 				{
 					ImGui::InputFloat3("Translation", &selected_plane->translation[0], "%.2f");
 					ImGui::InputFloat3("Rotation", &selected_plane->rotation[0], "%.2f");
 					ImGui::InputFloat3("Scale", &selected_plane->scale[0], "%.2f");
+
+					if (ImGui::Button("Delete plane"))
+					{
+						Plane last_plane = g_scene_planes[planes_last_index];
+						g_scene_planes[g_selected_plane_index] = last_plane;
+						g_scene_planes.pop_back();
+						g_selected_plane_index = -1;
+					}
 				}
 
 				ImGui::Text("Game window");
