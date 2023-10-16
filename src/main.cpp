@@ -10,6 +10,7 @@
 #include <array>
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
@@ -126,11 +127,10 @@ GameMetrics g_game_metrics = { 0 };
 float debug_font_vh = 1.0f;
 const char* g_debug_font_path = "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf";
 
+int g_max_UI_chars = 1000;
 FontData g_debug_font;
 
 FrameData g_frame_data = { 0 };
-
-int g_max_UI_chars = 1000;
 
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
@@ -141,10 +141,10 @@ typedef struct GameCamera {
 	glm::vec3 up_vec;
 	float yaw = -90.0f;	
 	float pitch = 0.0f;
-	float fov = 45.0f;
+	float fov = 60.0f;
 	float aspect_ratio_horizontal = 1.0f;
 	float look_sensitivity = 0.1f;
-	float move_speed = 2.5f;
+	float move_speed = 5.0f;
 } GameCamera;
 
 GameCamera g_game_camera = {};
@@ -160,6 +160,9 @@ typedef struct Plane {
 	glm::vec3 scale;
 	int texture_id;
 } Plane;
+
+int g_selected_plane_index = -1;
+std::vector<Plane> g_scene_planes = {};
 
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
@@ -820,13 +823,6 @@ int main(int argc, char* argv[])
 	g_game_camera.front_vec = glm::vec3(0.0f, 0.0f, -1.0f);
 	g_game_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
 
-	Plane my_plane01 = {
-		.translation =	glm::vec3(0.0f, 0.0f, 0.0f),
-		.rotation =		glm::vec3(0.0f, 0.0f, 0.0f),
-		.scale =		glm::vec3(1.0f, 1.0f, 1.0f),
-		.texture_id =	debug_texture
-	};
-
 	while (!glfwWindowShouldClose(window))
 	{
 		glfwPollEvents();
@@ -837,13 +833,46 @@ int main(int argc, char* argv[])
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui::NewFrame();
 
+			// Right hand panel
 			{
 				ImGui::Begin("Properties", nullptr, 0);
 
+				Plane* selected_plane;
+				int current_planes_count = g_scene_planes.size();
+
+				if (0 <= g_selected_plane_index && g_selected_plane_index <= current_planes_count - 1)
+				{
+					selected_plane = &g_scene_planes[g_selected_plane_index];
+				}
+				else
+				{
+					selected_plane = nullptr;
+				}
+
+				if (ImGui::Button("Add plane"))
+				{
+					Plane new_plane = {
+						.translation = glm::vec3(0.0f, 0.0f, 0.0f),
+						.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
+						.scale = glm::vec3(1.0f, 1.0f, 1.0f),
+						.texture_id = debug_texture
+					};
+
+					g_scene_planes.push_back(new_plane);
+				}
+
 				ImGui::Text("Mesh properties");
-				ImGui::InputFloat3("Translation", &my_plane01.translation[0], "%.2f");
-				ImGui::InputFloat3("Rotation", &my_plane01.rotation[0], "%.2f");
-				ImGui::InputFloat3("Scale", &my_plane01.scale[0], "%.2f");
+				ImGui::InputInt("Plane id", &g_selected_plane_index);
+
+				if (g_selected_plane_index < 0) g_selected_plane_index = 0;
+				if (g_selected_plane_index > current_planes_count - 1) g_selected_plane_index = current_planes_count - 1;
+
+				if (selected_plane)
+				{
+					ImGui::InputFloat3("Translation", &selected_plane->translation[0], "%.2f");
+					ImGui::InputFloat3("Rotation", &selected_plane->rotation[0], "%.2f");
+					ImGui::InputFloat3("Scale", &selected_plane->scale[0], "%.2f");
+				}
 
 				ImGui::Text("Game window");
 				ImGui::InputInt2("Screen width px", &g_user_settings.screen_size_px[0]);
@@ -971,9 +1000,12 @@ int main(int argc, char* argv[])
 		rect1.height = g_game_metrics.game_height_px;
 		rect1.width = g_game_metrics.game_width_px;
 
-		draw_simple_reactangle(rect1, 0.9f, 0.9f, 0.9f);
+		draw_simple_reactangle(rect1, 0.2f, 0.3f, 0.32f);
 
-		draw_mesh(&my_plane01);
+		for (auto plane : g_scene_planes)
+		{
+			draw_mesh(&plane);
+		}
 
 		// Print debug info
 		{
@@ -1000,7 +1032,7 @@ int main(int argc, char* argv[])
 			sprintf_s(debug_str, camera_pos_debug_str_format, g_game_camera.position.x, g_game_camera.position.y, g_game_camera.position.z);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
 
-			draw_ui_text(&g_debug_font, 0.1f, 0.1f, 0.1f);
+			draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
 		}
 
 		ImGui::Render();
