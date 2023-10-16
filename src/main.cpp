@@ -23,7 +23,6 @@
 
 typedef struct UserSettings {
 	int screen_size_px[2];
-	int screen_aspect[2];
 } UserSettings;
 
 UserSettings g_user_settings = { 0 };
@@ -87,6 +86,7 @@ typedef struct GameMetrics {
 	int game_height_px;
 	int game_aspect_ratio_x;
 	int game_aspect_ratio_y;
+	float aspect_ratio_horizontal;
 	double game_time;
 	double prev_frame_game_time;
 	int fps;
@@ -142,6 +142,7 @@ typedef struct GameCamera {
 	float yaw = -90.0f;	
 	float pitch = 0.0f;
 	float fov = 45.0f;
+	float aspect_ratio_horizontal = 1.0f;
 	float look_sensitivity = 0.1f;
 	float move_speed = 2.5f;
 } GameCamera;
@@ -335,7 +336,7 @@ void draw_mesh(Plane* mesh)
 
 	model = glm::scale(model, mesh->scale);
 
-	glm::mat4 projection = glm::perspective(glm::radians(g_game_camera.fov), (float)4 / (float)3, 0.1f, 100.0f);
+	glm::mat4 projection = glm::perspective(glm::radians(g_game_camera.fov), g_game_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
 
 	auto new_mat_4 = g_game_camera.position + g_game_camera.front_vec;
 	glm::mat4 view = glm::lookAt(g_game_camera.position, new_mat_4, g_game_camera.up_vec);
@@ -627,34 +628,16 @@ void load_font(FontData* font_data, int font_height_px, const char* font_path)
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-	float screen_x = (float)width;
-	float screen_y = (float)height;
+	float horizontal_aspect = (float)width / (float)height;
+	g_game_metrics.aspect_ratio_horizontal = horizontal_aspect;
+	g_game_camera.aspect_ratio_horizontal = horizontal_aspect;
 
-	float x_aspect = screen_x / (float)g_game_metrics.game_aspect_ratio_x;
-	float y_aspect = screen_y / (float)g_game_metrics.game_aspect_ratio_y;
+	g_game_metrics.game_width_px = width;
+	g_game_metrics.game_height_px = height;
 
-	bool is_wider_for_aspect = y_aspect < x_aspect;
+	glViewport(0, 0, width, height);
 
-	if (is_wider_for_aspect)
-	{
-		int new_width = (screen_y / (float)g_game_metrics.game_aspect_ratio_y) * g_game_metrics.game_aspect_ratio_x;
-		g_game_metrics.game_width_px = new_width;
-		g_game_metrics.game_height_px = height;
-
-		int x_start = (screen_x / 2) - ((float)g_game_metrics.game_width_px / 2);
-		glViewport(x_start, 0, new_width, height);
-	}
-	else
-	{
-		int new_height = (screen_x / (float)g_game_metrics.game_aspect_ratio_x) * g_game_metrics.game_aspect_ratio_y;
-		g_game_metrics.game_width_px = width;
-		g_game_metrics.game_height_px = new_height;
-
-		int y_start = (screen_y / 2) - ((float)g_game_metrics.game_height_px / 2);
-		glViewport(0, y_start, width, new_height);
-	}
-
-	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
+	int font_height_px = normalize_value(debug_font_vh, 100.0f, (float)height);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 }
 
@@ -674,10 +657,14 @@ int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
 
-	g_game_metrics.game_aspect_ratio_x = 4;
-	g_game_metrics.game_aspect_ratio_y = 3;
 	g_game_metrics.game_width_px = 1600;
 	g_game_metrics.game_height_px = 1200;
+
+	g_game_camera.aspect_ratio_horizontal = 
+		(float)g_game_metrics.game_width_px / (float)g_game_metrics.game_height_px;
+
+	g_user_settings.screen_size_px[0] = g_game_metrics.game_width_px;
+	g_user_settings.screen_size_px[1] = g_game_metrics.game_height_px;
 
 	// Init window and context
 	GLFWwindow* window;
@@ -798,13 +785,13 @@ int main(int argc, char* argv[])
 			float vertices[] =
 			{
 				// Coords				// UV
-				-0.5f, -0.5f, 0.0f,		0.0f, 0.0f, // bottom left
-				 0.5f, -0.5f, 0.0f,		1.0f, 0.0f, // bottom right
-				-0.5f,  0.5f, 0.0f,		0.0f, 1.0f, // top left
+				0.0f, 0.0f, 0.0f,		0.0f, 0.0f, // bottom left
+				1.0f, 0.0f, 0.0f,		1.0f, 0.0f, // bottom right
+				0.0f, 1.0f, 0.0f,		0.0f, 1.0f, // top left
 
-				-0.5f,  0.5f, 0.0f,		0.0f, 1.0f, // top left 
-				 0.5f,  0.5f, 0.0f,		1.0f, 1.0f, // top right
-				 0.5f, -0.5f, 0.0f,		1.0f, 0.0f  // bottom right
+				0.0f, 1.0f, 0.0f,		0.0f, 1.0f, // top left 
+				1.0f, 1.0f, 0.0f,		1.0f, 1.0f, // top right
+				1.0f, 0.0f, 0.0f,		1.0f, 0.0f  // bottom right
 			};
 
 			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -839,10 +826,6 @@ int main(int argc, char* argv[])
 		.scale =		glm::vec3(1.0f, 1.0f, 1.0f),
 		.texture_id =	debug_texture
 	};
-
-	float* test1 = &my_plane01.translation[0];
-	float* test2 = &my_plane01.rotation[0];
-	float* test3 = &my_plane01.scale[0];
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -959,23 +942,23 @@ int main(int argc, char* argv[])
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 
-		float camera_speed = g_game_camera.move_speed * g_frame_data.deltatime;
+		float speed_mult = g_game_camera.move_speed * g_frame_data.deltatime;
 
 		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 		{
-			g_game_camera.position += camera_speed * g_game_camera.front_vec;
+			g_game_camera.position += speed_mult * g_game_camera.front_vec;
 		}
 		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 		{
-			g_game_camera.position -= camera_speed * g_game_camera.front_vec;
+			g_game_camera.position -= speed_mult * g_game_camera.front_vec;
 		}
 		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 		{
-			g_game_camera.position -= glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * camera_speed;
+			g_game_camera.position -= glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * speed_mult;
 		}
 		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		{
-			g_game_camera.position += glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * camera_speed;
+			g_game_camera.position += glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * speed_mult;
 		}
 
 		// Draw
