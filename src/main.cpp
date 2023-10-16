@@ -21,6 +21,13 @@
 
 #include "utils.h"
 
+typedef struct UserSettings {
+	int screen_size_px[2];
+	int screen_aspect[2];
+} UserSettings;
+
+UserSettings g_user_settings = { 0 };
+
 int g_simple_rectangle_shader;
 unsigned int g_simple_rectangle_vao;
 unsigned int g_simple_rectangle_vbo;
@@ -39,9 +46,11 @@ int g_text_indicies = 0;
 typedef struct FrameData {
 	int draw_calls;
 	float deltatime;
-	bool mouse_clicked;
 	int mouse_click_x;
 	int mouse_click_y;
+	float prev_mouse_x;
+	float prev_mouse_y;
+	bool mouse_clicked;
 } FrameData;
 
 typedef struct ButtonState {
@@ -134,6 +143,7 @@ typedef struct GameCamera {
 	float pitch = 0.0f;
 	float fov = 45.0f;
 	float look_sensitivity = 0.1f;
+	float move_speed = 2.5f;
 } GameCamera;
 
 GameCamera g_game_camera = {};
@@ -142,6 +152,13 @@ float g_mouse_movement_x = 0;
 float g_mouse_movement_y = 0;
 
 float mesh_rotation = 0;
+
+typedef struct Plane {
+	glm::vec3 translation;
+	glm::vec3 rotation;
+	glm::vec3 scale;
+	int texture_id;
+} Plane;
 
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
@@ -303,12 +320,21 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(0);
 }
 
-void draw_mesh(int texture_id)
+void draw_mesh(Plane* mesh)
 {
 	glUseProgram(g_mesh_shader);
 	glBindVertexArray(g_mesh_vao);
 
-	glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(mesh_rotation), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::mat4 model = glm::mat4(1.0f);
+
+	model = glm::translate(model, mesh->translation);
+
+	model = glm::rotate(model, glm::radians(mesh->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(mesh->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(mesh->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+	model = glm::scale(model, mesh->scale);
+
 	glm::mat4 projection = glm::perspective(glm::radians(g_game_camera.fov), (float)4 / (float)3, 0.1f, 100.0f);
 
 	auto new_mat_4 = g_game_camera.position + g_game_camera.front_vec;
@@ -323,7 +349,7 @@ void draw_mesh(int texture_id)
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glBindTexture(GL_TEXTURE_2D, mesh->texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	g_frame_data.draw_calls++;
 
@@ -632,19 +658,16 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 }
 
-float lastX = 0;
-float lastY = 0;
-
 void mouse_move_callback(GLFWwindow* window, double xposIn, double yposIn)
 {
 	float xpos = static_cast<float>(xposIn);
 	float ypos = static_cast<float>(yposIn);
 
-	g_mouse_movement_x = xpos - lastX;
-	g_mouse_movement_y = lastY - ypos;
+	g_mouse_movement_x = xpos - g_frame_data.prev_mouse_x;
+	g_mouse_movement_y = g_frame_data.prev_mouse_y - ypos;
 
-	lastX = xpos;
-	lastY = ypos;
+	g_frame_data.prev_mouse_x = xpos;
+	g_frame_data.prev_mouse_y = ypos;
 }
 
 int main(int argc, char* argv[])
@@ -688,31 +711,31 @@ int main(int argc, char* argv[])
 
 	// Init game inputs
 	{
-		g_game_inputs.mouse1 = ButtonState { .key = GLFW_MOUSE_BUTTON_1 };
-		g_game_inputs.mouse2 = ButtonState { .key = GLFW_MOUSE_BUTTON_2 };
+		g_game_inputs.mouse1 = ButtonState{ .key = GLFW_MOUSE_BUTTON_1 };
+		g_game_inputs.mouse2 = ButtonState{ .key = GLFW_MOUSE_BUTTON_2 };
 
-		g_game_inputs.q = ButtonState { .key = GLFW_KEY_Q };
-		g_game_inputs.w = ButtonState { .key = GLFW_KEY_W };
-		g_game_inputs.e = ButtonState { .key = GLFW_KEY_E };
-		g_game_inputs.r = ButtonState { .key = GLFW_KEY_R };
-		g_game_inputs.a = ButtonState { .key = GLFW_KEY_A };
-		g_game_inputs.s = ButtonState { .key = GLFW_KEY_S };
-		g_game_inputs.d = ButtonState { .key = GLFW_KEY_D };
-		g_game_inputs.f = ButtonState { .key = GLFW_KEY_F };
-		g_game_inputs.z = ButtonState { .key = GLFW_KEY_Z };
-		g_game_inputs.x = ButtonState { .key = GLFW_KEY_X };
-		g_game_inputs.c = ButtonState { .key = GLFW_KEY_C };
-		g_game_inputs.v = ButtonState { .key = GLFW_KEY_V };
-		g_game_inputs.esc = ButtonState { .key = GLFW_KEY_ESCAPE };
-		g_game_inputs.plus = ButtonState { .key = GLFW_KEY_KP_ADD };
-		g_game_inputs.minus = ButtonState { .key = GLFW_KEY_KP_SUBTRACT };
+		g_game_inputs.q = ButtonState{ .key = GLFW_KEY_Q };
+		g_game_inputs.w = ButtonState{ .key = GLFW_KEY_W };
+		g_game_inputs.e = ButtonState{ .key = GLFW_KEY_E };
+		g_game_inputs.r = ButtonState{ .key = GLFW_KEY_R };
+		g_game_inputs.a = ButtonState{ .key = GLFW_KEY_A };
+		g_game_inputs.s = ButtonState{ .key = GLFW_KEY_S };
+		g_game_inputs.d = ButtonState{ .key = GLFW_KEY_D };
+		g_game_inputs.f = ButtonState{ .key = GLFW_KEY_F };
+		g_game_inputs.z = ButtonState{ .key = GLFW_KEY_Z };
+		g_game_inputs.x = ButtonState{ .key = GLFW_KEY_X };
+		g_game_inputs.c = ButtonState{ .key = GLFW_KEY_C };
+		g_game_inputs.v = ButtonState{ .key = GLFW_KEY_V };
+		g_game_inputs.esc = ButtonState{ .key = GLFW_KEY_ESCAPE };
+		g_game_inputs.plus = ButtonState{ .key = GLFW_KEY_KP_ADD };
+		g_game_inputs.minus = ButtonState{ .key = GLFW_KEY_KP_SUBTRACT };
 	}
 
 	// Init simple rectangle shader
 	{
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_fs.glsl";
-		
+
 		g_simple_rectangle_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 		{
 			glGenVertexArrays(1, &g_simple_rectangle_vao);
@@ -797,7 +820,7 @@ int main(int argc, char* argv[])
 	}
 
 	const char* image_path = "G:/projects/game/Engine3D/resources/images/debug_img_01.png";
-	unsigned int debug_texture = load_image_into_texture(image_path, true);
+	int debug_texture = load_image_into_texture(image_path, true);
 
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
@@ -810,6 +833,17 @@ int main(int argc, char* argv[])
 	g_game_camera.front_vec = glm::vec3(0.0f, 0.0f, -1.0f);
 	g_game_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
 
+	Plane my_plane01 = {
+		.translation =	glm::vec3(0.0f, 0.0f, 0.0f),
+		.rotation =		glm::vec3(0.0f, 0.0f, 0.0f),
+		.scale =		glm::vec3(1.0f, 1.0f, 1.0f),
+		.texture_id =	debug_texture
+	};
+
+	float* test1 = &my_plane01.translation[0];
+	float* test2 = &my_plane01.rotation[0];
+	float* test3 = &my_plane01.scale[0];
+
 	while (!glfwWindowShouldClose(window))
 	{
 		glfwPollEvents();
@@ -820,16 +854,22 @@ int main(int argc, char* argv[])
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui::NewFrame();
 
-			// Right hand panel
 			{
-				ImGui::SetNextWindowSize(ImVec2(300, -1));
-				ImGui::SetNextWindowPos(ImVec2(g_game_metrics.game_width_px - 300, 0));
+				ImGui::Begin("Properties", nullptr, 0);
 
-				ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
+				ImGui::Text("Mesh properties");
+				ImGui::InputFloat3("Translation", &my_plane01.translation[0], "%.2f");
+				ImGui::InputFloat3("Rotation", &my_plane01.rotation[0], "%.2f");
+				ImGui::InputFloat3("Scale", &my_plane01.scale[0], "%.2f");
 
-				ImGui::Begin("Right Panel", nullptr, flags);
-				ImGui::InputFloat("Float Value", &mesh_rotation, 0.0f, 0.0f, "%.2f");
-				ImGui::Text("This is a fixed panel on the right side");
+				ImGui::Text("Game window");
+				ImGui::InputInt2("Screen width px", &g_user_settings.screen_size_px[0]);
+
+				if (ImGui::Button("Apply changes"))
+				{
+					glfwSetWindowSize(window, g_user_settings.screen_size_px[0], g_user_settings.screen_size_px[1]);
+				}
+
 				ImGui::End();
 			}
 		}
@@ -856,14 +896,6 @@ int main(int argc, char* argv[])
 			key_state = glfwGetKey(window, g_game_inputs.esc.key);
 			g_game_inputs.esc.pressed = !g_game_inputs.esc.is_down && key_state == GLFW_PRESS;
 			g_game_inputs.esc.is_down = key_state == GLFW_PRESS;
-
-			key_state = glfwGetKey(window, g_game_inputs.minus.key);
-			g_game_inputs.minus.pressed = !g_game_inputs.minus.is_down && key_state == GLFW_PRESS;
-			g_game_inputs.minus.is_down = key_state == GLFW_PRESS;
-
-			key_state = glfwGetKey(window, g_game_inputs.plus.key);
-			g_game_inputs.plus.pressed = !g_game_inputs.plus.is_down && key_state == GLFW_PRESS;
-			g_game_inputs.plus.is_down = key_state == GLFW_PRESS;
 		}
 
 		// Logic
@@ -879,15 +911,6 @@ int main(int argc, char* argv[])
 			g_game_metrics.fps = g_game_metrics.fps_frames;
 			g_game_metrics.fps_frames = 0;
 			g_game_metrics.fps_prev_second = current_game_second;
-		}
-
-		if (g_game_inputs.plus.pressed)
-		{
-			glfwSetWindowSize(window, g_game_metrics.game_width_px + 100, g_game_metrics.game_height_px + 100);
-		}
-		else if (g_game_inputs.minus.pressed)
-		{
-			glfwSetWindowSize(window, g_game_metrics.game_width_px - 100, g_game_metrics.game_height_px - 100);
 		}
 
 		if (g_game_inputs.mouse1.pressed)
@@ -936,7 +959,7 @@ int main(int argc, char* argv[])
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 
-		float camera_speed = 2.5f * g_frame_data.deltatime;
+		float camera_speed = g_game_camera.move_speed * g_frame_data.deltatime;
 
 		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 		{
@@ -967,20 +990,24 @@ int main(int argc, char* argv[])
 
 		draw_simple_reactangle(rect1, 0.9f, 0.9f, 0.9f);
 
-		draw_mesh(debug_texture);
+		draw_mesh(&my_plane01);
 
 		// Print debug info
 		{
 			char debug_str[512];
 
-			const char* fps_debug_str_format = "FPS: %d Delta: %.2fms";
-			float display_deltatime = g_frame_data.deltatime * 1000;
-			sprintf_s(debug_str, fps_debug_str_format, g_game_metrics.fps, display_deltatime);
+			const char* fps_debug_str_format = "FPS: %d";
+			sprintf_s(debug_str, fps_debug_str_format, g_game_metrics.fps);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
+
+			const char* delta_debug_str_format = "Delta: %.2fms";
+			float display_deltatime = g_frame_data.deltatime * 1000;
+			sprintf_s(debug_str, delta_debug_str_format, display_deltatime);
+			append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
 
 			const char* frames_debug_str_format = "Frames: %lu";
 			sprintf_s(debug_str, frames_debug_str_format, g_game_metrics.frames);
-			append_ui_text(&g_debug_font, debug_str, 10.0f, 100.0f);
+			append_ui_text(&g_debug_font, debug_str, 10.5f, 100.0f);
 
 			const char* draw_calls_debug_str_format = "Draw calls: %d";
 			sprintf_s(debug_str, draw_calls_debug_str_format, ++g_frame_data.draw_calls);
