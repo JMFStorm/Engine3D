@@ -32,6 +32,21 @@ inline void null_terminate_string(char* string, int str_length)
 	string[str_length] = '\0';
 }
 
+inline float clamp_float(float value, float min, float max)
+{
+	if (value < min)
+	{
+		return min;
+	}
+
+	if (max < value)
+	{
+		return max;
+	}
+
+	return value;
+}
+
 void memory_buffer_mallocate(MemoryBuffer* buffer, unsigned long size_in_bytes, char* name);
 
 void memory_buffer_wipe(MemoryBuffer* buffer);

@@ -155,6 +155,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="glew32.dll" />
+    <None Include="resources\shaders\line_fs.glsl" />
+    <None Include="resources\shaders\line_vs.glsl" />
     <None Include="resources\shaders\mesh_fs.glsl" />
     <None Include="resources\shaders\mesh_vs.glsl" />
     <None Include="resources\shaders\simple_reactangle_fs.glsl" />
