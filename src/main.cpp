@@ -47,13 +47,17 @@ unsigned int g_ui_text_vbo;
 int g_text_buffer_size = 0;
 int g_text_indicies = 0;
 
+glm::vec3 g_debug_click_line_start = glm::vec3(0, 0, 0);
+glm::vec3 g_debug_click_line_end = glm::vec3(0, 0, 0);
+
 typedef struct FrameData {
-	int draw_calls;
-	float deltatime;
+	glm::vec4 mouse_click_ray = glm::vec4(0,0,0,0);
 	int mouse_click_x;
 	int mouse_click_y;
 	float prev_mouse_x;
 	float prev_mouse_y;
+	int draw_calls;
+	float deltatime;
 	bool mouse_clicked;
 } FrameData;
 
@@ -134,7 +138,7 @@ const char* g_debug_font_path = "G:/projects/game/Engine3D/resources/fonts/Inter
 int g_max_UI_chars = 1000;
 FontData g_debug_font;
 
-FrameData g_frame_data = { 0 };
+FrameData g_frame_data = {};
 
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
@@ -149,6 +153,8 @@ typedef struct GameCamera {
 	float aspect_ratio_horizontal = 1.0f;
 	float look_sensitivity = 0.1f;
 	float move_speed = 5.0f;
+	float near_clip = 0.1f;
+	float far_clip = 100.0f;
 } GameCamera;
 
 GameCamera g_game_camera = {};
@@ -721,7 +727,7 @@ int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
 
-	g_game_metrics.game_width_px = 1600;
+	g_game_metrics.game_width_px = 1900;
 	g_game_metrics.game_height_px = 1200;
 
 	g_game_camera.aspect_ratio_horizontal = 
@@ -1024,10 +1030,45 @@ int main(int argc, char* argv[])
 			g_frame_data.mouse_click_x = xpos;
 			g_frame_data.mouse_click_y = g_game_metrics.game_height_px - ypos;
 
-			std::cout 
-				<< "Mouse click - x:" << g_frame_data.mouse_click_x 
-				<< " y:" << g_frame_data.mouse_click_y 
+			float x_NDC = (2.0f * xpos) / g_game_metrics.game_width_px - 1.0f;
+			float y_NDC = 1.0f - (2.0f * ypos) / g_game_metrics.game_height_px;
+			glm::vec4 ray_clip(x_NDC, y_NDC, -1.0f, 1.0f);
+
+			glm::mat4 projection = glm::perspective(
+				glm::radians(g_game_camera.fov),
+				g_game_camera.aspect_ratio_horizontal,
+				g_game_camera.near_clip,
+				g_game_camera.far_clip);
+
+			glm::mat4 view = glm::lookAt(
+				g_game_camera.position,
+				g_game_camera.position + g_game_camera.front_vec,
+				g_game_camera.up_vec);
+
+			glm::mat4 inverse_projection = glm::inverse(projection);
+			glm::mat4 inverse_view = glm::inverse(view);
+
+			glm::vec4 ray_eye = inverse_projection * ray_clip;
+			ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0, 0.0);
+
+			glm::vec4 ray_world = inverse_view * ray_eye;
+			ray_world = glm::normalize(ray_world);
+
+			g_frame_data.mouse_click_ray = ray_world;
+
+			std::cout
+				<< "Mouse click - x:" << g_frame_data.mouse_click_x
+				<< " y:" << g_frame_data.mouse_click_y
+				<< " - Vector ray:" << ray_world.x << " " << ray_world.y << " " << ray_world.z
 				<< std::endl;
+
+			{
+				auto new_click_ray_line = glm::vec3(ray_world);
+				new_click_ray_line *= 10;
+
+				g_debug_click_line_start = g_game_camera.position;
+				g_debug_click_line_end = g_game_camera.position + new_click_ray_line;
+			}
 		}
 
 		if (g_game_inputs.mouse2.is_down)
@@ -1055,29 +1096,29 @@ int main(int argc, char* argv[])
 			new_camera_front.z = sin(glm::radians(g_game_camera.yaw)) * cos(glm::radians(g_game_camera.pitch));
 
 			g_game_camera.front_vec = glm::normalize(new_camera_front);
+
+			float speed_mult = g_game_camera.move_speed * g_frame_data.deltatime;
+
+			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+			{
+				g_game_camera.position += speed_mult * g_game_camera.front_vec;
+			}
+			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+			{
+				g_game_camera.position -= speed_mult * g_game_camera.front_vec;
+			}
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+			{
+				g_game_camera.position -= glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * speed_mult;
+			}
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+			{
+				g_game_camera.position += glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * speed_mult;
+			}
 		}
 		else
 		{
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-		}
-
-		float speed_mult = g_game_camera.move_speed * g_frame_data.deltatime;
-
-		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		{
-			g_game_camera.position += speed_mult * g_game_camera.front_vec;
-		}
-		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		{
-			g_game_camera.position -= speed_mult * g_game_camera.front_vec;
-		}
-		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		{
-			g_game_camera.position -= glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * speed_mult;
-		}
-		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		{
-			g_game_camera.position += glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * speed_mult;
 		}
 
 		// Draw
@@ -1095,6 +1136,11 @@ int main(int argc, char* argv[])
 		{
 			Plane selected_plane = g_scene_planes[g_selected_plane_index];
 			draw_selection_arrows(selected_plane.translation);
+		}
+
+		// Click ray
+		{
+			draw_line(g_debug_click_line_start, g_debug_click_line_end, glm::vec3(1.0f, 0.2f, 1.0f), 3.0f, 10.0f);
 		}
 
 		for (auto plane : g_scene_planes)
