@@ -411,6 +411,17 @@ void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness_
 	glBindVertexArray(0);
 }
 
+void draw_selection_arrows(glm::vec3 position)
+{
+	auto end_x = glm::vec3(position.x + 1.0f, position.y, position.z);
+	auto end_y = glm::vec3(position.x, position.y + 1.0f, position.z);
+	auto end_z = glm::vec3(position.x, position.y, position.z + 1.0f);
+
+	draw_line(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f), 1.0f, 7.0f);
+	draw_line(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 7.0f);
+	draw_line(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f), 1.0f, 7.0f);
+}
+
 void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh)
 {
 	auto chars = font_data->char_data.data();
@@ -1073,9 +1084,18 @@ int main(int argc, char* argv[])
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		draw_line(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), 1.0f, 4.0f);
-		draw_line(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 4.0f);
-		draw_line(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 1.0f), 1.0f, 4.0f);
+		// Coordinate lines
+		{
+			draw_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), 1.0f, 1.0f);
+			draw_line(glm::vec3(0.0f, -1000.0f, 0.0f), glm::vec3(0.0f, 1000.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 1.0f);
+			draw_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f), 1.0f, 1.0f);
+		}
+
+		if (-1 < g_selected_plane_index)
+		{
+			Plane selected_plane = g_scene_planes[g_selected_plane_index];
+			draw_selection_arrows(selected_plane.translation);
+		}
 
 		for (auto plane : g_scene_planes)
 		{
