@@ -22,8 +22,10 @@
 
 #include "utils.h"
 
+constexpr int right_hand_panel_width = 400;
+
 typedef struct UserSettings {
-	int screen_size_px[2];
+	int window_size_px[2];
 } UserSettings;
 
 UserSettings g_user_settings = { 0 };
@@ -93,8 +95,8 @@ typedef struct GameMetrics {
 	unsigned long frames;
 	int game_width_px;
 	int game_height_px;
-	int game_aspect_ratio_x;
-	int game_aspect_ratio_y;
+	int scene_width_px;
+	int scene_height_px;
 	float aspect_ratio_horizontal;
 	double game_time;
 	double prev_frame_game_time;
@@ -157,7 +159,7 @@ typedef struct GameCamera {
 	float far_clip = 100.0f;
 } GameCamera;
 
-GameCamera g_game_camera = {};
+GameCamera g_scene_camera = {};
 
 float g_mouse_movement_x = 0;
 float g_mouse_movement_y = 0;
@@ -349,10 +351,10 @@ void draw_mesh(Plane* mesh)
 
 	model = glm::scale(model, mesh->scale);
 
-	glm::mat4 projection = glm::perspective(glm::radians(g_game_camera.fov), g_game_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
+	glm::mat4 projection = glm::perspective(glm::radians(g_scene_camera.fov), g_scene_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
 
-	auto new_mat_4 = g_game_camera.position + g_game_camera.front_vec;
-	glm::mat4 view = glm::lookAt(g_game_camera.position, new_mat_4, g_game_camera.up_vec);
+	auto new_mat_4 = g_scene_camera.position + g_scene_camera.front_vec;
+	glm::mat4 view = glm::lookAt(g_scene_camera.position, new_mat_4, g_scene_camera.up_vec);
 	
 	unsigned int model_loc = glGetUniformLocation(g_mesh_shader, "model");
 	unsigned int view_loc = glGetUniformLocation(g_mesh_shader, "view");
@@ -377,10 +379,10 @@ void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness_
 	glBindVertexArray(g_line_vao);
 
 	glm::mat4 model = glm::mat4(1.0f);
-	glm::mat4 projection = glm::perspective(glm::radians(g_game_camera.fov), g_game_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
+	glm::mat4 projection = glm::perspective(glm::radians(g_scene_camera.fov), g_scene_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
 
-	auto new_mat_4 = g_game_camera.position + g_game_camera.front_vec;
-	glm::mat4 view = glm::lookAt(g_game_camera.position, new_mat_4, g_game_camera.up_vec);
+	auto new_mat_4 = g_scene_camera.position + g_scene_camera.front_vec;
+	glm::mat4 view = glm::lookAt(g_scene_camera.position, new_mat_4, g_scene_camera.up_vec);
 
 	unsigned int model_loc = glGetUniformLocation(g_line_shader, "model");
 	unsigned int view_loc = glGetUniformLocation(g_line_shader, "view");
@@ -404,7 +406,7 @@ void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness_
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 
 	glm::vec3 line_midpoint = (start + end) / 2.0f;
-	float line_distance = glm::length(g_game_camera.position - line_midpoint);
+	float line_distance = glm::length(g_scene_camera.position - line_midpoint);
 	float scaling = 8.0f / (line_distance);
 	float average_thickness = (thickness_max + thickness_min) / 2.0f;
 	float line_width = clamp_float(average_thickness * scaling, thickness_min, thickness_max);
@@ -700,12 +702,15 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	float horizontal_aspect = (float)width / (float)height;
 	g_game_metrics.aspect_ratio_horizontal = horizontal_aspect;
-	g_game_camera.aspect_ratio_horizontal = horizontal_aspect;
+	g_scene_camera.aspect_ratio_horizontal = horizontal_aspect;
 
 	g_game_metrics.game_width_px = width;
 	g_game_metrics.game_height_px = height;
 
-	glViewport(0, 0, width, height);
+	g_game_metrics.scene_width_px = width - right_hand_panel_width;
+	g_game_metrics.scene_height_px = height;
+
+	glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
 
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, (float)height);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
@@ -723,18 +728,26 @@ void mouse_move_callback(GLFWwindow* window, double xposIn, double yposIn)
 	g_frame_data.prev_mouse_y = ypos;
 }
 
+bool clicked_scene_space(int x, int y)
+{
+	return x < g_game_metrics.scene_width_px && y < g_game_metrics.scene_height_px;
+}
+
 int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
 
-	g_game_metrics.game_width_px = 1900;
+	g_game_metrics.game_width_px = 2100;
 	g_game_metrics.game_height_px = 1200;
 
-	g_game_camera.aspect_ratio_horizontal = 
-		(float)g_game_metrics.game_width_px / (float)g_game_metrics.game_height_px;
+	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - right_hand_panel_width;
+	g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
 
-	g_user_settings.screen_size_px[0] = g_game_metrics.game_width_px;
-	g_user_settings.screen_size_px[1] = g_game_metrics.game_height_px;
+	g_scene_camera.aspect_ratio_horizontal = 
+		(float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
+
+	g_user_settings.window_size_px[0] = g_game_metrics.game_width_px;
+	g_user_settings.window_size_px[1] = g_game_metrics.game_height_px;
 
 	// Init window and context
 	GLFWwindow* window;
@@ -750,6 +763,8 @@ int main(int argc, char* argv[])
 		glfwMakeContextCurrent(window);
 		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 		glfwSetCursorPosCallback(window, mouse_move_callback);
+
+		glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
 
 		int glew_init_result = glewInit();
 		ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
@@ -904,11 +919,11 @@ int main(int argc, char* argv[])
 	glEnable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glClearColor(0.2f, 0.35f, 0.35f, 1.0f);
+	glClearColor(0.25f, 0.35f, 0.35f, 1.0f);
 
-	g_game_camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
-	g_game_camera.front_vec = glm::vec3(0.0f, 0.0f, -1.0f);
-	g_game_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
+	g_scene_camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
+	g_scene_camera.front_vec = glm::vec3(0.0f, 0.0f, -1.0f);
+	g_scene_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -922,6 +937,9 @@ int main(int argc, char* argv[])
 
 			// Right hand panel
 			{
+				ImGui::SetNextWindowPos(ImVec2(static_cast<float>(g_game_metrics.game_width_px - right_hand_panel_width), 0), ImGuiCond_Always);
+				ImGui::SetNextWindowSize(ImVec2(right_hand_panel_width, g_game_metrics.game_height_px), ImGuiCond_Always);
+
 				ImGui::Begin("Properties", nullptr, 0);
 
 				Plane* selected_plane;
@@ -971,11 +989,11 @@ int main(int argc, char* argv[])
 				}
 
 				ImGui::Text("Game window");
-				ImGui::InputInt2("Screen width px", &g_user_settings.screen_size_px[0]);
+				ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);
 
 				if (ImGui::Button("Apply changes"))
 				{
-					glfwSetWindowSize(window, g_user_settings.screen_size_px[0], g_user_settings.screen_size_px[1]);
+					glfwSetWindowSize(window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 				}
 
 				ImGui::End();
@@ -1030,44 +1048,92 @@ int main(int argc, char* argv[])
 			g_frame_data.mouse_click_x = xpos;
 			g_frame_data.mouse_click_y = g_game_metrics.game_height_px - ypos;
 
-			float x_NDC = (2.0f * xpos) / g_game_metrics.game_width_px - 1.0f;
-			float y_NDC = 1.0f - (2.0f * ypos) / g_game_metrics.game_height_px;
-			glm::vec4 ray_clip(x_NDC, y_NDC, -1.0f, 1.0f);
-
-			glm::mat4 projection = glm::perspective(
-				glm::radians(g_game_camera.fov),
-				g_game_camera.aspect_ratio_horizontal,
-				g_game_camera.near_clip,
-				g_game_camera.far_clip);
-
-			glm::mat4 view = glm::lookAt(
-				g_game_camera.position,
-				g_game_camera.position + g_game_camera.front_vec,
-				g_game_camera.up_vec);
-
-			glm::mat4 inverse_projection = glm::inverse(projection);
-			glm::mat4 inverse_view = glm::inverse(view);
-
-			glm::vec4 ray_eye = inverse_projection * ray_clip;
-			ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0, 0.0);
-
-			glm::vec4 ray_world = inverse_view * ray_eye;
-			ray_world = glm::normalize(ray_world);
-
-			g_frame_data.mouse_click_ray = ray_world;
-
-			std::cout
-				<< "Mouse click - x:" << g_frame_data.mouse_click_x
+			std::cout << "Mouse click - x:" << g_frame_data.mouse_click_x
 				<< " y:" << g_frame_data.mouse_click_y
-				<< " - Vector ray:" << ray_world.x << " " << ray_world.y << " " << ray_world.z
 				<< std::endl;
 
+			if (clicked_scene_space((int)xpos, (int)ypos))
 			{
-				auto new_click_ray_line = glm::vec3(ray_world);
-				new_click_ray_line *= 10;
+				float x_NDC = (2.0f * xpos) / g_game_metrics.scene_width_px - 1.0f;
+				float y_NDC = 1.0f - (2.0f * ypos) / g_game_metrics.scene_height_px;
+				glm::vec4 ray_clip(x_NDC, y_NDC, -1.0f, 1.0f);
 
-				g_debug_click_line_start = g_game_camera.position;
-				g_debug_click_line_end = g_game_camera.position + new_click_ray_line;
+				glm::mat4 projection = glm::perspective(
+					glm::radians(g_scene_camera.fov),
+					g_scene_camera.aspect_ratio_horizontal,
+					g_scene_camera.near_clip,
+					g_scene_camera.far_clip);
+
+				glm::mat4 view = glm::lookAt(
+					g_scene_camera.position,
+					g_scene_camera.position + g_scene_camera.front_vec,
+					g_scene_camera.up_vec);
+
+				glm::mat4 inverse_projection = glm::inverse(projection);
+				glm::mat4 inverse_view = glm::inverse(view);
+
+				glm::vec4 ray_eye = inverse_projection * ray_clip;
+				ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0, 0.0);
+
+				glm::vec4 ray_world = inverse_view * ray_eye;
+				ray_world = glm::normalize(ray_world);
+
+				g_frame_data.mouse_click_ray = ray_world;
+
+				glm::vec3 rayOrigin = g_scene_camera.position;
+				glm::vec3 rayDirection = g_frame_data.mouse_click_ray;
+
+				bool selected_plane = false;
+
+				for (int i = 0; i < g_scene_planes.size(); i++)
+				{
+					Plane* plane = &g_scene_planes[i];
+
+					glm::vec3 plane_point = plane->translation;
+					glm::vec3 planeNormal = glm::vec3(0, 1.0f, 0); // @TODO: Assume just up now
+
+					// Calculate the D coefficient of the plane equation
+					float D = -glm::dot(planeNormal, plane_point);
+
+					// Calculate t where the ray intersects the plane
+					float t = -(glm::dot(planeNormal, rayOrigin) + D) / glm::dot(planeNormal, rayDirection);
+
+					// Check if t is non-positive (ray doesn't intersect) or invalid
+					if (t <= 0.0f || std::isinf(t) || std::isnan(t))
+					{
+						std::cout << "No intersection." << std::endl;
+						continue;
+					}
+
+					glm::vec3 intersectionPoint = rayOrigin + t * rayDirection;
+
+					std::cout << "intersectionPoint: "
+						<< intersectionPoint.x << " "
+						<< intersectionPoint.y << " "
+						<< intersectionPoint.z
+						<< std::endl;
+
+					bool within_x = plane->translation.x <= intersectionPoint.x && intersectionPoint.x <= plane->translation.x + plane->scale.x;
+					bool within_z = plane->translation.z <= intersectionPoint.z && intersectionPoint.z <= plane->translation.z + plane->scale.z;
+
+					if (within_x && within_z)
+					{
+						g_selected_plane_index = i;
+						selected_plane = true;
+						break;
+					}
+				}
+
+				if (!selected_plane) g_selected_plane_index = -1;
+
+				// Debug line
+				{
+					auto new_click_ray_line = glm::vec3(ray_world);
+					new_click_ray_line *= 10;
+
+					g_debug_click_line_start = g_scene_camera.position;
+					g_debug_click_line_end = g_scene_camera.position + new_click_ray_line;
+				}
 			}
 		}
 
@@ -1075,45 +1141,45 @@ int main(int argc, char* argv[])
 		{
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-			g_mouse_movement_x *= g_game_camera.look_sensitivity;
-			g_mouse_movement_y *= g_game_camera.look_sensitivity;
+			g_mouse_movement_x *= g_scene_camera.look_sensitivity;
+			g_mouse_movement_y *= g_scene_camera.look_sensitivity;
 
-			g_game_camera.yaw += g_mouse_movement_x;
-			g_game_camera.pitch += g_mouse_movement_y;
+			g_scene_camera.yaw += g_mouse_movement_x;
+			g_scene_camera.pitch += g_mouse_movement_y;
 
-			if (g_game_camera.pitch > 89.0f)
+			if (g_scene_camera.pitch > 89.0f)
 			{
-				g_game_camera.pitch = 89.0f;
+				g_scene_camera.pitch = 89.0f;
 			}
-			else if (g_game_camera.pitch < -89.0f)
+			else if (g_scene_camera.pitch < -89.0f)
 			{
-				g_game_camera.pitch = -89.0f;
+				g_scene_camera.pitch = -89.0f;
 			}
 
 			glm::vec3 new_camera_front;
-			new_camera_front.x = cos(glm::radians(g_game_camera.yaw)) * cos(glm::radians(g_game_camera.pitch));
-			new_camera_front.y = sin(glm::radians(g_game_camera.pitch));
-			new_camera_front.z = sin(glm::radians(g_game_camera.yaw)) * cos(glm::radians(g_game_camera.pitch));
+			new_camera_front.x = cos(glm::radians(g_scene_camera.yaw)) * cos(glm::radians(g_scene_camera.pitch));
+			new_camera_front.y = sin(glm::radians(g_scene_camera.pitch));
+			new_camera_front.z = sin(glm::radians(g_scene_camera.yaw)) * cos(glm::radians(g_scene_camera.pitch));
 
-			g_game_camera.front_vec = glm::normalize(new_camera_front);
+			g_scene_camera.front_vec = glm::normalize(new_camera_front);
 
-			float speed_mult = g_game_camera.move_speed * g_frame_data.deltatime;
+			float speed_mult = g_scene_camera.move_speed * g_frame_data.deltatime;
 
 			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 			{
-				g_game_camera.position += speed_mult * g_game_camera.front_vec;
+				g_scene_camera.position += speed_mult * g_scene_camera.front_vec;
 			}
 			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 			{
-				g_game_camera.position -= speed_mult * g_game_camera.front_vec;
+				g_scene_camera.position -= speed_mult * g_scene_camera.front_vec;
 			}
 			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 			{
-				g_game_camera.position -= glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * speed_mult;
+				g_scene_camera.position -= glm::normalize(glm::cross(g_scene_camera.front_vec, g_scene_camera.up_vec)) * speed_mult;
 			}
 			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 			{
-				g_game_camera.position += glm::normalize(glm::cross(g_game_camera.front_vec, g_game_camera.up_vec)) * speed_mult;
+				g_scene_camera.position += glm::normalize(glm::cross(g_scene_camera.front_vec, g_scene_camera.up_vec)) * speed_mult;
 			}
 		}
 		else
@@ -1140,7 +1206,7 @@ int main(int argc, char* argv[])
 
 		// Click ray
 		{
-			draw_line(g_debug_click_line_start, g_debug_click_line_end, glm::vec3(1.0f, 0.2f, 1.0f), 3.0f, 10.0f);
+			draw_line(g_debug_click_line_start, g_debug_click_line_end, glm::vec3(1.0f, 0.2f, 1.0f), 2.0f, 3.0f);
 		}
 
 		for (auto plane : g_scene_planes)
@@ -1170,7 +1236,7 @@ int main(int argc, char* argv[])
 			append_ui_text(&g_debug_font, debug_str, 17.0f, 100.0f);
 
 			const char* camera_pos_debug_str_format = "Camera X=%.2f Y=%.2f Z=%.2f";
-			sprintf_s(debug_str, camera_pos_debug_str_format, g_game_camera.position.x, g_game_camera.position.y, g_game_camera.position.z);
+			sprintf_s(debug_str, camera_pos_debug_str_format, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
 
 			draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
