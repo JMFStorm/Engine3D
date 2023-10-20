@@ -15,6 +15,7 @@
 #include <glm.hpp>
 #include <gtc/quaternion.hpp>
 #include <gtc/matrix_transform.hpp>
+#include <gtc/matrix_inverse.hpp>
 #include <gtc/type_ptr.hpp>
 
 #include <imgui/imgui.h>
@@ -50,11 +51,10 @@ unsigned int g_ui_text_vbo;
 int g_text_buffer_size = 0;
 int g_text_indicies = 0;
 
-glm::vec3 g_debug_click_line_start = glm::vec3(0, 0, 0);
-glm::vec3 g_debug_click_line_end = glm::vec3(0, 0, 0);
+glm::vec3 g_debug_click_camera_pos = glm::vec3(0, 0, 0);
+glm::vec3 g_debug_click_ray_normal = glm::vec3(0, 0, 0);
 
 typedef struct FrameData {
-	glm::vec4 mouse_click_ray = glm::vec4(0,0,0,0);
 	float mouse_x;
 	float mouse_y;
 	float prev_mouse_x;
@@ -737,8 +737,8 @@ int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
 
-	g_game_metrics.game_width_px = 2100;
-	g_game_metrics.game_height_px = 1200;
+	g_game_metrics.game_width_px = 1800;
+	g_game_metrics.game_height_px = 1100;
 
 	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - right_hand_panel_width;
 	g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
@@ -1057,6 +1057,7 @@ int main(int argc, char* argv[])
 			{
 				float x_NDC = (2.0f * xpos) / g_game_metrics.scene_width_px - 1.0f;
 				float y_NDC = 1.0f - (2.0f * ypos) / g_game_metrics.scene_height_px;
+
 				glm::vec4 ray_clip(x_NDC, y_NDC, -1.0f, 1.0f);
 
 				glm::mat4 projection = glm::perspective(
@@ -1079,10 +1080,12 @@ int main(int argc, char* argv[])
 				glm::vec4 ray_world = inverse_view * ray_eye;
 				ray_world = glm::normalize(ray_world);
 
-				g_frame_data.mouse_click_ray = ray_world;
-
 				glm::vec3 rayOrigin = g_scene_camera.position;
-				glm::vec3 rayDirection = g_frame_data.mouse_click_ray;
+				glm::vec3 rayDirection = ray_world;
+
+				// Debug line
+				g_debug_click_ray_normal = rayDirection;
+				g_debug_click_camera_pos = rayOrigin;
 
 				bool selected_plane = false;
 
@@ -1095,6 +1098,7 @@ int main(int argc, char* argv[])
 					rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 
 					auto plane_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
+
 					auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up_vector, 1.0f));
 					planeNormal = glm::normalize(planeNormal);
 
@@ -1112,17 +1116,21 @@ int main(int argc, char* argv[])
 					}
 
 					glm::vec3 intersectionPoint = rayOrigin + t * rayDirection;
+					glm::vec3 intersection_vec3 = intersectionPoint - plane->translation;
 
-					std::cout << "intersectionPoint: "
-						<< intersectionPoint.x << " "
-						<< intersectionPoint.y << " "
-						<< intersectionPoint.z
-						<< std::endl;
+					// Calculate the relative position of the intersection point with respect to the plane's origin
+					glm::vec3 relativePosition = intersection_vec3 - glm::vec3(rotationMatrix[3]);
 
-					bool within_x = plane->translation.x <= intersectionPoint.x && intersectionPoint.x <= plane->translation.x + plane->scale.x;
-					bool within_z = plane->translation.z <= intersectionPoint.z && intersectionPoint.z <= plane->translation.z + plane->scale.z;
+					// Calculate the inverse of the plane's rotation matrix
+					glm::mat4 inverseRotationMatrix = glm::affineInverse(rotationMatrix);
 
-					if (within_x && within_z)
+					// Apply the inverse rotation matrix to convert the point from world space to local space
+					glm::vec3 localIntersectionPoint = glm::vec3(inverseRotationMatrix * glm::vec4(relativePosition, 1.0f));
+
+					bool intersect_x = 0.0f <= localIntersectionPoint.x && localIntersectionPoint.x <= plane->scale.x;
+					bool intersect_z = 0.0f <= localIntersectionPoint.z && localIntersectionPoint.z <= plane->scale.z;
+
+					if (intersect_x && intersect_z)
 					{
 						g_selected_plane_index = i;
 						selected_plane = true;
@@ -1131,15 +1139,6 @@ int main(int argc, char* argv[])
 				}
 
 				if (!selected_plane) g_selected_plane_index = -1;
-
-				// Debug line
-				{
-					auto new_click_ray_line = glm::vec3(ray_world);
-					new_click_ray_line *= 10;
-
-					g_debug_click_line_start = g_scene_camera.position;
-					g_debug_click_line_end = g_scene_camera.position + new_click_ray_line;
-				}
 			}
 		}
 
@@ -1220,9 +1219,8 @@ int main(int argc, char* argv[])
 		}
 
 		// Click ray
-		{
-			draw_line(g_debug_click_line_start, g_debug_click_line_end, glm::vec3(1.0f, 0.2f, 1.0f), 2.0f, 3.0f);
-		}
+		auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
+		draw_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f), 1.0f, 2.0f);
 
 		for (auto plane : g_scene_planes)
 		{
