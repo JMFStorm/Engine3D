@@ -461,15 +461,15 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 		int char_height_px = current.height;
 		int char_width_px = current.width;
 
-		int x_start = vw_into_screen_px(pos_x_vw, g_game_metrics.game_width_px) + current.x_offset + text_offset_x_px;
+		int x_start = vw_into_screen_px(pos_x_vw, g_game_metrics.scene_width_px) + current.x_offset + text_offset_x_px;
 		int char_y_offset = current.y_offset;
-		int y_start = vh_into_screen_px(pos_y_vh, g_game_metrics.game_height_px) + text_offset_y_px - line_height_px + char_y_offset;
+		int y_start = vh_into_screen_px(pos_y_vh, g_game_metrics.scene_height_px) + text_offset_y_px - line_height_px + char_y_offset;
 
-		float x0 = normalize_screen_px_to_ndc(x_start, g_game_metrics.game_width_px);
-		float y0 = normalize_screen_px_to_ndc(y_start, g_game_metrics.game_height_px);
+		float x0 = normalize_screen_px_to_ndc(x_start, g_game_metrics.scene_width_px);
+		float y0 = normalize_screen_px_to_ndc(y_start, g_game_metrics.scene_height_px);
 
-		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px, g_game_metrics.game_width_px);
-		float y1 = normalize_screen_px_to_ndc(y_start + char_height_px, g_game_metrics.game_height_px);
+		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px, g_game_metrics.scene_width_px);
+		float y1 = normalize_screen_px_to_ndc(y_start + char_height_px, g_game_metrics.scene_height_px);
 
 		float vertices[] =
 		{
@@ -737,8 +737,8 @@ int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
 
-	g_game_metrics.game_width_px = 1800;
-	g_game_metrics.game_height_px = 1100;
+	g_game_metrics.game_width_px = 1900;
+	g_game_metrics.game_height_px = 1200;
 
 	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - right_hand_panel_width;
 	g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
