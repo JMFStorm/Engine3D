@@ -40,9 +40,9 @@ int g_simple_rectangle_shader;
 unsigned int g_simple_rectangle_vao;
 unsigned int g_simple_rectangle_vbo;
 
-int g_mesh_shader;
-unsigned int g_mesh_vao;
-unsigned int g_mesh_vbo;
+int g_plane_shader;
+unsigned int g_plane_vao;
+unsigned int g_plane_vbo;
 
 int g_ui_text_shader;
 unsigned int g_ui_text_vao;
@@ -336,36 +336,36 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(0);
 }
 
-void draw_mesh(Plane* mesh)
+void draw_plane(Plane* plane)
 {
-	glUseProgram(g_mesh_shader);
-	glBindVertexArray(g_mesh_vao);
+	glUseProgram(g_plane_shader);
+	glBindVertexArray(g_plane_vao);
 
 	glm::mat4 model = glm::mat4(1.0f);
 
-	model = glm::translate(model, mesh->translation);
+	model = glm::translate(model, plane->translation);
 
-	model = glm::rotate(model, glm::radians(mesh->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(mesh->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(mesh->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 
-	model = glm::scale(model, mesh->scale);
+	model = glm::scale(model, plane->scale);
 
 	glm::mat4 projection = glm::perspective(glm::radians(g_scene_camera.fov), g_scene_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
 
 	auto new_mat_4 = g_scene_camera.position + g_scene_camera.front_vec;
 	glm::mat4 view = glm::lookAt(g_scene_camera.position, new_mat_4, g_scene_camera.up_vec);
 	
-	unsigned int model_loc = glGetUniformLocation(g_mesh_shader, "model");
-	unsigned int view_loc = glGetUniformLocation(g_mesh_shader, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader, "projection");
+	unsigned int model_loc = glGetUniformLocation(g_plane_shader, "model");
+	unsigned int view_loc = glGetUniformLocation(g_plane_shader, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_plane_shader, "projection");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, mesh->texture_id);
+	glBindTexture(GL_TEXTURE_2D, plane->texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	g_frame_data.draw_calls++;
 
@@ -474,12 +474,12 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 		float vertices[] =
 		{
 			// Coords			// UV
+			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left
 			x0, y0, 0.0f,		current.UV_x0, current.UV_y0, // bottom left
 			x1, y0, 0.0f,		current.UV_x1, current.UV_y0, // bottom right
-			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left
 
-			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left 
 			x1, y1, 0.0f,		current.UV_x1, current.UV_y1, // top right
+			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left 
 			x1, y0, 0.0f,		current.UV_x1, current.UV_y0  // bottom right
 		};
 
@@ -854,29 +854,29 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	// Init mesh shader
+	// Init plane shader
 	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_fs.glsl";
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/plane_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/plane_fs.glsl";
 
-		g_mesh_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_plane_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 		{
-			glGenVertexArrays(1, &g_mesh_vao);
-			glBindVertexArray(g_mesh_vao);
+			glGenVertexArrays(1, &g_plane_vao);
+			glBindVertexArray(g_plane_vao);
 
-			glGenBuffers(1, &g_mesh_vbo);
-			glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
+			glGenBuffers(1, &g_plane_vbo);
+			glBindBuffer(GL_ARRAY_BUFFER, g_plane_vbo);
 
 			float vertices[] =
 			{
 				// Coords				// UV
-				0.0f, 0.0f, 0.0f,		0.0f, 0.0f, // bottom left
-				1.0f, 0.0f, 0.0f,		1.0f, 0.0f, // bottom right
-				0.0f, 0.0f, 1.0f,		0.0f, 1.0f, // top left
+				1.0f, 0.0f, 0.0f,		1.0f, 1.0f, // top right
+				0.0f, 0.0f, 0.0f,		0.0f, 1.0f, // top left
+				0.0f, 0.0f, 1.0f,		0.0f, 0.0f, // bot left
 
-				0.0f, 0.0f, 1.0f,		0.0f, 1.0f, // top left 
-				1.0f, 0.0f, 1.0f,		1.0f, 1.0f, // top right
-				1.0f, 0.0f, 0.0f,		1.0f, 0.0f  // bottom right
+				1.0f, 0.0f, 0.0f,		1.0f, 1.0f, // top right
+				0.0f, 0.0f, 1.0f,		0.0f, 0.0f, // bot left 
+				1.0f, 0.0f, 1.0f,		1.0f, 0.0f  // bot right
 			};
 
 			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -916,9 +916,15 @@ int main(int argc, char* argv[])
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 
-	glEnable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
+
+	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+	glFrontFace(GL_CCW);
+
 	glClearColor(0.25f, 0.35f, 0.35f, 1.0f);
 
 	g_scene_camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
@@ -1222,9 +1228,9 @@ int main(int argc, char* argv[])
 		auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
 		draw_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f), 1.0f, 2.0f);
 
-		for (auto plane : g_scene_planes)
+		for (auto& plane : g_scene_planes)
 		{
-			draw_mesh(&plane);
+			draw_plane(&plane);
 		}
 
 		// Print debug info
