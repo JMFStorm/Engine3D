@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <glm.hpp>
+#include <gtc/quaternion.hpp>
 #include <gtc/matrix_transform.hpp>
 #include <gtc/type_ptr.hpp>
 
@@ -54,8 +55,8 @@ glm::vec3 g_debug_click_line_end = glm::vec3(0, 0, 0);
 
 typedef struct FrameData {
 	glm::vec4 mouse_click_ray = glm::vec4(0,0,0,0);
-	int mouse_click_x;
-	int mouse_click_y;
+	float mouse_x;
+	float mouse_y;
 	float prev_mouse_x;
 	float prev_mouse_y;
 	int draw_calls;
@@ -160,11 +161,10 @@ typedef struct GameCamera {
 } GameCamera;
 
 GameCamera g_scene_camera = {};
+bool g_camera_move_mode = false;
 
 float g_mouse_movement_x = 0;
 float g_mouse_movement_y = 0;
-
-float mesh_rotation = 0;
 
 typedef struct Plane {
 	glm::vec3 translation;
@@ -1030,6 +1030,12 @@ int main(int argc, char* argv[])
 		g_game_metrics.game_time = glfwGetTime();
 		g_frame_data.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time);
 
+		double xpos, ypos;
+		glfwGetCursorPos(window, &xpos, &ypos);
+
+		g_frame_data.mouse_x = xpos;
+		g_frame_data.mouse_y = ypos;
+
 		int current_game_second = (int)g_game_metrics.game_time;
 
 		if (current_game_second - g_game_metrics.fps_prev_second > 0)
@@ -1041,18 +1047,13 @@ int main(int argc, char* argv[])
 
 		if (g_game_inputs.mouse1.pressed)
 		{
-			double xpos, ypos;
-			glfwGetCursorPos(window, &xpos, &ypos);
-
 			g_frame_data.mouse_clicked = true;
-			g_frame_data.mouse_click_x = xpos;
-			g_frame_data.mouse_click_y = g_game_metrics.game_height_px - ypos;
 
-			std::cout << "Mouse click - x:" << g_frame_data.mouse_click_x
-				<< " y:" << g_frame_data.mouse_click_y
+			std::cout << "Mouse click - x:" << g_frame_data.mouse_x
+				<< " y:" << g_frame_data.mouse_y
 				<< std::endl;
 
-			if (clicked_scene_space((int)xpos, (int)ypos))
+			if (clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y))
 			{
 				float x_NDC = (2.0f * xpos) / g_game_metrics.scene_width_px - 1.0f;
 				float y_NDC = 1.0f - (2.0f * ypos) / g_game_metrics.scene_height_px;
@@ -1089,11 +1090,16 @@ int main(int argc, char* argv[])
 				{
 					Plane* plane = &g_scene_planes[i];
 
-					glm::vec3 plane_point = plane->translation;
-					glm::vec3 planeNormal = glm::vec3(0, 1.0f, 0); // @TODO: Assume just up now
+					glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+					rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+					rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+					auto plane_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
+					auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up_vector, 1.0f));
+					planeNormal = glm::normalize(planeNormal);
 
 					// Calculate the D coefficient of the plane equation
-					float D = -glm::dot(planeNormal, plane_point);
+					float D = -glm::dot(planeNormal, plane->translation);
 
 					// Calculate t where the ray intersects the plane
 					float t = -(glm::dot(planeNormal, rayOrigin) + D) / glm::dot(planeNormal, rayDirection);
@@ -1137,7 +1143,16 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		if (g_game_inputs.mouse2.is_down)
+		if (g_game_inputs.mouse2.pressed && clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y))
+		{
+			g_camera_move_mode = true;
+		}
+		else if (!g_game_inputs.mouse2.is_down)
+		{
+			g_camera_move_mode = false;
+		}
+
+		if (g_camera_move_mode)
 		{
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
