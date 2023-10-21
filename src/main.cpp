@@ -11,6 +11,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <unordered_map>
 
 #include <glm.hpp>
 #include <gtc/quaternion.hpp>
@@ -169,17 +170,33 @@ float g_mouse_movement_y = 0;
 constexpr const int texture_path_len = 128;
 char texture_paths[][texture_path_len] = {
 	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
-	"G:/projects/game/Engine3D/resources/images/tilemap_floor_01.png"
+	"G:/projects/game/Engine3D/resources/images/tilemap_floor_01.png",
+	"G:/projects/game/Engine3D/resources/images/tile_bricks_01.png"
 };
 std::vector<const char*> g_texture_menu_items = {};
 int g_selected_texture_item = 0;
 
 typedef struct Texture {
-	char path[texture_path_len] = { 0 };
+	char file_name[texture_path_len / 2] = { 0 };
 	int texture_id;
 } Texture;
 
 std::vector<Texture> g_textures = {};
+
+// Custom hash function for char*
+struct CharPtrHash {
+	std::size_t operator()(const char* str) const {
+		return std::hash<std::string_view>{}(str);
+	}
+};
+
+// Custom equality operator for char*
+struct CharPtrEqual {
+	bool operator()(const char* a, const char* b) const {
+		return std::strcmp(a, b) == 0;
+	}
+};
+std::unordered_map<char*, int, CharPtrHash, CharPtrEqual> g_texture_menu_map = {};
 
 typedef struct Plane {
 	glm::vec3 translation;
@@ -934,10 +951,15 @@ int main(int argc, char* argv[])
 		char* path = texture_paths[i];
 		int texture_id = load_image_into_texture(path, true);
 
+		char* file_name = strrchr(path, '/');
+		file_name++;
+		ASSERT_TRUE(file_name, "Filename from file path");
+
 		Texture new_texture = { .texture_id = texture_id };
-		strncpy_s(new_texture.path, path, texture_path_len);
+		strncpy_s(new_texture.file_name, file_name, texture_path_len / 2);
 		g_textures.push_back(new_texture);
-		g_texture_menu_items.push_back(path);
+		g_texture_menu_items.push_back(file_name);
+		g_texture_menu_map[file_name] = i;
 	}
 
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
@@ -999,6 +1021,8 @@ int main(int argc, char* argv[])
 				if (0 <= g_selected_plane_index && g_selected_plane_index <= planes_last_index)
 				{
 					selected_plane = &g_scene_planes[g_selected_plane_index];
+					int texture_index = g_texture_menu_map[selected_plane->texture->file_name];
+					g_selected_texture_item = texture_index;
 				}
 				else
 				{
