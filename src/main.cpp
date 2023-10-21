@@ -166,11 +166,27 @@ bool g_camera_move_mode = false;
 float g_mouse_movement_x = 0;
 float g_mouse_movement_y = 0;
 
+constexpr const int texture_path_len = 128;
+char texture_paths[][texture_path_len] = {
+	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
+	"G:/projects/game/Engine3D/resources/images/tilemap_floor_01.png"
+};
+std::vector<const char*> g_texture_menu_items = {};
+int g_selected_texture_item = 0;
+
+typedef struct Texture {
+	char path[texture_path_len] = { 0 };
+	int texture_id;
+} Texture;
+
+std::vector<Texture> g_textures = {};
+
 typedef struct Plane {
 	glm::vec3 translation;
 	glm::vec3 rotation;
 	glm::vec3 scale;
-	int texture_id;
+	Texture* texture;
+	float uv_multiplier = 1.0f;
 } Plane;
 
 int g_selected_plane_index = -1;
@@ -359,13 +375,15 @@ void draw_plane(Plane* plane)
 	unsigned int model_loc = glGetUniformLocation(g_plane_shader, "model");
 	unsigned int view_loc = glGetUniformLocation(g_plane_shader, "view");
 	unsigned int projection_loc = glGetUniformLocation(g_plane_shader, "projection");
+	unsigned int uv_loc = glGetUniformLocation(g_plane_shader, "uv_multiplier");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
+	glUniform1f(uv_loc, plane->uv_multiplier);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, plane->texture_id);
+	glBindTexture(GL_TEXTURE_2D, plane->texture->texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	g_frame_data.draw_calls++;
 
@@ -397,9 +415,9 @@ void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness_
 
 	float vertices[] =
 	{
-		// Coords	
+		// Coords
 		start.x, start.y, start.z,
-		end.x, end.y, end.z
+		end.x,   end.y,   end.z
 	};
 
 	glBindBuffer(GL_ARRAY_BUFFER, g_line_vbo);
@@ -910,8 +928,17 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	const char* image_path = "G:/projects/game/Engine3D/resources/images/debug_img_01.png";
-	int debug_texture = load_image_into_texture(image_path, true);
+	// Init textures
+	for (int i = 0; i < (sizeof(texture_paths) / texture_path_len); i++)
+	{
+		char* path = texture_paths[i];
+		int texture_id = load_image_into_texture(path, true);
+
+		Texture new_texture = { .texture_id = texture_id };
+		strncpy_s(new_texture.path, path, texture_path_len);
+		g_textures.push_back(new_texture);
+		g_texture_menu_items.push_back(path);
+	}
 
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
@@ -948,8 +975,26 @@ int main(int argc, char* argv[])
 
 				ImGui::Begin("Properties", nullptr, 0);
 
+				if (ImGui::Button("Add plane"))
+				{
+					Plane new_plane = {
+						.translation = glm::vec3(0.0f, 0.0f, 0.0f),
+						.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
+						.scale = glm::vec3(1.0f, 1.0f, 1.0f),
+						.texture = &g_textures[0]
+					};
+
+					g_scene_planes.push_back(new_plane);
+					g_selected_plane_index = g_scene_planes.size() - 1;
+				}
+
 				Plane* selected_plane;
 				int planes_last_index = g_scene_planes.size() - 1;
+
+				ImGui::InputInt("Plane id", &g_selected_plane_index);
+
+				if (g_selected_plane_index < -1) g_selected_plane_index = -1;
+				if (g_selected_plane_index > planes_last_index) g_selected_plane_index = planes_last_index;
 
 				if (0 <= g_selected_plane_index && g_selected_plane_index <= planes_last_index)
 				{
@@ -960,30 +1005,22 @@ int main(int argc, char* argv[])
 					selected_plane = nullptr;
 				}
 
-				if (ImGui::Button("Add plane"))
-				{
-					Plane new_plane = {
-						.translation = glm::vec3(0.0f, 0.0f, 0.0f),
-						.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
-						.scale = glm::vec3(1.0f, 1.0f, 1.0f),
-						.texture_id = debug_texture
-					};
-
-					g_scene_planes.push_back(new_plane);
-					g_selected_plane_index = ++planes_last_index;
-				}
-
-				ImGui::Text("Mesh properties");
-				ImGui::InputInt("Plane id", &g_selected_plane_index);
-
-				if (g_selected_plane_index < -1) g_selected_plane_index = -1;
-				if (g_selected_plane_index > planes_last_index) g_selected_plane_index = planes_last_index;
-
 				if (selected_plane)
 				{
+					ImGui::Text("Mesh properties");
 					ImGui::InputFloat3("Translation", &selected_plane->translation[0], "%.2f");
 					ImGui::InputFloat3("Rotation", &selected_plane->rotation[0], "%.2f");
 					ImGui::InputFloat3("Scale", &selected_plane->scale[0], "%.2f");
+
+					ImGui::Text("UV properties");
+					ImGui::Image((ImTextureID)selected_plane->texture->texture_id, ImVec2(128, 128));
+
+					if (ImGui::Combo("Texture image", &g_selected_texture_item, g_texture_menu_items.data(), g_texture_menu_items.size()))
+					{
+						selected_plane->texture = &g_textures[g_selected_texture_item];
+					}
+
+					ImGui::InputFloat("UV mult", &selected_plane->uv_multiplier, 0, 0, "%.2f");
 
 					if (ImGui::Button("Delete plane"))
 					{
@@ -1055,12 +1092,12 @@ int main(int argc, char* argv[])
 		{
 			g_frame_data.mouse_clicked = true;
 
-			std::cout << "Mouse click - x:" << g_frame_data.mouse_x
-				<< " y:" << g_frame_data.mouse_y
-				<< std::endl;
-
 			if (clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y))
 			{
+				std::cout << "Mouse click - x:" << g_frame_data.mouse_x
+					<< " y:" << g_frame_data.mouse_y
+					<< std::endl;
+
 				float x_NDC = (2.0f * xpos) / g_game_metrics.scene_width_px - 1.0f;
 				float y_NDC = 1.0f - (2.0f * ypos) / g_game_metrics.scene_height_px;
 

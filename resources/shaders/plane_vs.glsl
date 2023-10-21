@@ -8,9 +8,16 @@ out vec2 TexCoord;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform float uv_multiplier;
 
 void main()
 {
+    float scale_u = length(model[0].xyz); // Scale along the X-axis
+    float scale_v = length(model[2].xyz); // Scale along the Z-axis
+
+	float used_uv_mult_u = scale_u / uv_multiplier;
+	float used_uv_mult_v = scale_v / uv_multiplier;
+
 	gl_Position = projection * view * model * vec4(aPos, 1.0);
-	TexCoord = vec2(aTexCoord.x, aTexCoord.y);
+	TexCoord = vec2(aTexCoord.x * used_uv_mult_u, aTexCoord.y * used_uv_mult_v);
 }
