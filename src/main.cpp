@@ -89,6 +89,8 @@ typedef struct GameInputs {
 	ButtonState esc;
 	ButtonState plus;
 	ButtonState minus;
+	ButtonState del;
+	ButtonState left_ctrl;
 } GameInputs;
 
 GameInputs g_game_inputs = {};
@@ -169,9 +171,9 @@ float g_mouse_movement_y = 0;
 
 constexpr const int texture_path_len = 128;
 char texture_paths[][texture_path_len] = {
-	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
 	"G:/projects/game/Engine3D/resources/images/tilemap_floor_01.png",
-	"G:/projects/game/Engine3D/resources/images/tile_bricks_01.png"
+	"G:/projects/game/Engine3D/resources/images/tile_bricks_01.png",
+	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
 };
 std::vector<const char*> g_texture_menu_items = {};
 int g_selected_texture_item = 0;
@@ -206,6 +208,7 @@ typedef struct Plane {
 	float uv_multiplier = 1.0f;
 } Plane;
 
+Plane* g_selected_plane = nullptr;
 int g_selected_plane_index = -1;
 std::vector<Plane> g_scene_planes = {};
 
@@ -768,6 +771,92 @@ bool clicked_scene_space(int x, int y)
 	return x < g_game_metrics.scene_width_px && y < g_game_metrics.scene_height_px;
 }
 
+void delete_plane(int plane_index)
+{
+	Plane last_plane = g_scene_planes[g_scene_planes.size() - 1];
+	g_scene_planes[plane_index] = last_plane;
+	g_scene_planes.pop_back();
+	g_selected_plane = nullptr;
+	g_selected_plane_index = -1;
+}
+
+int add_new_plane()
+{
+	Plane new_plane = {
+		.translation = glm::vec3(0.0f, 0.0f, 0.0f),
+		.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
+		.scale = glm::vec3(1.0f, 1.0f, 1.0f),
+		.texture = &g_textures[0]
+	};
+
+	g_scene_planes.push_back(new_plane);
+	return g_scene_planes.size() - 1;
+}
+
+void select_plane_index(int index)
+{
+	g_selected_plane = &g_scene_planes[index];
+	g_selected_plane_index = index;
+}
+
+void deselect_current_plane()
+{
+	g_selected_plane = nullptr;
+	g_selected_plane_index = -1;
+}
+
+int get_plane_intersection_from_ray(glm::vec3 ray_origin, glm::vec3 ray_direction)
+{
+	for (int i = 0; i < g_scene_planes.size(); i++)
+	{
+		Plane* plane = &g_scene_planes[i];
+
+		glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+		rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+		rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+		auto plane_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
+
+		auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up_vector, 1.0f));
+		planeNormal = glm::normalize(planeNormal);
+
+		// Calculate the D coefficient of the plane equation
+		float D = -glm::dot(planeNormal, plane->translation);
+
+		// Calculate t where the ray intersects the plane
+		float t = -(glm::dot(planeNormal, ray_origin) + D) / glm::dot(planeNormal, ray_direction);
+
+		// Check if t is non-positive (ray doesn't intersect) or invalid
+		if (t <= 0.0f || std::isinf(t) || std::isnan(t))
+		{
+			std::cout << "No intersection." << std::endl;
+			continue;
+		}
+
+		glm::vec3 intersectionPoint = ray_origin + t * ray_direction;
+		glm::vec3 intersection_vec3 = intersectionPoint - plane->translation;
+
+		// Calculate the relative position of the intersection point with respect to the plane's origin
+		glm::vec3 relativePosition = intersection_vec3 - glm::vec3(rotationMatrix[3]);
+
+		// Calculate the inverse of the plane's rotation matrix
+		glm::mat4 inverseRotationMatrix = glm::affineInverse(rotationMatrix);
+
+		// Apply the inverse rotation matrix to convert the point from world space to local space
+		glm::vec3 localIntersectionPoint = glm::vec3(inverseRotationMatrix * glm::vec4(relativePosition, 1.0f));
+
+		bool intersect_x = 0.0f <= localIntersectionPoint.x && localIntersectionPoint.x <= plane->scale.x;
+		bool intersect_z = 0.0f <= localIntersectionPoint.z && localIntersectionPoint.z <= plane->scale.z;
+
+		if (intersect_x && intersect_z)
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
 int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
@@ -836,6 +925,8 @@ int main(int argc, char* argv[])
 		g_game_inputs.esc = ButtonState{ .key = GLFW_KEY_ESCAPE };
 		g_game_inputs.plus = ButtonState{ .key = GLFW_KEY_KP_ADD };
 		g_game_inputs.minus = ButtonState{ .key = GLFW_KEY_KP_SUBTRACT };
+		g_game_inputs.del = ButtonState{ .key = GLFW_KEY_DELETE };
+		g_game_inputs.left_ctrl = ButtonState{ .key = GLFW_KEY_LEFT_CONTROL };
 	}
 
 	// Init simple rectangle shader
@@ -999,60 +1090,30 @@ int main(int argc, char* argv[])
 
 				if (ImGui::Button("Add plane"))
 				{
-					Plane new_plane = {
-						.translation = glm::vec3(0.0f, 0.0f, 0.0f),
-						.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
-						.scale = glm::vec3(1.0f, 1.0f, 1.0f),
-						.texture = &g_textures[0]
-					};
-
-					g_scene_planes.push_back(new_plane);
-					g_selected_plane_index = g_scene_planes.size() - 1;
+					int new_plane_index = add_new_plane();
+					select_plane_index(new_plane_index);
 				}
 
-				Plane* selected_plane;
-				int planes_last_index = g_scene_planes.size() - 1;
+				char selected_plane_str[24];
+				sprintf_s(selected_plane_str, "Plane index: %d", g_selected_plane_index);
+				ImGui::Text(selected_plane_str);
 
-				ImGui::InputInt("Plane id", &g_selected_plane_index);
-
-				if (g_selected_plane_index < -1) g_selected_plane_index = -1;
-				if (g_selected_plane_index > planes_last_index) g_selected_plane_index = planes_last_index;
-
-				if (0 <= g_selected_plane_index && g_selected_plane_index <= planes_last_index)
-				{
-					selected_plane = &g_scene_planes[g_selected_plane_index];
-					int texture_index = g_texture_menu_map[selected_plane->texture->file_name];
-					g_selected_texture_item = texture_index;
-				}
-				else
-				{
-					selected_plane = nullptr;
-				}
-
-				if (selected_plane)
+				if (g_selected_plane != nullptr)
 				{
 					ImGui::Text("Mesh properties");
-					ImGui::InputFloat3("Translation", &selected_plane->translation[0], "%.2f");
-					ImGui::InputFloat3("Rotation", &selected_plane->rotation[0], "%.2f");
-					ImGui::InputFloat3("Scale", &selected_plane->scale[0], "%.2f");
+					ImGui::InputFloat3("Translation", &g_selected_plane->translation[0], "%.2f");
+					ImGui::InputFloat3("Rotation", &g_selected_plane->rotation[0], "%.2f");
+					ImGui::InputFloat3("Scale", &g_selected_plane->scale[0], "%.2f");
 
 					ImGui::Text("UV properties");
-					ImGui::Image((ImTextureID)selected_plane->texture->texture_id, ImVec2(128, 128));
+					ImGui::Image((ImTextureID)g_selected_plane->texture->texture_id, ImVec2(128, 128));
 
 					if (ImGui::Combo("Texture image", &g_selected_texture_item, g_texture_menu_items.data(), g_texture_menu_items.size()))
 					{
-						selected_plane->texture = &g_textures[g_selected_texture_item];
+						g_selected_plane->texture = &g_textures[g_selected_texture_item];
 					}
 
-					ImGui::InputFloat("UV mult", &selected_plane->uv_multiplier, 0, 0, "%.2f");
-
-					if (ImGui::Button("Delete plane"))
-					{
-						Plane last_plane = g_scene_planes[planes_last_index];
-						g_scene_planes[g_selected_plane_index] = last_plane;
-						g_scene_planes.pop_back();
-						g_selected_plane_index = -1;
-					}
+					ImGui::InputFloat("UV mult", &g_selected_plane->uv_multiplier, 0, 0, "%.2f");
 				}
 
 				ImGui::Text("Game window");
@@ -1089,6 +1150,14 @@ int main(int argc, char* argv[])
 			key_state = glfwGetKey(window, g_game_inputs.esc.key);
 			g_game_inputs.esc.pressed = !g_game_inputs.esc.is_down && key_state == GLFW_PRESS;
 			g_game_inputs.esc.is_down = key_state == GLFW_PRESS;
+
+			key_state = glfwGetKey(window, g_game_inputs.del.key);
+			g_game_inputs.del.pressed = !g_game_inputs.del.is_down && key_state == GLFW_PRESS;
+			g_game_inputs.del.is_down = key_state == GLFW_PRESS;
+
+			key_state = glfwGetKey(window, g_game_inputs.left_ctrl.key);
+			g_game_inputs.left_ctrl.pressed = !g_game_inputs.left_ctrl.is_down && key_state == GLFW_PRESS;
+			g_game_inputs.left_ctrl.is_down = key_state == GLFW_PRESS;
 		}
 
 		// Logic
@@ -1147,65 +1216,31 @@ int main(int argc, char* argv[])
 				glm::vec4 ray_world = inverse_view * ray_eye;
 				ray_world = glm::normalize(ray_world);
 
-				glm::vec3 rayOrigin = g_scene_camera.position;
-				glm::vec3 rayDirection = ray_world;
+				glm::vec3 ray_origin = g_scene_camera.position;
+				glm::vec3 ray_direction = ray_world;
 
 				// Debug line
-				g_debug_click_ray_normal = rayDirection;
-				g_debug_click_camera_pos = rayOrigin;
-
-				bool selected_plane = false;
-
-				for (int i = 0; i < g_scene_planes.size(); i++)
+				if (g_game_inputs.left_ctrl.is_down)
 				{
-					Plane* plane = &g_scene_planes[i];
-
-					glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-					rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-					rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-
-					auto plane_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
-
-					auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up_vector, 1.0f));
-					planeNormal = glm::normalize(planeNormal);
-
-					// Calculate the D coefficient of the plane equation
-					float D = -glm::dot(planeNormal, plane->translation);
-
-					// Calculate t where the ray intersects the plane
-					float t = -(glm::dot(planeNormal, rayOrigin) + D) / glm::dot(planeNormal, rayDirection);
-
-					// Check if t is non-positive (ray doesn't intersect) or invalid
-					if (t <= 0.0f || std::isinf(t) || std::isnan(t))
-					{
-						std::cout << "No intersection." << std::endl;
-						continue;
-					}
-
-					glm::vec3 intersectionPoint = rayOrigin + t * rayDirection;
-					glm::vec3 intersection_vec3 = intersectionPoint - plane->translation;
-
-					// Calculate the relative position of the intersection point with respect to the plane's origin
-					glm::vec3 relativePosition = intersection_vec3 - glm::vec3(rotationMatrix[3]);
-
-					// Calculate the inverse of the plane's rotation matrix
-					glm::mat4 inverseRotationMatrix = glm::affineInverse(rotationMatrix);
-
-					// Apply the inverse rotation matrix to convert the point from world space to local space
-					glm::vec3 localIntersectionPoint = glm::vec3(inverseRotationMatrix * glm::vec4(relativePosition, 1.0f));
-
-					bool intersect_x = 0.0f <= localIntersectionPoint.x && localIntersectionPoint.x <= plane->scale.x;
-					bool intersect_z = 0.0f <= localIntersectionPoint.z && localIntersectionPoint.z <= plane->scale.z;
-
-					if (intersect_x && intersect_z)
-					{
-						g_selected_plane_index = i;
-						selected_plane = true;
-						break;
-					}
+					g_debug_click_ray_normal = ray_direction;
+					g_debug_click_camera_pos = ray_origin;
+				}
+				else
+				{
+					g_debug_click_ray_normal = glm::vec3(0.0f);
+					g_debug_click_camera_pos = glm::vec3(0.0f);
 				}
 
-				if (!selected_plane) g_selected_plane_index = -1;
+				int selected_plane_i = get_plane_intersection_from_ray(ray_origin, ray_direction);
+
+				if (selected_plane_i != -1)
+				{
+					select_plane_index(selected_plane_i);
+				}
+				else
+				{
+					deselect_current_plane();
+				}
 			}
 		}
 
@@ -1266,6 +1301,11 @@ int main(int argc, char* argv[])
 		else
 		{
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
+
+		if (g_game_inputs.del.pressed && g_selected_plane != nullptr)
+		{
+			delete_plane(g_selected_plane_index);
 		}
 
 		// Draw
@@ -1331,7 +1371,7 @@ int main(int argc, char* argv[])
 		g_frame_data.draw_calls = 0;
 	}
 
-	glfwTerminate(); // @Performance: Unnecessary slowdown
+	glfwTerminate(); // @Performance: Unnecessary slowdown?
 
 	return 0;
 }
