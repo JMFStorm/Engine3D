@@ -25,6 +25,8 @@
 
 #include "utils.h"
 
+glm::vec3 lastMousePos(0.0f);
+
 constexpr int right_hand_panel_width = 400;
 
 typedef struct UserSettings {
@@ -91,6 +93,7 @@ typedef struct GameInputs {
 	ButtonState minus;
 	ButtonState del;
 	ButtonState left_ctrl;
+	ButtonState space;
 } GameInputs;
 
 GameInputs g_game_inputs = {};
@@ -372,25 +375,44 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(0);
 }
 
+inline glm::mat4 get_projection_matrix()
+{
+	glm::mat4 projection = glm::perspective(
+		glm::radians(g_scene_camera.fov),
+		g_scene_camera.aspect_ratio_horizontal,
+		g_scene_camera.near_clip,
+		g_scene_camera.far_clip);
+	return projection;
+}
+
+inline glm::mat4 get_view_matrix()
+{
+	glm::mat4 view = glm::lookAt(
+		g_scene_camera.position,
+		g_scene_camera.position + g_scene_camera.front_vec,
+		g_scene_camera.up_vec);
+	return view;
+}
+
+inline glm::mat4 get_model_matrix(Plane* plane)
+{
+	glm::mat4 model = glm::mat4(1.0f);
+	model = glm::translate(model, plane->translation);
+	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	model = glm::scale(model, plane->scale);
+	return model;
+}
+
 void draw_plane(Plane* plane)
 {
 	glUseProgram(g_plane_shader);
 	glBindVertexArray(g_plane_vao);
 
-	glm::mat4 model = glm::mat4(1.0f);
-
-	model = glm::translate(model, plane->translation);
-
-	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-
-	model = glm::scale(model, plane->scale);
-
-	glm::mat4 projection = glm::perspective(glm::radians(g_scene_camera.fov), g_scene_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
-
-	auto new_mat_4 = g_scene_camera.position + g_scene_camera.front_vec;
-	glm::mat4 view = glm::lookAt(g_scene_camera.position, new_mat_4, g_scene_camera.up_vec);
+	glm::mat4 model = get_model_matrix(plane);
+	glm::mat4 projection = get_projection_matrix();
+	glm::mat4 view = get_view_matrix();
 	
 	unsigned int model_loc = glGetUniformLocation(g_plane_shader, "model");
 	unsigned int view_loc = glGetUniformLocation(g_plane_shader, "view");
@@ -936,6 +958,7 @@ int main(int argc, char* argv[])
 		g_game_inputs.minus = ButtonState{ .key = GLFW_KEY_KP_SUBTRACT };
 		g_game_inputs.del = ButtonState{ .key = GLFW_KEY_DELETE };
 		g_game_inputs.left_ctrl = ButtonState{ .key = GLFW_KEY_LEFT_CONTROL };
+		g_game_inputs.space = ButtonState{ .key = GLFW_KEY_SPACE };
 	}
 
 	// Init simple rectangle shader
@@ -1164,6 +1187,10 @@ int main(int argc, char* argv[])
 			g_game_inputs.del.pressed = !g_game_inputs.del.is_down && key_state == GLFW_PRESS;
 			g_game_inputs.del.is_down = key_state == GLFW_PRESS;
 
+			key_state = glfwGetKey(window, g_game_inputs.space.key);
+			g_game_inputs.space.pressed = !g_game_inputs.space.is_down && key_state == GLFW_PRESS;
+			g_game_inputs.space.is_down = key_state == GLFW_PRESS;
+
 			key_state = glfwGetKey(window, g_game_inputs.left_ctrl.key);
 			g_game_inputs.left_ctrl.pressed = !g_game_inputs.left_ctrl.is_down && key_state == GLFW_PRESS;
 			g_game_inputs.left_ctrl.is_down = key_state == GLFW_PRESS;
@@ -1205,16 +1232,8 @@ int main(int argc, char* argv[])
 
 				glm::vec4 ray_clip(x_NDC, y_NDC, -1.0f, 1.0f);
 
-				glm::mat4 projection = glm::perspective(
-					glm::radians(g_scene_camera.fov),
-					g_scene_camera.aspect_ratio_horizontal,
-					g_scene_camera.near_clip,
-					g_scene_camera.far_clip);
-
-				glm::mat4 view = glm::lookAt(
-					g_scene_camera.position,
-					g_scene_camera.position + g_scene_camera.front_vec,
-					g_scene_camera.up_vec);
+				glm::mat4 projection = get_projection_matrix();
+				glm::mat4 view = get_view_matrix();
 
 				glm::mat4 inverse_projection = glm::inverse(projection);
 				glm::mat4 inverse_view = glm::inverse(view);
@@ -1317,6 +1336,11 @@ int main(int argc, char* argv[])
 			delete_plane(g_selected_plane_index);
 		}
 
+		if (g_game_inputs.space.is_down && g_selected_plane != nullptr)
+		{
+			
+		}
+
 		// Draw
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1328,26 +1352,28 @@ int main(int argc, char* argv[])
 			draw_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f), 1.0f, 1.0f);
 		}
 
+		// Draw selection
 		if (-1 < g_selected_plane_index)
 		{
 			Plane selected_plane = g_scene_planes[g_selected_plane_index];
 			draw_selection_arrows(selected_plane.translation);
 
 			glm::vec3 bot_left = selected_plane.translation;
+			glm::vec3 bot_right = glm::vec3(0.0f, 0, 1.0f);
+			glm::vec3 top_left  = glm::vec3(1.0f, 0, 0.0f);
+			glm::vec3 top_right = glm::vec3(1.0f, 0, 1.0f);
 
-			glm::vec3 bot_right = bot_left;
-			bot_right.x += selected_plane.scale.x;
+			auto model = get_model_matrix(&selected_plane);
 
-			glm::vec3 top_left = bot_left;
-			top_left.z += selected_plane.scale.z;
+			glm::vec4 new_bot_right = model * glm::vec4(bot_right, 1.0f);
+			glm::vec4 new_top_left  = model * glm::vec4(top_left,  1.0f);
+			glm::vec4 new_top_right = model * glm::vec4(top_right, 1.0f);
 
-			glm::vec3 top_right = top_left;
-			top_right.x += selected_plane.scale.x;
+			draw_line(bot_left,		 glm::vec3(new_top_left),  glm::vec3(1.0f), 1.0f, 3.0f);
+			draw_line(bot_left,		 glm::vec3(new_bot_right), glm::vec3(1.0f), 1.0f, 3.0f);
+			draw_line(new_top_right, glm::vec3(new_top_left),  glm::vec3(1.0f), 1.0f, 3.0f);
+			draw_line(new_top_right, glm::vec3(new_bot_right), glm::vec3(1.0f), 1.0f, 3.0f);
 
-			draw_line(bot_left, bot_right,  glm::vec3(1.0f, 1.0f, 1.0f), 2.0f, 2.0f);
-			draw_line(bot_left, top_left,   glm::vec3(1.0f, 1.0f, 1.0f), 2.0f, 2.0f);
-			draw_line(top_left, top_right,  glm::vec3(1.0f, 1.0f, 1.0f), 2.0f, 2.0f);
-			draw_line(bot_right, top_right, glm::vec3(1.0f, 1.0f, 1.0f), 2.0f, 2.0f);
 		}
 
 		// Click ray
