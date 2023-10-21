@@ -805,11 +805,14 @@ void deselect_current_plane()
 	g_selected_plane_index = -1;
 }
 
-int get_plane_intersection_from_ray(glm::vec3 ray_origin, glm::vec3 ray_direction)
+int get_plane_intersection_from_ray(std::vector<Plane>& planes, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
-	for (int i = 0; i < g_scene_planes.size(); i++)
+	int index = -1;
+	float closest_dist = std::numeric_limits<float>::max();
+
+	for (int i = 0; i < planes.size(); i++)
 	{
-		Plane* plane = &g_scene_planes[i];
+		Plane* plane = &planes[i];
 
 		glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
 		rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -850,11 +853,17 @@ int get_plane_intersection_from_ray(glm::vec3 ray_origin, glm::vec3 ray_directio
 
 		if (intersect_x && intersect_z)
 		{
-			return i;
+			float dist = glm::length(ray_origin - plane->translation);
+
+			if (dist < closest_dist)
+			{
+				closest_dist = dist;
+				index = i;
+			}
 		}
 	}
 
-	return -1;
+	return index;
 }
 
 int main(int argc, char* argv[])
@@ -1231,7 +1240,7 @@ int main(int argc, char* argv[])
 					g_debug_click_camera_pos = glm::vec3(0.0f);
 				}
 
-				int selected_plane_i = get_plane_intersection_from_ray(ray_origin, ray_direction);
+				int selected_plane_i = get_plane_intersection_from_ray(g_scene_planes, ray_origin, ray_direction);
 
 				if (selected_plane_i != -1)
 				{
@@ -1323,6 +1332,22 @@ int main(int argc, char* argv[])
 		{
 			Plane selected_plane = g_scene_planes[g_selected_plane_index];
 			draw_selection_arrows(selected_plane.translation);
+
+			glm::vec3 bot_left = selected_plane.translation;
+
+			glm::vec3 bot_right = bot_left;
+			bot_right.x += selected_plane.scale.x;
+
+			glm::vec3 top_left = bot_left;
+			top_left.z += selected_plane.scale.z;
+
+			glm::vec3 top_right = top_left;
+			top_right.x += selected_plane.scale.x;
+
+			draw_line(bot_left, bot_right,  glm::vec3(1.0f, 1.0f, 1.0f), 2.0f, 2.0f);
+			draw_line(bot_left, top_left,   glm::vec3(1.0f, 1.0f, 1.0f), 2.0f, 2.0f);
+			draw_line(top_left, top_right,  glm::vec3(1.0f, 1.0f, 1.0f), 2.0f, 2.0f);
+			draw_line(bot_right, top_right, glm::vec3(1.0f, 1.0f, 1.0f), 2.0f, 2.0f);
 		}
 
 		// Click ray
