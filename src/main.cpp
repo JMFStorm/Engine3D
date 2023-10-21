@@ -57,6 +57,8 @@ int g_text_indicies = 0;
 glm::vec3 g_debug_click_camera_pos = glm::vec3(0, 0, 0);
 glm::vec3 g_debug_click_ray_normal = glm::vec3(0, 0, 0);
 
+glm::vec3 g_debug_plane_intersection = glm::vec3(0, 0, 0);
+
 typedef struct FrameData {
 	float mouse_x;
 	float mouse_y;
@@ -827,6 +829,30 @@ void deselect_current_plane()
 	g_selected_plane_index = -1;
 }
 
+bool calculate_plane_ray_intersection(
+	glm::vec3 plane_normal,
+	glm::vec3 plane_position,
+	glm::vec3 ray_origin,
+	glm::vec3 ray_direction,
+	glm::vec3& result)
+{
+	// Calculate the D coefficient of the plane equation
+	float D = -glm::dot(plane_normal, plane_position);
+
+	// Calculate t where the ray intersects the plane
+	float t = -(glm::dot(plane_normal, ray_origin) + D) / glm::dot(plane_normal, ray_direction);
+
+	// Check if t is non-positive (ray doesn't intersect) or invalid
+	if (t <= 0.0f || std::isinf(t) || std::isnan(t))
+	{
+		return false;
+	}
+
+	glm::vec3 intersection_point = ray_origin + t * ray_direction;
+	result = intersection_point;
+	return true;
+}
+
 int get_plane_intersection_from_ray(std::vector<Plane>& planes, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
 	int index = -1;
@@ -845,33 +871,26 @@ int get_plane_intersection_from_ray(std::vector<Plane>& planes, glm::vec3 ray_or
 		auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up_vector, 1.0f));
 		planeNormal = glm::normalize(planeNormal);
 
-		// Calculate the D coefficient of the plane equation
-		float D = -glm::dot(planeNormal, plane->translation);
+		glm::vec3 intersection_point = glm::vec3(0);
 
-		// Calculate t where the ray intersects the plane
-		float t = -(glm::dot(planeNormal, ray_origin) + D) / glm::dot(planeNormal, ray_direction);
+		bool intersection = calculate_plane_ray_intersection(
+			planeNormal, plane->translation, ray_origin, ray_direction, intersection_point);
 
-		// Check if t is non-positive (ray doesn't intersect) or invalid
-		if (t <= 0.0f || std::isinf(t) || std::isnan(t))
-		{
-			std::cout << "No intersection." << std::endl;
-			continue;
-		}
+		if (!intersection) continue;
 
-		glm::vec3 intersectionPoint = ray_origin + t * ray_direction;
-		glm::vec3 intersection_vec3 = intersectionPoint - plane->translation;
+		glm::vec3 intersection_vec3 = intersection_point - plane->translation;
 
 		// Calculate the relative position of the intersection point with respect to the plane's origin
-		glm::vec3 relativePosition = intersection_vec3 - glm::vec3(rotationMatrix[3]);
+		glm::vec3 relative_position = intersection_vec3 - glm::vec3(rotationMatrix[3]);
 
 		// Calculate the inverse of the plane's rotation matrix
-		glm::mat4 inverseRotationMatrix = glm::affineInverse(rotationMatrix);
+		glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotationMatrix);
 
 		// Apply the inverse rotation matrix to convert the point from world space to local space
-		glm::vec3 localIntersectionPoint = glm::vec3(inverseRotationMatrix * glm::vec4(relativePosition, 1.0f));
+		glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
 
-		bool intersect_x = 0.0f <= localIntersectionPoint.x && localIntersectionPoint.x <= plane->scale.x;
-		bool intersect_z = 0.0f <= localIntersectionPoint.z && localIntersectionPoint.z <= plane->scale.z;
+		bool intersect_x = 0.0f <= local_intersection_point.x && local_intersection_point.x <= plane->scale.x;
+		bool intersect_z = 0.0f <= local_intersection_point.z && local_intersection_point.z <= plane->scale.z;
 
 		if (intersect_x && intersect_z)
 		{
@@ -886,6 +905,28 @@ int get_plane_intersection_from_ray(std::vector<Plane>& planes, glm::vec3 ray_or
 	}
 
 	return index;
+}
+
+inline glm::vec3 get_camera_ray_from_scene_px(int x, int y)
+{
+	float x_NDC = (2.0f * x) / g_game_metrics.scene_width_px - 1.0f;
+	float y_NDC = 1.0f - (2.0f * y) / g_game_metrics.scene_height_px;
+
+	glm::vec4 ray_clip(x_NDC, y_NDC, -1.0f, 1.0f);
+
+	glm::mat4 projection = get_projection_matrix();
+	glm::mat4 view = get_view_matrix();
+
+	glm::mat4 inverse_projection = glm::inverse(projection);
+	glm::mat4 inverse_view = glm::inverse(view);
+
+	glm::vec4 ray_eye = inverse_projection * ray_clip;
+	ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0, 0.0);
+
+	glm::vec4 ray_world = inverse_view * ray_eye;
+	ray_world = glm::normalize(ray_world);
+
+	return glm::vec3(ray_world);
 }
 
 int main(int argc, char* argv[])
@@ -1227,25 +1268,8 @@ int main(int argc, char* argv[])
 					<< " y:" << g_frame_data.mouse_y
 					<< std::endl;
 
-				float x_NDC = (2.0f * xpos) / g_game_metrics.scene_width_px - 1.0f;
-				float y_NDC = 1.0f - (2.0f * ypos) / g_game_metrics.scene_height_px;
-
-				glm::vec4 ray_clip(x_NDC, y_NDC, -1.0f, 1.0f);
-
-				glm::mat4 projection = get_projection_matrix();
-				glm::mat4 view = get_view_matrix();
-
-				glm::mat4 inverse_projection = glm::inverse(projection);
-				glm::mat4 inverse_view = glm::inverse(view);
-
-				glm::vec4 ray_eye = inverse_projection * ray_clip;
-				ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0, 0.0);
-
-				glm::vec4 ray_world = inverse_view * ray_eye;
-				ray_world = glm::normalize(ray_world);
-
 				glm::vec3 ray_origin = g_scene_camera.position;
-				glm::vec3 ray_direction = ray_world;
+				glm::vec3 ray_direction = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
 				// Debug line
 				if (g_game_inputs.left_ctrl.is_down)
@@ -1338,12 +1362,57 @@ int main(int argc, char* argv[])
 
 		if (g_game_inputs.space.is_down && g_selected_plane != nullptr)
 		{
-			
+			// @TODO: use x,y,z keys for debug dev next
+
+			auto normal_vector_y = glm::vec3(0, 1.0f, 0);
+			auto normal_vector_z = glm::vec3(0, 0, 1.0f);
+
+			glm::vec3 my_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
+
+			float dot_y = glm::dot(normal_vector_y, my_ray);
+			float dot_z = glm::dot(normal_vector_z, my_ray);
+
+			glm::vec3 used_normal;
+
+			if (dot_z < dot_y)
+			{
+				used_normal = normal_vector_z;
+			}
+			else
+			{
+				used_normal = normal_vector_y;
+			}
+
+			glm::vec3 intersection_point;
+
+			bool intersection = calculate_plane_ray_intersection(
+				used_normal,
+				g_selected_plane->translation,
+				g_scene_camera.position,
+				my_ray,
+				intersection_point);
+
+			if (intersection)
+			{
+				g_debug_plane_intersection = intersection_point;
+			}
+			else
+			{
+				g_debug_plane_intersection = glm::vec3(1000, 1000, 1000);
+			}
 		}
 
 		// Draw
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		if (g_selected_plane != nullptr)
+		{
+			draw_line(g_debug_plane_intersection, g_selected_plane->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
+			glm::vec3 end = glm::vec3(g_selected_plane->translation);
+			end.x = g_debug_plane_intersection.x;
+			draw_line(g_debug_plane_intersection, end, glm::vec3(0.0f, 1.0f, 0.0f), 2.0f, 2.0f);
+		}
 
 		// Coordinate lines
 		{
