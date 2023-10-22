@@ -247,6 +247,9 @@ glm::vec3 g_used_normal;
 glm::vec3 g_used_ray;
 glm::vec3 g_prev_intersection;
 glm::vec3 g_new_translation;
+glm::vec3 g_new_scale;
+glm::vec3 g_point_on_scale_plane;
+glm::vec3 g_prev_point_on_scale_plane;
 
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
@@ -1491,6 +1494,8 @@ int main(int argc, char* argv[])
 			auto normal_vector_y = glm::vec3(0, 1.0f, 0);
 			auto normal_vector_z = glm::vec3(0, 0, 1.0f);
 
+			// @TODO: Cleanup
+
 			if (g_transform_mode.transformation != Transformation::Rotate)
 			{
 				g_transform_mode.is_active = true;
@@ -1544,6 +1549,7 @@ int main(int argc, char* argv[])
 
 				g_prev_intersection = intersection_point;
 				g_new_translation = g_selected_plane->translation;
+				g_new_scale = g_selected_plane->scale;
 			}
 		}
 		else if (!g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.y.is_down)
@@ -1564,6 +1570,8 @@ int main(int argc, char* argv[])
 				g_scene_camera.position,
 				g_used_ray,
 				intersection_point);
+
+			// @TODO: Cleanup
 
 			g_debug_plane_intersection = intersection_point;
 			glm::vec3 travel_dist = intersection_point - g_prev_intersection;
@@ -1594,6 +1602,61 @@ int main(int argc, char* argv[])
 				else
 				{
 					g_selected_plane->translation = g_new_translation;
+				}
+			}
+
+			if (intersection && g_transform_mode.transformation == Transformation::Scale)
+			{
+				glm::mat4 rotation_mat4 = get_rotation_matrix(g_selected_plane);
+				glm::vec3 used_normal = glm::vec3(0);
+
+				if (g_transform_mode.axis == Axis::X)
+				{
+					used_normal = glm::vec3(1.0f, 0, 0);
+				}
+				if (g_transform_mode.axis == Axis::Y)
+				{
+					used_normal = glm::vec3(0, 1.0f, 0);
+				}
+				if (g_transform_mode.axis == Axis::Z)
+				{
+					used_normal = glm::vec3(0, 0, 1.0f);
+				}
+
+				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
+				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, g_selected_plane->translation, used_normal);
+				g_point_on_scale_plane = point_on_scale_plane;
+
+				// Reverse the rotation by applying the inverse rotation matrix to the vector
+				glm::vec3 reversedVector =  glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
+				glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_prev_point_on_scale_plane, 1.0f);
+
+				glm::vec3 travel_dist = reversedVector - reversedVector2;
+				g_prev_point_on_scale_plane = point_on_scale_plane;
+
+				if (g_transform_mode.axis == Axis::X)
+				{
+					g_new_scale.x += travel_dist.x;
+				}
+				if (g_transform_mode.axis == Axis::Y)
+				{
+					g_new_scale.y += travel_dist.y;
+				}
+				if (g_transform_mode.axis == Axis::Z)
+				{
+					g_new_scale.z += travel_dist.z;
+				}
+
+				if (0.0f < g_user_settings.transform_clip)
+				{
+					float rounded_x = roundf(g_new_scale.x / g_user_settings.transform_clip) * g_user_settings.transform_clip;
+					float rounded_y = roundf(g_new_scale.y / g_user_settings.transform_clip) * g_user_settings.transform_clip;
+					float rounded_z = roundf(g_new_scale.z / g_user_settings.transform_clip) * g_user_settings.transform_clip;
+					g_selected_plane->scale = glm::vec3(rounded_x, rounded_y, rounded_z);
+				}
+				else
+				{
+					g_selected_plane->scale = g_new_scale;
 				}
 			}
 		}
