@@ -90,6 +90,7 @@ typedef struct GameInputs {
 	ButtonState x;
 	ButtonState c;
 	ButtonState v;
+	ButtonState y;
 	ButtonState esc;
 	ButtonState plus;
 	ButtonState minus;
@@ -98,7 +99,12 @@ typedef struct GameInputs {
 	ButtonState space;
 } GameInputs;
 
-GameInputs g_game_inputs = {};
+union GameInputsU {
+	GameInputs as_struct;
+	ButtonState as_array[sizeof(GameInputs)];
+};
+
+GameInputsU g_inputs = {};
 
 typedef struct GameMetrics {
 	unsigned long frames;
@@ -216,6 +222,34 @@ typedef struct Plane {
 Plane* g_selected_plane = nullptr;
 int g_selected_plane_index = -1;
 std::vector<Plane> g_scene_planes = {};
+
+enum Axis {
+	X,
+	Y,
+	Z
+};
+
+enum Transformation {
+	Translate,
+	Rotate,
+	Scale
+};
+
+typedef struct TransformationMode {
+	Axis axis;
+	Transformation transformation;
+	bool is_active;
+} TransformationMode;
+
+TransformationMode g_transform_mode = {};
+glm::vec3 g_test_planes[2] = {};
+glm::vec3 g_used_normal;
+glm::vec3 g_used_ray;
+glm::vec3 g_prev_intersection;
+
+auto normal_vector_x = glm::vec3(1.0f, 0, 0);
+auto normal_vector_y = glm::vec3(0, 1.0f, 0);
+auto normal_vector_z = glm::vec3(0, 0, 1.0f);
 
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
@@ -929,6 +963,13 @@ inline glm::vec3 get_camera_ray_from_scene_px(int x, int y)
 	return glm::vec3(ray_world);
 }
 
+inline void set_button_state(GLFWwindow* window, ButtonState* button)
+{
+	int key_state = glfwGetKey(window, button->key);
+	button->pressed = !button->is_down && key_state == GLFW_PRESS;
+	button->is_down = key_state == GLFW_PRESS;
+}
+
 int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
@@ -979,27 +1020,28 @@ int main(int argc, char* argv[])
 
 	// Init game inputs
 	{
-		g_game_inputs.mouse1 = ButtonState{ .key = GLFW_MOUSE_BUTTON_1 };
-		g_game_inputs.mouse2 = ButtonState{ .key = GLFW_MOUSE_BUTTON_2 };
+		g_inputs.as_struct.mouse1 = ButtonState{ .key = GLFW_MOUSE_BUTTON_1 };
+		g_inputs.as_struct.mouse2 = ButtonState{ .key = GLFW_MOUSE_BUTTON_2 };
 
-		g_game_inputs.q = ButtonState{ .key = GLFW_KEY_Q };
-		g_game_inputs.w = ButtonState{ .key = GLFW_KEY_W };
-		g_game_inputs.e = ButtonState{ .key = GLFW_KEY_E };
-		g_game_inputs.r = ButtonState{ .key = GLFW_KEY_R };
-		g_game_inputs.a = ButtonState{ .key = GLFW_KEY_A };
-		g_game_inputs.s = ButtonState{ .key = GLFW_KEY_S };
-		g_game_inputs.d = ButtonState{ .key = GLFW_KEY_D };
-		g_game_inputs.f = ButtonState{ .key = GLFW_KEY_F };
-		g_game_inputs.z = ButtonState{ .key = GLFW_KEY_Z };
-		g_game_inputs.x = ButtonState{ .key = GLFW_KEY_X };
-		g_game_inputs.c = ButtonState{ .key = GLFW_KEY_C };
-		g_game_inputs.v = ButtonState{ .key = GLFW_KEY_V };
-		g_game_inputs.esc = ButtonState{ .key = GLFW_KEY_ESCAPE };
-		g_game_inputs.plus = ButtonState{ .key = GLFW_KEY_KP_ADD };
-		g_game_inputs.minus = ButtonState{ .key = GLFW_KEY_KP_SUBTRACT };
-		g_game_inputs.del = ButtonState{ .key = GLFW_KEY_DELETE };
-		g_game_inputs.left_ctrl = ButtonState{ .key = GLFW_KEY_LEFT_CONTROL };
-		g_game_inputs.space = ButtonState{ .key = GLFW_KEY_SPACE };
+		g_inputs.as_struct.q = ButtonState{ .key = GLFW_KEY_Q };
+		g_inputs.as_struct.w = ButtonState{ .key = GLFW_KEY_W };
+		g_inputs.as_struct.e = ButtonState{ .key = GLFW_KEY_E };
+		g_inputs.as_struct.r = ButtonState{ .key = GLFW_KEY_R };
+		g_inputs.as_struct.a = ButtonState{ .key = GLFW_KEY_A };
+		g_inputs.as_struct.s = ButtonState{ .key = GLFW_KEY_S };
+		g_inputs.as_struct.d = ButtonState{ .key = GLFW_KEY_D };
+		g_inputs.as_struct.f = ButtonState{ .key = GLFW_KEY_F };
+		g_inputs.as_struct.z = ButtonState{ .key = GLFW_KEY_Z };
+		g_inputs.as_struct.x = ButtonState{ .key = GLFW_KEY_X };
+		g_inputs.as_struct.c = ButtonState{ .key = GLFW_KEY_C };
+		g_inputs.as_struct.v = ButtonState{ .key = GLFW_KEY_V };
+		g_inputs.as_struct.y = ButtonState{ .key = GLFW_KEY_Y };
+		g_inputs.as_struct.esc = ButtonState{ .key = GLFW_KEY_ESCAPE };
+		g_inputs.as_struct.plus = ButtonState{ .key = GLFW_KEY_KP_ADD };
+		g_inputs.as_struct.minus = ButtonState{ .key = GLFW_KEY_KP_SUBTRACT };
+		g_inputs.as_struct.del = ButtonState{ .key = GLFW_KEY_DELETE };
+		g_inputs.as_struct.left_ctrl = ButtonState{ .key = GLFW_KEY_LEFT_CONTROL };
+		g_inputs.as_struct.space = ButtonState{ .key = GLFW_KEY_SPACE };
 	}
 
 	// Init simple rectangle shader
@@ -1205,36 +1247,28 @@ int main(int argc, char* argv[])
 		{
 			g_frame_data.mouse_clicked = false;
 
-			if (glfwGetKey(window, g_game_inputs.esc.key) == GLFW_PRESS)
+			if (glfwGetKey(window, g_inputs.as_struct.esc.key) == GLFW_PRESS)
 			{
 				glfwSetWindowShouldClose(window, true);
 			}
 
 			int key_state;
 
-			key_state = glfwGetMouseButton(window, g_game_inputs.mouse1.key);
-			g_game_inputs.mouse1.pressed = !g_game_inputs.mouse1.is_down && key_state == GLFW_PRESS;
-			g_game_inputs.mouse1.is_down = key_state == GLFW_PRESS;
+			key_state = glfwGetMouseButton(window, g_inputs.as_struct.mouse1.key);
+			g_inputs.as_struct.mouse1.pressed = !g_inputs.as_struct.mouse1.is_down && key_state == GLFW_PRESS;
+			g_inputs.as_struct.mouse1.is_down = key_state == GLFW_PRESS;
 
-			key_state = glfwGetMouseButton(window, g_game_inputs.mouse2.key);
-			g_game_inputs.mouse2.pressed = !g_game_inputs.mouse2.is_down && key_state == GLFW_PRESS;
-			g_game_inputs.mouse2.is_down = key_state == GLFW_PRESS;
+			key_state = glfwGetMouseButton(window, g_inputs.as_struct.mouse2.key);
+			g_inputs.as_struct.mouse2.pressed = !g_inputs.as_struct.mouse2.is_down && key_state == GLFW_PRESS;
+			g_inputs.as_struct.mouse2.is_down = key_state == GLFW_PRESS;
 
-			key_state = glfwGetKey(window, g_game_inputs.esc.key);
-			g_game_inputs.esc.pressed = !g_game_inputs.esc.is_down && key_state == GLFW_PRESS;
-			g_game_inputs.esc.is_down = key_state == GLFW_PRESS;
+			int buttons_count = sizeof(g_inputs) / sizeof(ButtonState);
 
-			key_state = glfwGetKey(window, g_game_inputs.del.key);
-			g_game_inputs.del.pressed = !g_game_inputs.del.is_down && key_state == GLFW_PRESS;
-			g_game_inputs.del.is_down = key_state == GLFW_PRESS;
-
-			key_state = glfwGetKey(window, g_game_inputs.space.key);
-			g_game_inputs.space.pressed = !g_game_inputs.space.is_down && key_state == GLFW_PRESS;
-			g_game_inputs.space.is_down = key_state == GLFW_PRESS;
-
-			key_state = glfwGetKey(window, g_game_inputs.left_ctrl.key);
-			g_game_inputs.left_ctrl.pressed = !g_game_inputs.left_ctrl.is_down && key_state == GLFW_PRESS;
-			g_game_inputs.left_ctrl.is_down = key_state == GLFW_PRESS;
+			for (int i = 2; i < buttons_count - 1; i++) // Skip 2 mouse buttons
+			{
+				ButtonState* button = &g_inputs.as_array[i];
+				set_button_state(window, button);
+			}
 		}
 
 		// Logic
@@ -1258,7 +1292,7 @@ int main(int argc, char* argv[])
 			g_game_metrics.fps_prev_second = current_game_second;
 		}
 
-		if (g_game_inputs.mouse1.pressed)
+		if (g_inputs.as_struct.mouse1.pressed)
 		{
 			g_frame_data.mouse_clicked = true;
 
@@ -1272,7 +1306,7 @@ int main(int argc, char* argv[])
 				glm::vec3 ray_direction = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
 				// Debug line
-				if (g_game_inputs.left_ctrl.is_down)
+				if (g_inputs.as_struct.left_ctrl.is_down)
 				{
 					g_debug_click_ray_normal = ray_direction;
 					g_debug_click_camera_pos = ray_origin;
@@ -1296,11 +1330,11 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		if (g_game_inputs.mouse2.pressed && clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y))
+		if (g_inputs.as_struct.mouse2.pressed && clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y))
 		{
 			g_camera_move_mode = true;
 		}
-		else if (!g_game_inputs.mouse2.is_down)
+		else if (!g_inputs.as_struct.mouse2.is_down)
 		{
 			g_camera_move_mode = false;
 		}
@@ -1355,46 +1389,101 @@ int main(int argc, char* argv[])
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 
-		if (g_game_inputs.del.pressed && g_selected_plane != nullptr)
+		if (g_inputs.as_struct.del.pressed && g_selected_plane != nullptr)
 		{
 			delete_plane(g_selected_plane_index);
 		}
 
-		if (g_game_inputs.space.is_down && g_selected_plane != nullptr)
+		if (g_selected_plane != nullptr
+			&& (g_inputs.as_struct.z.pressed
+				|| g_inputs.as_struct.x.pressed
+				|| g_inputs.as_struct.y.pressed))
 		{
-			// @TODO: use x,y,z keys for debug dev next
+			if		(g_inputs.as_struct.x.is_down) g_transform_mode.axis = Axis::X;
+			else if (g_inputs.as_struct.y.is_down) g_transform_mode.axis = Axis::Y;
+			else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = Axis::Z;
 
-			auto normal_vector_y = glm::vec3(0, 1.0f, 0);
-			auto normal_vector_z = glm::vec3(0, 0, 1.0f);
+			g_transform_mode.transformation = Transformation::Translate;
+			g_transform_mode.is_active = true;
 
-			glm::vec3 my_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
-
-			float dot_y = glm::dot(normal_vector_y, my_ray);
-			float dot_z = glm::dot(normal_vector_z, my_ray);
-
-			glm::vec3 used_normal;
-
-			if (dot_z < dot_y)
+			if (g_transform_mode.axis == Axis::X)
 			{
-				used_normal = normal_vector_z;
+				g_test_planes[0] = normal_vector_y;
+				g_test_planes[1] = normal_vector_z;
+			}
+			if (g_transform_mode.axis == Axis::Y)
+			{
+				g_test_planes[0] = normal_vector_x;
+				g_test_planes[1] = normal_vector_z;
+			}
+			if (g_transform_mode.axis == Axis::Z)
+			{
+				g_test_planes[0] = normal_vector_x;
+				g_test_planes[1] = normal_vector_y;
+			}
+
+			g_used_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
+
+			float dot_1 = glm::dot(g_test_planes[0], g_used_ray);
+			float dot_2 = glm::dot(g_test_planes[1], g_used_ray);
+
+			if (dot_1 < dot_2)
+			{
+				g_used_normal = g_test_planes[0];
 			}
 			else
 			{
-				used_normal = normal_vector_y;
+				g_used_normal = g_test_planes[1];
 			}
 
 			glm::vec3 intersection_point;
 
-			bool intersection = calculate_plane_ray_intersection(
-				used_normal,
+			calculate_plane_ray_intersection(
+				g_used_normal,
 				g_selected_plane->translation,
 				g_scene_camera.position,
-				my_ray,
+				g_used_ray,
+				intersection_point);
+
+			g_prev_intersection = intersection_point;
+		}
+		else if (!g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.y.is_down)
+		{
+			g_transform_mode.is_active = false;
+		}
+
+		if (g_transform_mode.is_active)
+		{
+			glm::vec3 intersection_point;
+			g_used_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
+
+			bool intersection = calculate_plane_ray_intersection(
+				g_used_normal,
+				g_selected_plane->translation,
+				g_scene_camera.position,
+				g_used_ray,
 				intersection_point);
 
 			if (intersection)
 			{
 				g_debug_plane_intersection = intersection_point;
+
+				glm::vec3 travel_dist = intersection_point - g_prev_intersection;
+
+				g_prev_intersection = intersection_point;
+
+				if (g_transform_mode.axis == Axis::X)
+				{
+					g_selected_plane->translation.x += travel_dist.x;
+				}
+				if (g_transform_mode.axis == Axis::Y)
+				{
+					g_selected_plane->translation.y += travel_dist.y;
+				}
+				if (g_transform_mode.axis == Axis::Z)
+				{
+					g_selected_plane->translation.z += travel_dist.z;
+				}
 			}
 			else
 			{
@@ -1402,15 +1491,29 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		// Draw
+		// Draw OpenGL
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		if (g_selected_plane != nullptr)
+		if (g_selected_plane != nullptr && g_transform_mode.is_active)
 		{
 			draw_line(g_debug_plane_intersection, g_selected_plane->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
+
 			glm::vec3 end = glm::vec3(g_selected_plane->translation);
-			end.x = g_debug_plane_intersection.x;
+
+			if (g_transform_mode.axis == Axis::X)
+			{
+				end.x = g_debug_plane_intersection.x;
+			}
+			if (g_transform_mode.axis == Axis::Y)
+			{
+				end.y = g_debug_plane_intersection.y;
+			}
+			if (g_transform_mode.axis == Axis::Z)
+			{
+				end.z = g_debug_plane_intersection.z;
+			}
+
 			draw_line(g_debug_plane_intersection, end, glm::vec3(0.0f, 1.0f, 0.0f), 2.0f, 2.0f);
 		}
 
@@ -1442,7 +1545,6 @@ int main(int argc, char* argv[])
 			draw_line(bot_left,		 glm::vec3(new_bot_right), glm::vec3(1.0f), 1.0f, 3.0f);
 			draw_line(new_top_right, glm::vec3(new_top_left),  glm::vec3(1.0f), 1.0f, 3.0f);
 			draw_line(new_top_right, glm::vec3(new_bot_right), glm::vec3(1.0f), 1.0f, 3.0f);
-
 		}
 
 		// Click ray
