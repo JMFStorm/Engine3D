@@ -1378,6 +1378,10 @@ int main(int argc, char* argv[])
 		else if (!g_inputs.as_struct.mouse2.is_down)
 		{
 			g_camera_move_mode = false;
+
+			if		(g_inputs.as_struct.q.pressed) g_transform_mode.transformation = Transformation::Translate;
+			else if (g_inputs.as_struct.w.pressed) g_transform_mode.transformation = Transformation::Rotate;
+			else if (g_inputs.as_struct.e.pressed) g_transform_mode.transformation = Transformation::Scale;
 		}
 
 		if (g_camera_move_mode)
@@ -1444,53 +1448,56 @@ int main(int argc, char* argv[])
 			else if (g_inputs.as_struct.y.is_down) g_transform_mode.axis = Axis::Y;
 			else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = Axis::Z;
 
-			g_transform_mode.transformation = Transformation::Translate;
-			g_transform_mode.is_active = true;
-
-			if (g_transform_mode.axis == Axis::X)
+			if (g_transform_mode.transformation == Transformation::Translate)
 			{
-				g_test_planes[0] = normal_vector_y;
-				g_test_planes[1] = normal_vector_z;
+				g_transform_mode.is_active = true;
+
+				if (g_transform_mode.axis == Axis::X)
+				{
+					g_test_planes[0] = normal_vector_y;
+					g_test_planes[1] = normal_vector_z;
+				}
+				if (g_transform_mode.axis == Axis::Y)
+				{
+					g_test_planes[0] = normal_vector_x;
+					g_test_planes[1] = normal_vector_z;
+				}
+				if (g_transform_mode.axis == Axis::Z)
+				{
+					g_test_planes[0] = normal_vector_x;
+					g_test_planes[1] = normal_vector_y;
+				}
+
+				g_used_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
+
+				float dot_1 = glm::dot(g_test_planes[0], g_used_ray);
+				float dot_2 = glm::dot(g_test_planes[1], g_used_ray);
+
+				if (dot_1 < dot_2)
+				{
+					g_used_normal = g_test_planes[0];
+				}
+				else
+				{
+					g_used_normal = g_test_planes[1];
+				}
+
+				glm::vec3 intersection_point;
+
+				calculate_plane_ray_intersection(
+					g_used_normal,
+					g_selected_plane->translation,
+					g_scene_camera.position,
+					g_used_ray,
+					intersection_point);
+
+				g_prev_intersection = intersection_point;
 			}
-			if (g_transform_mode.axis == Axis::Y)
-			{
-				g_test_planes[0] = normal_vector_x;
-				g_test_planes[1] = normal_vector_z;
-			}
-			if (g_transform_mode.axis == Axis::Z)
-			{
-				g_test_planes[0] = normal_vector_x;
-				g_test_planes[1] = normal_vector_y;
-			}
-
-			g_used_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
-
-			float dot_1 = glm::dot(g_test_planes[0], g_used_ray);
-			float dot_2 = glm::dot(g_test_planes[1], g_used_ray);
-
-			if (dot_1 < dot_2)
-			{
-				g_used_normal = g_test_planes[0];
-			}
-			else
-			{
-				g_used_normal = g_test_planes[1];
-			}
-
-			glm::vec3 intersection_point;
-
-			calculate_plane_ray_intersection(
-				g_used_normal,
-				g_selected_plane->translation,
-				g_scene_camera.position,
-				g_used_ray,
-				intersection_point);
-
-			g_prev_intersection = intersection_point;
 		}
 		else if (!g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.y.is_down)
 		{
 			g_transform_mode.is_active = false;
+			g_prev_intersection = glm::vec3(0);
 		}
 
 		if (g_transform_mode.is_active)
@@ -1505,12 +1512,10 @@ int main(int argc, char* argv[])
 				g_used_ray,
 				intersection_point);
 
-			if (intersection)
+			if (intersection && g_transform_mode.transformation == Transformation::Translate)
 			{
 				g_debug_plane_intersection = intersection_point;
-
 				glm::vec3 travel_dist = intersection_point - g_prev_intersection;
-
 				g_prev_intersection = intersection_point;
 
 				if (g_transform_mode.axis == Axis::X)
@@ -1525,10 +1530,6 @@ int main(int argc, char* argv[])
 				{
 					g_selected_plane->translation.z += travel_dist.z;
 				}
-			}
-			else
-			{
-				g_debug_plane_intersection = glm::vec3(1000, 1000, 1000);
 			}
 		}
 
@@ -1622,6 +1623,18 @@ int main(int argc, char* argv[])
 			sprintf_s(debug_str, camera_pos_debug_str_format, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
 
+			char* t_mode = nullptr;
+			const char* tt = "Translate";
+			const char* tr = "Rotate";
+			const char* ts = "Scale";
+			const char* transform_mode_debug_str_format = "Transform mode: %s";
+
+			if (g_transform_mode.transformation == Transformation::Translate) t_mode = const_cast<char*>(tt);
+			if (g_transform_mode.transformation == Transformation::Rotate) t_mode = const_cast<char*>(tr);
+			if (g_transform_mode.transformation == Transformation::Scale) t_mode = const_cast<char*>(ts);
+
+			sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
 			draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
 		}
 
