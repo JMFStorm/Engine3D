@@ -476,7 +476,6 @@ void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness_
 
 	glm::mat4 model = glm::mat4(1.0f);
 	glm::mat4 projection = glm::perspective(glm::radians(g_scene_camera.fov), g_scene_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
-
 	auto new_mat_4 = g_scene_camera.position + g_scene_camera.front_vec;
 	glm::mat4 view = glm::lookAt(g_scene_camera.position, new_mat_4, g_scene_camera.up_vec);
 
@@ -515,15 +514,57 @@ void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness_
 	glBindVertexArray(0);
 }
 
+void draw_line_ontop(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness)
+{
+	glUseProgram(g_line_shader);
+	glBindVertexArray(g_line_vao);
+
+	glDisable(GL_DEPTH_TEST);
+
+	glm::mat4 model = glm::mat4(1.0f);
+	glm::mat4 projection = glm::perspective(glm::radians(g_scene_camera.fov), g_scene_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
+	auto new_mat_4 = g_scene_camera.position + g_scene_camera.front_vec;
+	glm::mat4 view = glm::lookAt(g_scene_camera.position, new_mat_4, g_scene_camera.up_vec);
+
+	unsigned int model_loc = glGetUniformLocation(g_line_shader, "model");
+	unsigned int view_loc = glGetUniformLocation(g_line_shader, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_line_shader, "projection");
+
+	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
+
+	unsigned int color_loc = glGetUniformLocation(g_line_shader, "lineColor");
+	glUniform3f(color_loc, color.r, color.g, color.b);
+
+	float vertices[] =
+	{
+		// Coords
+		start.x, start.y, start.z,
+		end.x,   end.y,   end.z
+	};
+
+	glBindBuffer(GL_ARRAY_BUFFER, g_line_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+	glLineWidth(thickness);
+	glDrawArrays(GL_LINES, 0, 2);
+	g_frame_data.draw_calls++;
+
+	glEnable(GL_DEPTH_TEST);
+	glUseProgram(0);
+	glBindVertexArray(0);
+}
+
 void draw_selection_arrows(glm::vec3 position)
 {
 	auto end_x = glm::vec3(position.x + 1.0f, position.y, position.z);
 	auto end_y = glm::vec3(position.x, position.y + 1.0f, position.z);
 	auto end_z = glm::vec3(position.x, position.y, position.z + 1.0f);
 
-	draw_line(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f), 1.0f, 7.0f);
-	draw_line(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 7.0f);
-	draw_line(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f), 1.0f, 7.0f);
+	draw_line_ontop(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f), 15.0f);
+	draw_line_ontop(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f), 15.0f);
+	draw_line_ontop(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f), 15.0f);
 }
 
 void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh)
@@ -1495,6 +1536,11 @@ int main(int argc, char* argv[])
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		for (auto& plane : g_scene_planes)
+		{
+			draw_plane(&plane);
+		}
+
 		if (g_selected_plane != nullptr && g_transform_mode.is_active)
 		{
 			draw_line(g_debug_plane_intersection, g_selected_plane->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
@@ -1528,33 +1574,28 @@ int main(int argc, char* argv[])
 		if (-1 < g_selected_plane_index)
 		{
 			Plane selected_plane = g_scene_planes[g_selected_plane_index];
-			draw_selection_arrows(selected_plane.translation);
+			auto model = get_model_matrix(&selected_plane);
 
 			glm::vec3 bot_left = selected_plane.translation;
 			glm::vec3 bot_right = glm::vec3(0.0f, 0, 1.0f);
 			glm::vec3 top_left  = glm::vec3(1.0f, 0, 0.0f);
 			glm::vec3 top_right = glm::vec3(1.0f, 0, 1.0f);
 
-			auto model = get_model_matrix(&selected_plane);
-
 			glm::vec4 new_bot_right = model * glm::vec4(bot_right, 1.0f);
 			glm::vec4 new_top_left  = model * glm::vec4(top_left,  1.0f);
 			glm::vec4 new_top_right = model * glm::vec4(top_right, 1.0f);
 
-			draw_line(bot_left,		 glm::vec3(new_top_left),  glm::vec3(1.0f), 1.0f, 3.0f);
-			draw_line(bot_left,		 glm::vec3(new_bot_right), glm::vec3(1.0f), 1.0f, 3.0f);
-			draw_line(new_top_right, glm::vec3(new_top_left),  glm::vec3(1.0f), 1.0f, 3.0f);
-			draw_line(new_top_right, glm::vec3(new_bot_right), glm::vec3(1.0f), 1.0f, 3.0f);
+			draw_line_ontop(bot_left,	   glm::vec3(new_top_left),  glm::vec3(1.0f), 2.0f);
+			draw_line_ontop(bot_left,	   glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
+			draw_line_ontop(new_top_right, glm::vec3(new_top_left),  glm::vec3(1.0f), 2.0f);
+			draw_line_ontop(new_top_right, glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
+
+			draw_selection_arrows(selected_plane.translation);
 		}
 
 		// Click ray
 		auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
 		draw_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f), 1.0f, 2.0f);
-
-		for (auto& plane : g_scene_planes)
-		{
-			draw_plane(&plane);
-		}
 
 		// Print debug info
 		{
