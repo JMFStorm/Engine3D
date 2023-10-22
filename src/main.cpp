@@ -31,6 +31,7 @@ constexpr int right_hand_panel_width = 400;
 
 typedef struct UserSettings {
 	int window_size_px[2];
+	float transform_clip = 0.50f;
 } UserSettings;
 
 UserSettings g_user_settings = { 0 };
@@ -246,6 +247,7 @@ glm::vec3 g_test_planes[2] = {};
 glm::vec3 g_used_normal;
 glm::vec3 g_used_ray;
 glm::vec3 g_prev_intersection;
+glm::vec3 g_new_translation;
 
 auto normal_vector_x = glm::vec3(1.0f, 0, 0);
 auto normal_vector_y = glm::vec3(0, 1.0f, 0);
@@ -1272,6 +1274,9 @@ int main(int argc, char* argv[])
 					ImGui::InputFloat("UV mult", &g_selected_plane->uv_multiplier, 0, 0, "%.2f");
 				}
 
+				ImGui::Text("Editor settings");
+				ImGui::InputFloat("Transformation clip", &g_user_settings.transform_clip, 0, 0, "%.2f");
+
 				ImGui::Text("Game window");
 				ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);
 
@@ -1439,6 +1444,7 @@ int main(int argc, char* argv[])
 			delete_plane(g_selected_plane_index);
 		}
 
+		// Register transformation mode start
 		if (g_selected_plane != nullptr
 			&& (g_inputs.as_struct.z.pressed
 				|| g_inputs.as_struct.x.pressed
@@ -1492,6 +1498,7 @@ int main(int argc, char* argv[])
 					intersection_point);
 
 				g_prev_intersection = intersection_point;
+				g_new_translation = g_selected_plane->translation;
 			}
 		}
 		else if (!g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.y.is_down)
@@ -1500,6 +1507,7 @@ int main(int argc, char* argv[])
 			g_prev_intersection = glm::vec3(0);
 		}
 
+		// Handle transformation mode
 		if (g_transform_mode.is_active)
 		{
 			glm::vec3 intersection_point;
@@ -1520,15 +1528,27 @@ int main(int argc, char* argv[])
 
 				if (g_transform_mode.axis == Axis::X)
 				{
-					g_selected_plane->translation.x += travel_dist.x;
+					g_new_translation.x += travel_dist.x;
 				}
 				if (g_transform_mode.axis == Axis::Y)
 				{
-					g_selected_plane->translation.y += travel_dist.y;
+					g_new_translation.y += travel_dist.y;
 				}
 				if (g_transform_mode.axis == Axis::Z)
 				{
-					g_selected_plane->translation.z += travel_dist.z;
+					g_new_translation.z += travel_dist.z;
+				}
+
+				if (0.0f < g_user_settings.transform_clip)
+				{
+					float rounded_x = roundf(g_new_translation.x / g_user_settings.transform_clip) * g_user_settings.transform_clip;
+					float rounded_y = roundf(g_new_translation.y / g_user_settings.transform_clip) * g_user_settings.transform_clip;
+					float rounded_z = roundf(g_new_translation.z / g_user_settings.transform_clip) * g_user_settings.transform_clip;
+					g_selected_plane->translation = glm::vec3(rounded_x, rounded_y, rounded_z);
+				}
+				else
+				{
+					g_selected_plane->translation = g_new_translation;
 				}
 			}
 		}
