@@ -31,7 +31,7 @@ constexpr int right_hand_panel_width = 400;
 
 typedef struct UserSettings {
 	int window_size_px[2];
-	float transform_clip = 0.50f;
+	float transform_clip = 0.25f;
 } UserSettings;
 
 UserSettings g_user_settings = { 0 };
@@ -57,7 +57,6 @@ int g_text_indicies = 0;
 
 glm::vec3 g_debug_click_camera_pos = glm::vec3(0, 0, 0);
 glm::vec3 g_debug_click_ray_normal = glm::vec3(0, 0, 0);
-
 glm::vec3 g_debug_plane_intersection = glm::vec3(0, 0, 0);
 
 typedef struct FrameData {
@@ -249,10 +248,6 @@ glm::vec3 g_used_ray;
 glm::vec3 g_prev_intersection;
 glm::vec3 g_new_translation;
 
-auto normal_vector_x = glm::vec3(1.0f, 0, 0);
-auto normal_vector_y = glm::vec3(0, 1.0f, 0);
-auto normal_vector_z = glm::vec3(0, 0, 1.0f);
-
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
 	std::ifstream file_stream(file_path, std::ios::binary | std::ios::ate);
@@ -443,6 +438,15 @@ inline glm::mat4 get_model_matrix(Plane* plane)
 	return model;
 }
 
+inline glm::mat4 get_rotation_matrix(Plane* plane)
+{
+	glm::mat4 model = glm::mat4(1.0f);
+	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	return model;
+}
+
 void draw_plane(Plane* plane)
 {
 	glUseProgram(g_plane_shader);
@@ -560,9 +564,25 @@ void draw_line_ontop(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thic
 
 void draw_selection_arrows(glm::vec3 position)
 {
-	auto end_x = glm::vec3(position.x + 1.0f, position.y, position.z);
-	auto end_y = glm::vec3(position.x, position.y + 1.0f, position.z);
-	auto end_z = glm::vec3(position.x, position.y, position.z + 1.0f);
+	auto vec_x = glm::vec3(1.0f, 0, 0);
+	auto vec_y = glm::vec3(0, 1.0f, 0);
+	auto vec_z = glm::vec3(0, 0, 1.0f);
+
+	if (g_transform_mode.transformation != Transformation::Translate)
+	{
+		glm::mat4 rotation_mat4 = glm::mat4(1.0f);
+		rotation_mat4 = glm::rotate(rotation_mat4, glm::radians(g_selected_plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+		rotation_mat4 = glm::rotate(rotation_mat4, glm::radians(g_selected_plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+		rotation_mat4 = glm::rotate(rotation_mat4, glm::radians(g_selected_plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+		vec_x = rotation_mat4 * glm::vec4(vec_x, 1.0f);
+		vec_y = rotation_mat4 * glm::vec4(vec_y, 1.0f);
+		vec_z = rotation_mat4 * glm::vec4(vec_z, 1.0f);
+	}
+
+	auto end_x = position + vec_x;
+	auto end_y = position + vec_y;
+	auto end_z = position + vec_z;
 
 	draw_line_ontop(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f), 15.0f);
 	draw_line_ontop(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f), 15.0f);
@@ -1013,6 +1033,19 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
+glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal) {
+	// Calculate the vector from point1 to the point on the plane
+	glm::vec3 vectorToPoint = point1 - pointOnPlane;
+
+	// Calculate the projection of vectorToPoint onto the plane's normal
+	glm::vec3 projection = glm::dot(vectorToPoint, planeNormal) / glm::dot(planeNormal, planeNormal) * planeNormal;
+
+	// Calculate the closest point on the plane to point1
+	glm::vec3 point2 = pointOnPlane + projection;
+
+	return point2;
+}
+
 int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
@@ -1454,9 +1487,21 @@ int main(int argc, char* argv[])
 			else if (g_inputs.as_struct.y.is_down) g_transform_mode.axis = Axis::Y;
 			else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = Axis::Z;
 
-			if (g_transform_mode.transformation == Transformation::Translate)
+			auto normal_vector_x = glm::vec3(1.0f, 0, 0);
+			auto normal_vector_y = glm::vec3(0, 1.0f, 0);
+			auto normal_vector_z = glm::vec3(0, 0, 1.0f);
+
+			if (g_transform_mode.transformation != Transformation::Rotate)
 			{
 				g_transform_mode.is_active = true;
+
+				if (g_transform_mode.transformation == Transformation::Scale)
+				{
+					glm::mat4 model = get_rotation_matrix(g_selected_plane);
+					normal_vector_x = model * glm::vec4(normal_vector_x, 1.0f);
+					normal_vector_y = model * glm::vec4(normal_vector_y, 1.0f);
+					normal_vector_z = model * glm::vec4(normal_vector_z, 1.0f);
+				}
 
 				if (g_transform_mode.axis == Axis::X)
 				{
@@ -1520,12 +1565,12 @@ int main(int argc, char* argv[])
 				g_used_ray,
 				intersection_point);
 
+			g_debug_plane_intersection = intersection_point;
+			glm::vec3 travel_dist = intersection_point - g_prev_intersection;
+			g_prev_intersection = intersection_point;
+
 			if (intersection && g_transform_mode.transformation == Transformation::Translate)
 			{
-				g_debug_plane_intersection = intersection_point;
-				glm::vec3 travel_dist = intersection_point - g_prev_intersection;
-				g_prev_intersection = intersection_point;
-
 				if (g_transform_mode.axis == Axis::X)
 				{
 					g_new_translation.x += travel_dist.x;
@@ -1553,6 +1598,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
+		// -------------
 		// Draw OpenGL
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1562,23 +1608,51 @@ int main(int argc, char* argv[])
 			draw_plane(&plane);
 		}
 
+		// Transformation mode debug lines
 		if (g_selected_plane != nullptr && g_transform_mode.is_active)
 		{
 			draw_line(g_debug_plane_intersection, g_selected_plane->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
 
 			glm::vec3 end = glm::vec3(g_selected_plane->translation);
 
-			if (g_transform_mode.axis == Axis::X)
+			// Scale mode
+			if (g_transform_mode.transformation == Transformation::Scale)
 			{
-				end.x = g_debug_plane_intersection.x;
+				glm::mat4 rotation_mat4 = get_rotation_matrix(g_selected_plane);
+				glm::vec3 used_normal = glm::vec3(0);
+
+				if (g_transform_mode.axis == Axis::X)
+				{
+					used_normal = glm::vec3(1.0f, 0, 0);
+				}
+				if (g_transform_mode.axis == Axis::Y)
+				{
+					used_normal = glm::vec3(0, 1.0f, 0);
+				}
+				if (g_transform_mode.axis == Axis::Z)
+				{
+					used_normal = glm::vec3(0, 0, 1.0f);
+				}
+
+				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
+				end = closest_point_on_plane(g_debug_plane_intersection, g_selected_plane->translation, used_normal);
 			}
-			if (g_transform_mode.axis == Axis::Y)
+
+			// Translate mode
+			if (g_transform_mode.transformation == Transformation::Translate)
 			{
-				end.y = g_debug_plane_intersection.y;
-			}
-			if (g_transform_mode.axis == Axis::Z)
-			{
-				end.z = g_debug_plane_intersection.z;
+				if (g_transform_mode.axis == Axis::X)
+				{
+					end.x = g_debug_plane_intersection.x;
+				}
+				if (g_transform_mode.axis == Axis::Y)
+				{
+					end.y = g_debug_plane_intersection.y;
+				}
+				if (g_transform_mode.axis == Axis::Z)
+				{
+					end.z = g_debug_plane_intersection.z;
+				}
 			}
 
 			draw_line(g_debug_plane_intersection, end, glm::vec3(0.0f, 1.0f, 0.0f), 2.0f, 2.0f);
