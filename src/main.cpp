@@ -1593,7 +1593,7 @@ int main(int argc, char* argv[])
 		// Transformation mode first frame
 		if (g_transform_mode.is_active && g_transform_mode.first_frame)
 		{
-			g_transform_mode.first_frame = false; // Not anymore
+			g_transform_mode.first_frame = false; // (Not anymore)
 
 			if (g_transform_mode.transformation == Transformation::Rotate)
 			{
@@ -1621,6 +1621,8 @@ int main(int argc, char* argv[])
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
+
+				// @Cleanup: Transformation mode specific initial values
 
 				g_prev_intersection = intersection_point;
 				g_new_translation = g_selected_plane->translation;
@@ -1677,7 +1679,7 @@ int main(int argc, char* argv[])
 				glm::vec3 reversedVector =  glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
 				glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_prev_point_on_scale_plane, 1.0f);
 
-				glm::vec3 travel_dist = reversedVector - reversedVector2;
+				glm::vec3 travel_dist = reversedVector - reversedVector2; // @Bug: initial dist not right
 				g_prev_point_on_scale_plane = point_on_scale_plane;
 
 				vec3_add_for_axis(g_new_scale, travel_dist, g_transform_mode.axis);
@@ -1836,7 +1838,7 @@ int main(int argc, char* argv[])
 		g_frame_data.draw_calls = 0;
 	}
 
-	glfwTerminate(); // @Performance: Unnecessary slowdown?
+	glfwTerminate();
 
 	return 0;
 }
