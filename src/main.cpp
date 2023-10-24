@@ -239,12 +239,12 @@ typedef struct TransformationMode {
 	Axis axis;
 	Transformation transformation;
 	bool is_active;
+	bool first_frame;
 } TransformationMode;
 
 TransformationMode g_transform_mode = {};
-glm::vec3 g_test_planes[2] = {};
 glm::vec3 g_used_normal;
-glm::vec3 g_used_ray;
+glm::vec3 g_used_transform_ray;
 glm::vec3 g_prev_intersection;
 glm::vec3 g_new_translation;
 glm::vec3 g_new_scale;
@@ -1036,6 +1036,30 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
+inline glm::vec3 clip_vec3(glm::vec3 vec3, float clip_amount)
+{
+	float rounded_x = roundf(vec3.x / clip_amount) * clip_amount;
+	float rounded_y = roundf(vec3.y / clip_amount) * clip_amount;
+	float rounded_z = roundf(vec3.z / clip_amount) * clip_amount;
+	return glm::vec3(rounded_x, rounded_y, rounded_z);
+}
+
+void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis)
+{
+	if (axis == Axis::X)
+	{
+		for_addition.x += to_add.x;
+	}
+	if (axis == Axis::Y)
+	{
+		for_addition.y += to_add.y;
+	}
+	if (axis == Axis::Z)
+	{
+		for_addition.z += to_add.z;
+	}
+}
+
 glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal) {
 	// Calculate the vector from point1 to the point on the plane
 	glm::vec3 vectorToPoint = point1 - pointOnPlane;
@@ -1047,6 +1071,77 @@ glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& point
 	glm::vec3 point2 = pointOnPlane + projection;
 
 	return point2;
+}
+
+std::array<glm::vec3, 2> get_axis_xor_normals(Axis axis)
+{
+	std::array<glm::vec3, 2> result{};
+
+	auto normal_vector_x = glm::vec3(1.0f, 0, 0);
+	auto normal_vector_y = glm::vec3(0, 1.0f, 0);
+	auto normal_vector_z = glm::vec3(0, 0, 1.0f);
+
+	if (axis == Axis::X)
+	{
+		result[0] = normal_vector_y;
+		result[1] = normal_vector_z;
+	}
+	else if (axis == Axis::Y)
+	{
+		result[0] = normal_vector_x;
+		result[1] = normal_vector_z;
+	}
+	else if (axis == Axis::Z)
+	{
+		result[0] = normal_vector_x;
+		result[1] = normal_vector_y;
+	}
+
+	return result;
+}
+
+glm::vec3 get_normal_for_axis(Axis axis)
+{
+	switch (axis)
+	{
+		case Axis::X: return glm::vec3(1.0f, 0, 0);
+		case Axis::Y: return glm::vec3(0, 1.0f, 0);
+		case Axis::Z: return glm::vec3(0, 0, 1.0f);
+	}
+}
+
+glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements)
+{
+	float smallest = std::numeric_limits<float>::max();
+	auto smallest_vec = glm::vec3(0);
+
+	for (int i = 0; i < elements; i++)
+	{
+		glm::vec3 current = normals[i];
+		float dot = glm::dot(current, direction_compare);
+
+		if (dot < smallest)
+		{
+			smallest = dot;
+			smallest_vec = current;
+		}
+	}
+
+	return smallest_vec;
+
+	/*
+	float dot_1 = glm::dot(use_normals[0], g_used_transform_ray);
+	float dot_2 = glm::dot(use_normals[1], g_used_transform_ray);
+
+	if (dot_1 < dot_2)
+	{
+		g_used_normal = use_normals[0];
+	}
+	else
+	{
+		g_used_normal = use_normals[1];
+	}
+	*/
 }
 
 int main(int argc, char* argv[])
@@ -1269,6 +1364,7 @@ int main(int argc, char* argv[])
 	{
 		glfwPollEvents();
 
+		// -------------
 		// ImGui logic
 		{
 			ImGui_ImplGlfw_NewFrame();
@@ -1325,6 +1421,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
+		// -----------------
 		// Register inputs
 		{
 			g_frame_data.mouse_clicked = false;
@@ -1353,6 +1450,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
+		// -------
 		// Logic
 
 		g_game_metrics.prev_frame_game_time = g_game_metrics.game_time;
@@ -1482,61 +1580,38 @@ int main(int argc, char* argv[])
 
 		// Register transformation mode start
 		if (g_selected_plane != nullptr
-			&& (g_inputs.as_struct.z.pressed
-				|| g_inputs.as_struct.x.pressed
-				|| g_inputs.as_struct.y.pressed))
+			&& (g_inputs.as_struct.z.pressed || g_inputs.as_struct.x.pressed || g_inputs.as_struct.c.pressed))
 		{
+			g_transform_mode.is_active = true;
+			g_transform_mode.first_frame = true;
+
 			if		(g_inputs.as_struct.x.is_down) g_transform_mode.axis = Axis::X;
-			else if (g_inputs.as_struct.y.is_down) g_transform_mode.axis = Axis::Y;
+			else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = Axis::Y;
 			else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = Axis::Z;
+		}
 
-			auto normal_vector_x = glm::vec3(1.0f, 0, 0);
-			auto normal_vector_y = glm::vec3(0, 1.0f, 0);
-			auto normal_vector_z = glm::vec3(0, 0, 1.0f);
+		// Transformation mode first frame
+		if (g_transform_mode.is_active && g_transform_mode.first_frame)
+		{
+			g_transform_mode.first_frame = false; // Not anymore
 
-			// @TODO: Cleanup
-
-			if (g_transform_mode.transformation != Transformation::Rotate)
+			if (g_transform_mode.transformation == Transformation::Rotate)
 			{
-				g_transform_mode.is_active = true;
+				// @TODO
+			}
+			else
+			{
+				std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
 
 				if (g_transform_mode.transformation == Transformation::Scale)
 				{
 					glm::mat4 model = get_rotation_matrix(g_selected_plane);
-					normal_vector_x = model * glm::vec4(normal_vector_x, 1.0f);
-					normal_vector_y = model * glm::vec4(normal_vector_y, 1.0f);
-					normal_vector_z = model * glm::vec4(normal_vector_z, 1.0f);
+					use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
+					use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
 				}
 
-				if (g_transform_mode.axis == Axis::X)
-				{
-					g_test_planes[0] = normal_vector_y;
-					g_test_planes[1] = normal_vector_z;
-				}
-				if (g_transform_mode.axis == Axis::Y)
-				{
-					g_test_planes[0] = normal_vector_x;
-					g_test_planes[1] = normal_vector_z;
-				}
-				if (g_transform_mode.axis == Axis::Z)
-				{
-					g_test_planes[0] = normal_vector_x;
-					g_test_planes[1] = normal_vector_y;
-				}
-
-				g_used_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
-
-				float dot_1 = glm::dot(g_test_planes[0], g_used_ray);
-				float dot_2 = glm::dot(g_test_planes[1], g_used_ray);
-
-				if (dot_1 < dot_2)
-				{
-					g_used_normal = g_test_planes[0];
-				}
-				else
-				{
-					g_used_normal = g_test_planes[1];
-				}
+				g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
+				g_used_normal = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
 				glm::vec3 intersection_point;
 
@@ -1544,7 +1619,7 @@ int main(int argc, char* argv[])
 					g_used_normal,
 					g_selected_plane->translation,
 					g_scene_camera.position,
-					g_used_ray,
+					g_used_transform_ray,
 					intersection_point);
 
 				g_prev_intersection = intersection_point;
@@ -1552,26 +1627,25 @@ int main(int argc, char* argv[])
 				g_new_scale = g_selected_plane->scale;
 			}
 		}
-		else if (!g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.y.is_down)
+
+		// Handle transformation mode
+		if (g_transform_mode.is_active
+			&& !g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.y.is_down)
 		{
 			g_transform_mode.is_active = false;
 			g_prev_intersection = glm::vec3(0);
 		}
-
-		// Handle transformation mode
-		if (g_transform_mode.is_active)
+		else if (g_transform_mode.is_active)
 		{
 			glm::vec3 intersection_point;
-			g_used_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
+			g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
 			bool intersection = calculate_plane_ray_intersection(
 				g_used_normal,
 				g_selected_plane->translation,
 				g_scene_camera.position,
-				g_used_ray,
+				g_used_transform_ray,
 				intersection_point);
-
-			// @TODO: Cleanup
 
 			g_debug_plane_intersection = intersection_point;
 			glm::vec3 travel_dist = intersection_point - g_prev_intersection;
@@ -1579,49 +1653,21 @@ int main(int argc, char* argv[])
 
 			if (intersection && g_transform_mode.transformation == Transformation::Translate)
 			{
-				if (g_transform_mode.axis == Axis::X)
-				{
-					g_new_translation.x += travel_dist.x;
-				}
-				if (g_transform_mode.axis == Axis::Y)
-				{
-					g_new_translation.y += travel_dist.y;
-				}
-				if (g_transform_mode.axis == Axis::Z)
-				{
-					g_new_translation.z += travel_dist.z;
-				}
+				vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
 
 				if (0.0f < g_user_settings.transform_clip)
 				{
-					float rounded_x = roundf(g_new_translation.x / g_user_settings.transform_clip) * g_user_settings.transform_clip;
-					float rounded_y = roundf(g_new_translation.y / g_user_settings.transform_clip) * g_user_settings.transform_clip;
-					float rounded_z = roundf(g_new_translation.z / g_user_settings.transform_clip) * g_user_settings.transform_clip;
-					g_selected_plane->translation = glm::vec3(rounded_x, rounded_y, rounded_z);
+					g_selected_plane->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
 				}
 				else
 				{
 					g_selected_plane->translation = g_new_translation;
 				}
 			}
-
-			if (intersection && g_transform_mode.transformation == Transformation::Scale)
+			else if (intersection && g_transform_mode.transformation == Transformation::Scale)
 			{
 				glm::mat4 rotation_mat4 = get_rotation_matrix(g_selected_plane);
-				glm::vec3 used_normal = glm::vec3(0);
-
-				if (g_transform_mode.axis == Axis::X)
-				{
-					used_normal = glm::vec3(1.0f, 0, 0);
-				}
-				if (g_transform_mode.axis == Axis::Y)
-				{
-					used_normal = glm::vec3(0, 1.0f, 0);
-				}
-				if (g_transform_mode.axis == Axis::Z)
-				{
-					used_normal = glm::vec3(0, 0, 1.0f);
-				}
+				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
 
 				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
 				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, g_selected_plane->translation, used_normal);
@@ -1634,25 +1680,11 @@ int main(int argc, char* argv[])
 				glm::vec3 travel_dist = reversedVector - reversedVector2;
 				g_prev_point_on_scale_plane = point_on_scale_plane;
 
-				if (g_transform_mode.axis == Axis::X)
-				{
-					g_new_scale.x += travel_dist.x;
-				}
-				if (g_transform_mode.axis == Axis::Y)
-				{
-					g_new_scale.y += travel_dist.y;
-				}
-				if (g_transform_mode.axis == Axis::Z)
-				{
-					g_new_scale.z += travel_dist.z;
-				}
+				vec3_add_for_axis(g_new_scale, travel_dist, g_transform_mode.axis);
 
 				if (0.0f < g_user_settings.transform_clip)
 				{
-					float rounded_x = roundf(g_new_scale.x / g_user_settings.transform_clip) * g_user_settings.transform_clip;
-					float rounded_y = roundf(g_new_scale.y / g_user_settings.transform_clip) * g_user_settings.transform_clip;
-					float rounded_z = roundf(g_new_scale.z / g_user_settings.transform_clip) * g_user_settings.transform_clip;
-					g_selected_plane->scale = glm::vec3(rounded_x, rounded_y, rounded_z);
+					g_selected_plane->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
 				}
 				else
 				{
