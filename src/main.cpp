@@ -243,10 +243,11 @@ typedef struct TransformationMode {
 } TransformationMode;
 
 TransformationMode g_transform_mode = {};
-glm::vec3 g_used_normal;
+glm::vec3 g_normal_for_ray_intersect;
 glm::vec3 g_used_transform_ray;
 glm::vec3 g_prev_intersection;
 glm::vec3 g_new_translation;
+glm::vec3 g_new_rotation;
 glm::vec3 g_new_scale;
 glm::vec3 g_point_on_scale_plane;
 glm::vec3 g_prev_point_on_scale_plane;
@@ -1128,20 +1129,16 @@ glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec
 	}
 
 	return smallest_vec;
+}
 
-	/*
-	float dot_1 = glm::dot(use_normals[0], g_used_transform_ray);
-	float dot_2 = glm::dot(use_normals[1], g_used_transform_ray);
-
-	if (dot_1 < dot_2)
-	{
-		g_used_normal = use_normals[0];
-	}
-	else
-	{
-		g_used_normal = use_normals[1];
-	}
-	*/
+glm::vec3 get_plane_middle_point(Plane plane)
+{
+	glm::mat4 rotation = get_rotation_matrix(&plane);
+	glm::vec3 scale_rotated = rotation * glm::vec4(plane.scale, 1.0f);
+	scale_rotated = scale_rotated / 2.0f;
+	scale_rotated.y = 0.0f;
+	glm::vec3 result = plane.translation + scale_rotated;
+	return result;
 }
 
 int main(int argc, char* argv[])
@@ -1593,18 +1590,18 @@ int main(int argc, char* argv[])
 		// Transformation mode first frame
 		if (g_transform_mode.is_active && g_transform_mode.first_frame)
 		{
-			g_transform_mode.first_frame = false; // (Not anymore)
+			g_transform_mode.first_frame = false;
 
 			glm::vec3 intersection_point;
 			std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
+			g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
 			if (g_transform_mode.transformation == Transformation::Translate)
 			{
-				g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
-				g_used_normal = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
+				g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
 				calculate_plane_ray_intersection(
-					g_used_normal,
+					g_normal_for_ray_intersect,
 					g_selected_plane->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
@@ -1620,24 +1617,38 @@ int main(int argc, char* argv[])
 				use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
 				use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
 
-				g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
-				g_used_normal = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
+				g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
 				calculate_plane_ray_intersection(
-					g_used_normal,
+					g_normal_for_ray_intersect,
 					g_selected_plane->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
 
 				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
+				used_normal = model * glm::vec4(used_normal, 1.0f);
+
 				glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, g_selected_plane->translation, used_normal);
 				g_prev_point_on_scale_plane = point_on_scale_plane;
 				g_new_scale = g_selected_plane->scale;
 			}
 			else if (g_transform_mode.transformation == Transformation::Rotate)
 			{
-				// @TODO
+				g_normal_for_ray_intersect = get_normal_for_axis(g_transform_mode.axis);
+
+				bool intersection = calculate_plane_ray_intersection(
+					g_normal_for_ray_intersect,
+					g_selected_plane->translation,
+					g_scene_camera.position,
+					g_used_transform_ray,
+					intersection_point);
+
+				if (intersection)
+				{
+					g_prev_intersection = intersection_point;
+					g_new_rotation = g_selected_plane->rotation;
+				}
 			}
 		}
 
@@ -1653,19 +1664,19 @@ int main(int argc, char* argv[])
 			g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
 			bool intersection = calculate_plane_ray_intersection(
-				g_used_normal,
+				g_normal_for_ray_intersect,
 				g_selected_plane->translation,
 				g_scene_camera.position,
 				g_used_transform_ray,
 				intersection_point);
 
 			g_debug_plane_intersection = intersection_point;
-			glm::vec3 travel_dist = intersection_point - g_prev_intersection;
-			g_prev_intersection = intersection_point;
 
 			if (intersection && g_transform_mode.transformation == Transformation::Translate)
 			{
+				glm::vec3 travel_dist = intersection_point - g_prev_intersection;
 				vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
+				g_prev_intersection = intersection_point;
 
 				if (0.0f < g_user_settings.transform_clip)
 				{
@@ -1701,6 +1712,35 @@ int main(int argc, char* argv[])
 				else
 				{
 					g_selected_plane->scale = g_new_scale;
+				}
+			}
+			else if (intersection && g_transform_mode.transformation == Transformation::Rotate)
+			{
+				glm::vec3 plane_middle = get_plane_middle_point(*g_selected_plane);
+				glm::vec3 prev_vec	   = glm::normalize(g_prev_intersection - plane_middle);
+				glm::vec3 current_vec  = glm::normalize(g_debug_plane_intersection - plane_middle);
+
+				printf("g_prev_intersection: %f, %f, %f\n", g_prev_intersection.x, g_prev_intersection.y, g_prev_intersection.z);
+				printf("g_debug_plane_intersection: %f, %f, %f\n\n", g_debug_plane_intersection.x, g_debug_plane_intersection.y, g_debug_plane_intersection.z);
+
+				bool equal = glm::all(glm::equal(prev_vec, current_vec));
+
+				if (!equal)
+				{
+					// Calculate the rotation axis using the cross product of the unit vectors
+					glm::vec3 rotation_axis = glm::cross(prev_vec, current_vec);
+
+					// Calculate the rotation angle in radians
+					float angle = glm::acos(glm::dot(prev_vec, current_vec));
+
+					// Create the rotation matrix
+					glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis);
+
+					g_selected_plane->rotation = rotation_matrix * glm::vec4(g_selected_plane->rotation, 1.0f);
+
+					printf("angle: %f\n", angle);
+					printf("g_selected_plane->rotation: %f, %f, %f\n\n",
+						g_selected_plane->rotation.x, g_selected_plane->rotation.y, g_selected_plane->rotation.z);
 				}
 			}
 		}
@@ -1760,6 +1800,12 @@ int main(int argc, char* argv[])
 				{
 					end.z = g_debug_plane_intersection.z;
 				}
+			}
+
+			// Rotate mode
+			if (g_transform_mode.transformation == Transformation::Rotate)
+			{
+				end = get_plane_middle_point(*g_selected_plane);
 			}
 
 			draw_line(g_debug_plane_intersection, end, glm::vec3(0.0f, 1.0f, 0.0f), 2.0f, 2.0f);
