@@ -33,6 +33,7 @@ constexpr int right_hand_panel_width = 400;
 typedef struct UserSettings {
 	int window_size_px[2];
 	float transform_clip = 0.10f;
+	float transform_rotation_clip = 15.0f;
 } UserSettings;
 
 UserSettings g_user_settings = { 0 };
@@ -1405,7 +1406,8 @@ int main(int argc, char* argv[])
 				}
 
 				ImGui::Text("Editor settings");
-				ImGui::InputFloat("Transformation clip", &g_user_settings.transform_clip, 0, 0, "%.2f");
+				ImGui::InputFloat("Transform clip", &g_user_settings.transform_clip, 0, 0, "%.2f");
+				ImGui::InputFloat("Rotation clip", &g_user_settings.transform_rotation_clip, 0, 0, "%.2f");
 
 				ImGui::Text("Game window");
 				ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);
@@ -1742,7 +1744,16 @@ int main(int argc, char* argv[])
 					glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
 					glm::vec3 rotation_normal = get_normal_for_axis(g_transform_mode.axis);
 
-					vec3_add_for_axis(g_selected_plane->rotation, eulerAngles, g_transform_mode.axis);
+					vec3_add_for_axis(g_new_rotation, eulerAngles, g_transform_mode.axis);
+
+					if (0.0f < g_user_settings.transform_rotation_clip)
+					{
+						g_selected_plane->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
+					}
+					else
+					{
+						g_selected_plane->rotation = g_new_rotation;
+					}
 				}
 			}
 		}
