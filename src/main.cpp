@@ -31,7 +31,7 @@ constexpr int right_hand_panel_width = 400;
 
 typedef struct UserSettings {
 	int window_size_px[2];
-	float transform_clip = 0.25f;
+	float transform_clip = 0.10f;
 } UserSettings;
 
 UserSettings g_user_settings = { 0 };
@@ -1595,25 +1595,13 @@ int main(int argc, char* argv[])
 		{
 			g_transform_mode.first_frame = false; // (Not anymore)
 
-			if (g_transform_mode.transformation == Transformation::Rotate)
-			{
-				// @TODO
-			}
-			else
-			{
-				std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
+			glm::vec3 intersection_point;
+			std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
 
-				if (g_transform_mode.transformation == Transformation::Scale)
-				{
-					glm::mat4 model = get_rotation_matrix(g_selected_plane);
-					use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
-					use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
-				}
-
+			if (g_transform_mode.transformation == Transformation::Translate)
+			{
 				g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 				g_used_normal = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
-
-				glm::vec3 intersection_point;
 
 				calculate_plane_ray_intersection(
 					g_used_normal,
@@ -1622,20 +1610,42 @@ int main(int argc, char* argv[])
 					g_used_transform_ray,
 					intersection_point);
 
-				// @Cleanup: Transformation mode specific initial values
-
 				g_prev_intersection = intersection_point;
 				g_new_translation = g_selected_plane->translation;
+			}
+			else if (g_transform_mode.transformation == Transformation::Scale)
+			{
+				glm::mat4 model = get_rotation_matrix(g_selected_plane);
+
+				use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
+				use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
+
+				g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
+				g_used_normal = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
+
+				calculate_plane_ray_intersection(
+					g_used_normal,
+					g_selected_plane->translation,
+					g_scene_camera.position,
+					g_used_transform_ray,
+					intersection_point);
+
+				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
+				glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, g_selected_plane->translation, used_normal);
+				g_prev_point_on_scale_plane = point_on_scale_plane;
 				g_new_scale = g_selected_plane->scale;
+			}
+			else if (g_transform_mode.transformation == Transformation::Rotate)
+			{
+				// @TODO
 			}
 		}
 
 		// Handle transformation mode
 		if (g_transform_mode.is_active
-			&& !g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.y.is_down)
+			&& !g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.c.is_down)
 		{
 			g_transform_mode.is_active = false;
-			g_prev_intersection = glm::vec3(0);
 		}
 		else if (g_transform_mode.is_active)
 		{
@@ -1679,7 +1689,7 @@ int main(int argc, char* argv[])
 				glm::vec3 reversedVector =  glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
 				glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_prev_point_on_scale_plane, 1.0f);
 
-				glm::vec3 travel_dist = reversedVector - reversedVector2; // @Bug: initial dist not right
+				glm::vec3 travel_dist = reversedVector - reversedVector2;
 				g_prev_point_on_scale_plane = point_on_scale_plane;
 
 				vec3_add_for_axis(g_new_scale, travel_dist, g_transform_mode.axis);
