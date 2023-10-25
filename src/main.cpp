@@ -17,6 +17,7 @@
 #include <gtc/quaternion.hpp>
 #include <gtc/matrix_transform.hpp>
 #include <gtc/matrix_inverse.hpp>
+#include <gtc/quaternion.hpp>
 #include <gtc/type_ptr.hpp>
 
 #include <imgui/imgui.h>
@@ -1716,19 +1717,17 @@ int main(int argc, char* argv[])
 			}
 			else if (intersection && g_transform_mode.transformation == Transformation::Rotate)
 			{
-				glm::vec3 plane_middle = get_plane_middle_point(*g_selected_plane);
-				glm::vec3 prev_vec	   = glm::normalize(g_prev_intersection - plane_middle);
-				glm::vec3 current_vec  = glm::normalize(g_debug_plane_intersection - plane_middle);
+				glm::vec3 prev_vec	   = glm::normalize(g_prev_intersection - g_selected_plane->translation);
+				glm::vec3 current_vec  = glm::normalize(g_debug_plane_intersection - g_selected_plane->translation);
 
-				printf("g_prev_intersection: %f, %f, %f\n", g_prev_intersection.x, g_prev_intersection.y, g_prev_intersection.z);
-				printf("g_debug_plane_intersection: %f, %f, %f\n\n", g_debug_plane_intersection.x, g_debug_plane_intersection.y, g_debug_plane_intersection.z);
+				g_prev_intersection = g_debug_plane_intersection;
 
 				bool equal = glm::all(glm::equal(prev_vec, current_vec));
 
 				if (!equal)
 				{
 					// Calculate the rotation axis using the cross product of the unit vectors
-					glm::vec3 rotation_axis = glm::cross(prev_vec, current_vec);
+					glm::vec3 rotation_axis = glm::normalize(glm::cross(prev_vec, current_vec));
 
 					// Calculate the rotation angle in radians
 					float angle = glm::acos(glm::dot(prev_vec, current_vec));
@@ -1736,11 +1735,14 @@ int main(int argc, char* argv[])
 					// Create the rotation matrix
 					glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis);
 
-					g_selected_plane->rotation = rotation_matrix * glm::vec4(g_selected_plane->rotation, 1.0f);
+					// Extract the rotation as a quaternion
+					glm::quat rotation_quaternion = rotation_matrix;
 
-					printf("angle: %f\n", angle);
-					printf("g_selected_plane->rotation: %f, %f, %f\n\n",
-						g_selected_plane->rotation.x, g_selected_plane->rotation.y, g_selected_plane->rotation.z);
+					// Convert the quaternion to Euler angles
+					glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
+					glm::vec3 rotation_normal = get_normal_for_axis(g_transform_mode.axis);
+
+					vec3_add_for_axis(g_selected_plane->rotation, eulerAngles, g_transform_mode.axis);
 				}
 			}
 		}
