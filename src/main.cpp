@@ -533,25 +533,55 @@ void draw_selection_arrows(glm::vec3 position)
 	auto vec_y = glm::vec3(0, 1.0f, 0);
 	auto vec_z = glm::vec3(0, 0, 1.0f);
 
-	if (g_transform_mode.transformation != Transformation::Translate)
+	constexpr float line_width = 15.0f;
+
+	if (g_transform_mode.transformation == Transformation::Rotate)
 	{
-		glm::mat4 rotation_mat4 = glm::mat4(1.0f);
-		rotation_mat4 = glm::rotate(rotation_mat4, glm::radians(g_selected_plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-		rotation_mat4 = glm::rotate(rotation_mat4, glm::radians(g_selected_plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-		rotation_mat4 = glm::rotate(rotation_mat4, glm::radians(g_selected_plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+		glm::mat4 rotation_mat = get_rotation_matrix(g_selected_plane);
 
-		vec_x = rotation_mat4 * glm::vec4(vec_x, 1.0f);
-		vec_y = rotation_mat4 * glm::vec4(vec_y, 1.0f);
-		vec_z = rotation_mat4 * glm::vec4(vec_z, 1.0f);
+		auto start_x = position - vec_x * 0.5f;
+		auto start_y = position - vec_y * 0.5f;
+		auto start_z = position - vec_z * 0.5f;
+
+		auto end_x = position + vec_x * 0.5f;
+		auto end_y = position + vec_y * 0.5f;
+		auto end_z = position + vec_z * 0.5f;
+
+		draw_line_ontop(start_x, end_x, glm::vec3(1.0f, 0.0f, 0.0f), line_width);
+		draw_line_ontop(start_y, end_y, glm::vec3(0.0f, 1.0f, 0.0f), line_width);
+		draw_line_ontop(start_z, end_z, glm::vec3(0.0f, 0.0f, 1.0f), line_width);
+
+		vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
+		vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
+		vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
+
+		start_x = position - vec_x * 0.25f;
+		start_y = position - vec_y * 0.25f;
+		start_z = position - vec_z * 0.25f;
+
+		end_x = position + vec_x * 0.25f;
+		end_y = position + vec_y * 0.25f;
+		end_z = position + vec_z * 0.25f;
+
+		draw_line_ontop(start_x, end_x, glm::vec3(1.0f, 0.0f, 0.0f), 3.0f);
+		draw_line_ontop(start_y, end_y, glm::vec3(0.0f, 1.0f, 0.0f), 3.0f);
+		draw_line_ontop(start_z, end_z, glm::vec3(0.0f, 0.0f, 1.0f), 3.0f);
 	}
+	else
+	{
+		glm::mat4 rotation_mat = get_rotation_matrix(g_selected_plane);
+		vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
+		vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
+		vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
 
-	auto end_x = position + vec_x;
-	auto end_y = position + vec_y;
-	auto end_z = position + vec_z;
+		auto end_x = position + vec_x;
+		auto end_y = position + vec_y;
+		auto end_z = position + vec_z;
 
-	draw_line_ontop(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f), 15.0f);
-	draw_line_ontop(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f), 15.0f);
-	draw_line_ontop(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f), 15.0f);
+		draw_line_ontop(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f), line_width);
+		draw_line_ontop(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f), line_width);
+		draw_line_ontop(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f), line_width);
+	}
 }
 
 void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh)
