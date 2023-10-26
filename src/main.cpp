@@ -221,7 +221,6 @@ typedef struct TransformationMode {
 	Axis axis;
 	Transformation transformation;
 	bool is_active;
-	bool first_frame;
 } TransformationMode;
 
 TransformationMode g_transform_mode = {};
@@ -1423,19 +1422,19 @@ int main(int argc, char* argv[])
 
 			float speed_mult = g_scene_camera.move_speed * g_frame_data.deltatime;
 
-			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+			if (g_inputs.as_struct.w.is_down)
 			{
 				g_scene_camera.position += speed_mult * g_scene_camera.front_vec;
 			}
-			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+			if (g_inputs.as_struct.s.is_down)
 			{
 				g_scene_camera.position -= speed_mult * g_scene_camera.front_vec;
 			}
-			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+			if (g_inputs.as_struct.a.is_down)
 			{
 				g_scene_camera.position -= glm::normalize(glm::cross(g_scene_camera.front_vec, g_scene_camera.up_vec)) * speed_mult;
 			}
-			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+			if (g_inputs.as_struct.d.is_down)
 			{
 				g_scene_camera.position += glm::normalize(glm::cross(g_scene_camera.front_vec, g_scene_camera.up_vec)) * speed_mult;
 			}
@@ -1451,21 +1450,15 @@ int main(int argc, char* argv[])
 		}
 
 		// Register transformation mode start
+
 		if (g_selected_plane != nullptr
 			&& (g_inputs.as_struct.z.pressed || g_inputs.as_struct.x.pressed || g_inputs.as_struct.c.pressed))
 		{
 			g_transform_mode.is_active = true;
-			g_transform_mode.first_frame = true;
 
 			if		(g_inputs.as_struct.x.is_down) g_transform_mode.axis = Axis::X;
 			else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = Axis::Y;
 			else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = Axis::Z;
-		}
-
-		// Transformation mode first frame
-		if (g_transform_mode.is_active && g_transform_mode.first_frame)
-		{
-			g_transform_mode.first_frame = false;
 
 			glm::vec3 intersection_point;
 			std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
@@ -1475,15 +1468,22 @@ int main(int argc, char* argv[])
 			{
 				g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
-				calculate_plane_ray_intersection(
+				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,
 					g_selected_plane->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
 
-				g_prev_intersection = intersection_point;
-				g_new_translation = g_selected_plane->translation;
+				if (intersection)
+				{
+					g_prev_intersection = intersection_point;
+					g_new_translation = g_selected_plane->translation;
+				}
+				else
+				{
+					g_transform_mode.is_active = false;
+				}
 			}
 			else if (g_transform_mode.transformation == Transformation::Scale)
 			{
@@ -1494,19 +1494,26 @@ int main(int argc, char* argv[])
 
 				g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
-				calculate_plane_ray_intersection(
+				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,
 					g_selected_plane->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
 
-				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
-				used_normal = model * glm::vec4(used_normal, 1.0f);
+				if (intersection)
+				{
+					glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
+					used_normal = model * glm::vec4(used_normal, 1.0f);
 
-				glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, g_selected_plane->translation, used_normal);
-				g_prev_point_on_scale_plane = point_on_scale_plane;
-				g_new_scale = g_selected_plane->scale;
+					glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, g_selected_plane->translation, used_normal);
+					g_prev_point_on_scale_plane = point_on_scale_plane;
+					g_new_scale = g_selected_plane->scale;
+				}
+				else
+				{
+					g_transform_mode.is_active = false;
+				}
 			}
 			else if (g_transform_mode.transformation == Transformation::Rotate)
 			{
@@ -1526,15 +1533,19 @@ int main(int argc, char* argv[])
 					g_prev_intersection = intersection_point;
 					g_new_rotation = g_selected_plane->rotation;
 				}
+				else
+				{
+					g_transform_mode.is_active = false;
+				}
 			}
 		}
-
-		// Handle transformation mode
-		if (g_transform_mode.is_active
+		// Check transformation mode end
+		else if (g_transform_mode.is_active
 			&& !g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.c.is_down)
 		{
 			g_transform_mode.is_active = false;
 		}
+		// Handle transformation mode
 		else if (g_transform_mode.is_active)
 		{
 			glm::vec3 intersection_point;
