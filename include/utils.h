@@ -1,3 +1,6 @@
+#include <glm.hpp>
+#include <gtc/type_ptr.hpp>
+
 #define KILOBYTES(x) (x * 1024)
 #define MEGABYTES(x) (KILOBYTES(x) * 1024)
 
@@ -8,6 +11,28 @@ typedef struct MemoryBuffer {
 	byte* memory;
 	char name[32];
 } MemoryBuffer;
+
+enum Axis {
+	X,
+	Y,
+	Z
+};
+
+constexpr const int TEXTURE_PATH_LEN = 128;
+constexpr const int TEXTURE_FILENAME_LEN = TEXTURE_PATH_LEN / 2;
+
+typedef struct Texture {
+	char file_name[TEXTURE_FILENAME_LEN] = { 0 };
+	int texture_id;
+} Texture;
+
+typedef struct Plane {
+	glm::vec3 translation;
+	glm::vec3 rotation;
+	glm::vec3 scale;
+	Texture* texture;
+	float uv_multiplier = 1.0f;
+} Plane;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
 
@@ -47,8 +72,53 @@ inline float clamp_float(float value, float min, float max)
 	return value;
 }
 
+inline float float_modulus_operation(float value, float divisor)
+{
+	return value = value - std::floor(value / divisor) * divisor;
+}
+
+inline glm::vec3 clip_vec3(glm::vec3 vec3, float clip_amount)
+{
+	float rounded_x = roundf(vec3.x / clip_amount) * clip_amount;
+	float rounded_y = roundf(vec3.y / clip_amount) * clip_amount;
+	float rounded_z = roundf(vec3.z / clip_amount) * clip_amount;
+	return glm::vec3(rounded_x, rounded_y, rounded_z);
+}
+
+inline glm::mat4 get_model_matrix(Plane* plane)
+{
+	glm::mat4 model = glm::mat4(1.0f);
+	model = glm::translate(model, plane->translation);
+	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	model = glm::scale(model, plane->scale);
+	return model;
+}
+
+inline glm::mat4 get_rotation_matrix(Plane* plane)
+{
+	glm::mat4 model = glm::mat4(1.0f);
+	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	return model;
+}
+
 void memory_buffer_mallocate(MemoryBuffer* buffer, unsigned long size_in_bytes, char* name);
 
 void memory_buffer_wipe(MemoryBuffer* buffer);
 
 void memory_buffer_free(MemoryBuffer* buffer);
+
+glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal);
+
+std::array<glm::vec3, 2> get_axis_xor_normals(Axis axis);
+
+std::array<float, 2> get_plane_axis_xor_rotations(Axis axis, Plane* plane);
+
+glm::vec3 get_normal_for_axis(Axis axis);
+
+glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
+
+glm::vec3 get_plane_middle_point(Plane plane);

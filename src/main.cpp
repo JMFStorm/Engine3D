@@ -182,19 +182,13 @@ bool g_camera_move_mode = false;
 float g_mouse_movement_x = 0;
 float g_mouse_movement_y = 0;
 
-constexpr const int texture_path_len = 128;
-char texture_paths[][texture_path_len] = {
+char texture_paths[][TEXTURE_PATH_LEN] = {
 	"G:/projects/game/Engine3D/resources/images/tilemap_floor_01.png",
 	"G:/projects/game/Engine3D/resources/images/tile_bricks_01.png",
 	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
 };
 std::vector<const char*> g_texture_menu_items = {};
 int g_selected_texture_item = 0;
-
-typedef struct Texture {
-	char file_name[texture_path_len / 2] = { 0 };
-	int texture_id;
-} Texture;
 
 std::vector<Texture> g_textures = {};
 
@@ -213,23 +207,9 @@ struct CharPtrEqual {
 };
 std::unordered_map<char*, int, CharPtrHash, CharPtrEqual> g_texture_menu_map = {};
 
-typedef struct Plane {
-	glm::vec3 translation;
-	glm::vec3 rotation;
-	glm::vec3 scale;
-	Texture* texture;
-	float uv_multiplier = 1.0f;
-} Plane;
-
 Plane* g_selected_plane = nullptr;
 int g_selected_plane_index = -1;
 std::vector<Plane> g_scene_planes = {};
-
-enum Axis {
-	X,
-	Y,
-	Z
-};
 
 enum Transformation {
 	Translate,
@@ -253,6 +233,25 @@ glm::vec3 g_new_rotation;
 glm::vec3 g_new_scale;
 glm::vec3 g_point_on_scale_plane;
 glm::vec3 g_prev_point_on_scale_plane;
+
+inline glm::mat4 get_projection_matrix()
+{
+	glm::mat4 projection = glm::perspective(
+		glm::radians(g_scene_camera.fov),
+		g_scene_camera.aspect_ratio_horizontal,
+		g_scene_camera.near_clip,
+		g_scene_camera.far_clip);
+	return projection;
+}
+
+inline glm::mat4 get_view_matrix()
+{
+	glm::mat4 view = glm::lookAt(
+		g_scene_camera.position,
+		g_scene_camera.position + g_scene_camera.front_vec,
+		g_scene_camera.up_vec);
+	return view;
+}
 
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
@@ -412,45 +411,6 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 
 	glUseProgram(0);
 	glBindVertexArray(0);
-}
-
-inline glm::mat4 get_projection_matrix()
-{
-	glm::mat4 projection = glm::perspective(
-		glm::radians(g_scene_camera.fov),
-		g_scene_camera.aspect_ratio_horizontal,
-		g_scene_camera.near_clip,
-		g_scene_camera.far_clip);
-	return projection;
-}
-
-inline glm::mat4 get_view_matrix()
-{
-	glm::mat4 view = glm::lookAt(
-		g_scene_camera.position,
-		g_scene_camera.position + g_scene_camera.front_vec,
-		g_scene_camera.up_vec);
-	return view;
-}
-
-inline glm::mat4 get_model_matrix(Plane* plane)
-{
-	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::translate(model, plane->translation);
-	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-	model = glm::scale(model, plane->scale);
-	return model;
-}
-
-inline glm::mat4 get_rotation_matrix(Plane* plane)
-{
-	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-	return model;
 }
 
 void draw_plane(Plane* plane)
@@ -1039,14 +999,6 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
-inline glm::vec3 clip_vec3(glm::vec3 vec3, float clip_amount)
-{
-	float rounded_x = roundf(vec3.x / clip_amount) * clip_amount;
-	float rounded_y = roundf(vec3.y / clip_amount) * clip_amount;
-	float rounded_z = roundf(vec3.z / clip_amount) * clip_amount;
-	return glm::vec3(rounded_x, rounded_y, rounded_z);
-}
-
 void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis)
 {
 	if (axis == Axis::X)
@@ -1061,113 +1013,6 @@ void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis)
 	{
 		for_addition.z += to_add.z;
 	}
-}
-
-glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal) {
-	// Calculate the vector from point1 to the point on the plane
-	glm::vec3 vectorToPoint = point1 - pointOnPlane;
-
-	// Calculate the projection of vectorToPoint onto the plane's normal
-	glm::vec3 projection = glm::dot(vectorToPoint, planeNormal) / glm::dot(planeNormal, planeNormal) * planeNormal;
-
-	// Calculate the closest point on the plane to point1
-	glm::vec3 point2 = pointOnPlane + projection;
-
-	return point2;
-}
-
-std::array<glm::vec3, 2> get_axis_xor_normals(Axis axis)
-{
-	std::array<glm::vec3, 2> result{};
-
-	auto normal_vector_x = glm::vec3(1.0f, 0, 0);
-	auto normal_vector_y = glm::vec3(0, 1.0f, 0);
-	auto normal_vector_z = glm::vec3(0, 0, 1.0f);
-
-	if (axis == Axis::X)
-	{
-		result[0] = normal_vector_y;
-		result[1] = normal_vector_z;
-	}
-	else if (axis == Axis::Y)
-	{
-		result[0] = normal_vector_x;
-		result[1] = normal_vector_z;
-	}
-	else if (axis == Axis::Z)
-	{
-		result[0] = normal_vector_x;
-		result[1] = normal_vector_y;
-	}
-
-	return result;
-}
-
-std::array<float, 2> get_plane_axis_xor_rotations(Axis axis, Plane* plane)
-{
-	std::array<float, 2> result{};
-
-	auto rotation_x = plane->rotation.x;
-	auto rotation_y = plane->rotation.y;
-	auto rotation_z = plane->rotation.z;
-
-	if (axis == Axis::X)
-	{
-		result[0] = rotation_y;
-		result[1] = rotation_z;
-	}
-	else if (axis == Axis::Y)
-	{
-		result[0] = rotation_x;
-		result[1] = rotation_z;
-	}
-	else if (axis == Axis::Z)
-	{
-		result[0] = rotation_x;
-		result[1] = rotation_y;
-	}
-
-	return result;
-}
-
-glm::vec3 get_normal_for_axis(Axis axis)
-{
-	switch (axis)
-	{
-		case Axis::X: return glm::vec3(1.0f, 0, 0);
-		case Axis::Y: return glm::vec3(0, 1.0f, 0);
-		case Axis::Z: return glm::vec3(0, 0, 1.0f);
-	}
-}
-
-glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements)
-{
-	float smallest = std::numeric_limits<float>::max();
-	auto smallest_vec = glm::vec3(0);
-
-	for (int i = 0; i < elements; i++)
-	{
-		glm::vec3 current = normals[i];
-		float dot = glm::dot(current, direction_compare);
-
-		if (dot < smallest)
-		{
-			smallest = dot;
-			smallest_vec = current;
-		}
-	}
-
-	return smallest_vec;
-}
-
-glm::vec3 get_plane_middle_point(Plane plane)
-{
-	glm::mat4 rotation = get_rotation_matrix(&plane);
-	glm::vec3 scale_rotated = rotation * glm::vec4(plane.scale, 1.0f);
-	scale_rotated = scale_rotated / 2.0f;
-	scale_rotated.y = 0.0f;
-	glm::vec3 result = plane.translation + scale_rotated;
-	return result;
 }
 
 int main(int argc, char* argv[])
@@ -1352,7 +1197,7 @@ int main(int argc, char* argv[])
 	}
 
 	// Init textures
-	for (int i = 0; i < (sizeof(texture_paths) / texture_path_len); i++)
+	for (int i = 0; i < (sizeof(texture_paths) / TEXTURE_PATH_LEN); i++)
 	{
 		char* path = texture_paths[i];
 		int texture_id = load_image_into_texture(path, true);
@@ -1362,7 +1207,7 @@ int main(int argc, char* argv[])
 		ASSERT_TRUE(file_name, "Filename from file path");
 
 		Texture new_texture = { .texture_id = texture_id };
-		strncpy_s(new_texture.file_name, file_name, texture_path_len / 2);
+		strncpy_s(new_texture.file_name, file_name, TEXTURE_FILENAME_LEN);
 		g_textures.push_back(new_texture);
 		g_texture_menu_items.push_back(file_name);
 		g_texture_menu_map[file_name] = i;
@@ -1782,9 +1627,9 @@ int main(int argc, char* argv[])
 						g_selected_plane->rotation = g_new_rotation;
 					}
 
-					g_selected_plane->rotation.x = g_selected_plane->rotation.x - std::floor(g_selected_plane->rotation.x / 360.0f) * 360.0f;
-					g_selected_plane->rotation.y = g_selected_plane->rotation.y - std::floor(g_selected_plane->rotation.y / 360.0f) * 360.0f;
-					g_selected_plane->rotation.z = g_selected_plane->rotation.z - std::floor(g_selected_plane->rotation.z / 360.0f) * 360.0f;
+					g_selected_plane->rotation.x = float_modulus_operation(g_selected_plane->rotation.x, 360.0f);
+					g_selected_plane->rotation.y = float_modulus_operation(g_selected_plane->rotation.y, 360.0f);
+					g_selected_plane->rotation.z = float_modulus_operation(g_selected_plane->rotation.z, 360.0f);
 				}
 			}
 		}
