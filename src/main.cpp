@@ -998,22 +998,6 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
-void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis)
-{
-	if (axis == Axis::X)
-	{
-		for_addition.x += to_add.x;
-	}
-	if (axis == Axis::Y)
-	{
-		for_addition.y += to_add.y;
-	}
-	if (axis == Axis::Z)
-	{
-		for_addition.z += to_add.z;
-	}
-}
-
 int main(int argc, char* argv[])
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
@@ -1449,8 +1433,7 @@ int main(int argc, char* argv[])
 			delete_plane(g_selected_plane_index);
 		}
 
-		// Register transformation mode start
-
+		// Transformation mode start
 		if (g_selected_plane != nullptr
 			&& (g_inputs.as_struct.z.pressed || g_inputs.as_struct.x.pressed || g_inputs.as_struct.c.pressed))
 		{
@@ -1518,6 +1501,7 @@ int main(int argc, char* argv[])
 			else if (g_transform_mode.transformation == Transformation::Rotate)
 			{
 				glm::mat4 model = get_rotation_matrix(g_selected_plane);
+
 				g_normal_for_ray_intersect = get_normal_for_axis(g_transform_mode.axis);
 				g_normal_for_ray_intersect = model * glm::vec4(g_normal_for_ray_intersect, 1.0f);
 

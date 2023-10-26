@@ -121,4 +121,8 @@ glm::vec3 get_normal_for_axis(Axis axis);
 
 glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
 
+glm::vec3 get_vec_for_largest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
+
+void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis);
+
 glm::vec3 get_plane_middle_point(Plane plane);

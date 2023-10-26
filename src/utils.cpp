@@ -160,6 +160,42 @@ glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec
 	return smallest_vec;
 }
 
+glm::vec3 get_vec_for_largest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements)
+{
+	float max = std::numeric_limits<float>::min();
+	auto max_vec = glm::vec3(0);
+
+	for (int i = 0; i < elements; i++)
+	{
+		glm::vec3 current = normals[i];
+		float dot = glm::dot(current, direction_compare);
+
+		if (max < dot)
+		{
+			max = dot;
+			max_vec = current;
+		}
+	}
+
+	return max_vec;
+}
+
+void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis)
+{
+	if (axis == Axis::X)
+	{
+		for_addition.x += to_add.x;
+	}
+	if (axis == Axis::Y)
+	{
+		for_addition.y += to_add.y;
+	}
+	if (axis == Axis::Z)
+	{
+		for_addition.z += to_add.z;
+	}
+}
+
 glm::vec3 get_plane_middle_point(Plane plane)
 {
 	glm::mat4 rotation = get_rotation_matrix(&plane);
