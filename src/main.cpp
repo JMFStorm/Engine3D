@@ -1103,6 +1103,33 @@ std::array<glm::vec3, 2> get_axis_xor_normals(Axis axis)
 	return result;
 }
 
+std::array<float, 2> get_plane_axis_xor_rotations(Axis axis, Plane* plane)
+{
+	std::array<float, 2> result{};
+
+	auto rotation_x = plane->rotation.x;
+	auto rotation_y = plane->rotation.y;
+	auto rotation_z = plane->rotation.z;
+
+	if (axis == Axis::X)
+	{
+		result[0] = rotation_y;
+		result[1] = rotation_z;
+	}
+	else if (axis == Axis::Y)
+	{
+		result[0] = rotation_x;
+		result[1] = rotation_z;
+	}
+	else if (axis == Axis::Z)
+	{
+		result[0] = rotation_x;
+		result[1] = rotation_y;
+	}
+
+	return result;
+}
+
 glm::vec3 get_normal_for_axis(Axis axis)
 {
 	switch (axis)
@@ -1638,7 +1665,9 @@ int main(int argc, char* argv[])
 			}
 			else if (g_transform_mode.transformation == Transformation::Rotate)
 			{
+				glm::mat4 model = get_rotation_matrix(g_selected_plane);
 				g_normal_for_ray_intersect = get_normal_for_axis(g_transform_mode.axis);
+				g_normal_for_ray_intersect = model * glm::vec4(g_normal_for_ray_intersect, 1.0f);
 
 				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,
@@ -1729,22 +1758,20 @@ int main(int argc, char* argv[])
 				if (!equal)
 				{
 					// Calculate the rotation axis using the cross product of the unit vectors
-					glm::vec3 rotation_axis = glm::normalize(glm::cross(prev_vec, current_vec));
+					glm::vec3 rotation_axis_cross = glm::normalize(glm::cross(prev_vec, current_vec));
 
 					// Calculate the rotation angle in radians
-					float angle = glm::acos(glm::dot(prev_vec, current_vec));
+					float angle = glm::acos(glm::dot(glm::normalize(prev_vec), glm::normalize(current_vec)));
 
 					// Create the rotation matrix
-					glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis);
+					glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis_cross);
 
 					// Extract the rotation as a quaternion
 					glm::quat rotation_quaternion = rotation_matrix;
 
 					// Convert the quaternion to Euler angles
 					glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
-					glm::vec3 rotation_normal = get_normal_for_axis(g_transform_mode.axis);
-
-					vec3_add_for_axis(g_new_rotation, eulerAngles, g_transform_mode.axis);
+					g_new_rotation += eulerAngles;
 
 					if (0.0f < g_user_settings.transform_rotation_clip)
 					{
@@ -1754,6 +1781,10 @@ int main(int argc, char* argv[])
 					{
 						g_selected_plane->rotation = g_new_rotation;
 					}
+
+					g_selected_plane->rotation.x = g_selected_plane->rotation.x - std::floor(g_selected_plane->rotation.x / 360.0f) * 360.0f;
+					g_selected_plane->rotation.y = g_selected_plane->rotation.y - std::floor(g_selected_plane->rotation.y / 360.0f) * 360.0f;
+					g_selected_plane->rotation.z = g_selected_plane->rotation.z - std::floor(g_selected_plane->rotation.z / 360.0f) * 360.0f;
 				}
 			}
 		}
