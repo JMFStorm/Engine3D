@@ -924,11 +924,8 @@ int get_plane_intersection_from_ray(std::vector<Plane>& planes, glm::vec3 ray_or
 	{
 		Plane* plane = &planes[i];
 
-		glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-		rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-		rotationMatrix = glm::rotate(rotationMatrix, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-
 		auto plane_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
+		glm::mat4 rotationMatrix = get_rotation_matrix(plane);
 
 		auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up_vector, 1.0f));
 		planeNormal = glm::normalize(planeNormal);
@@ -1500,10 +1497,7 @@ int main(int argc, char* argv[])
 			}
 			else if (g_transform_mode.transformation == Transformation::Rotate)
 			{
-				glm::mat4 model = get_rotation_matrix(g_selected_plane);
-
 				g_normal_for_ray_intersect = get_normal_for_axis(g_transform_mode.axis);
-				g_normal_for_ray_intersect = model * glm::vec4(g_normal_for_ray_intersect, 1.0f);
 
 				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,

@@ -89,15 +89,33 @@ inline glm::mat4 get_model_matrix(Plane* plane)
 {
 	glm::mat4 model = glm::mat4(1.0f);
 	model = glm::translate(model, plane->translation);
-	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+	glm::quat quaternionX = glm::angleAxis(glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat quaternionY = glm::angleAxis(glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::quat quaternionZ = glm::angleAxis(glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
+	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
+
+	model = model * rotation_matrix;
+
+	// model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	// model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	// model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
 	model = glm::scale(model, plane->scale);
 	return model;
 }
 
 inline glm::mat4 get_rotation_matrix(Plane* plane)
 {
+	glm::quat quaternionX = glm::angleAxis(glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat quaternionY = glm::angleAxis(glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::quat quaternionZ = glm::angleAxis(glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
+	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
+
+	return rotation_matrix;
+
 	glm::mat4 model = glm::mat4(1.0f);
 	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
 	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
