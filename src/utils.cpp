@@ -34,35 +34,6 @@ float normalize_value(float value, float src_max, float dest_max)
 	return result;
 }
 
-void memory_buffer_mallocate(MemoryBuffer* buffer, unsigned long size_in_bytes, char* name)
-{
-	ASSERT_TRUE(buffer->size == 0, "Arena is not already allocated");
-
-	buffer->memory = (byte*)malloc(size_in_bytes);
-	memset(buffer->memory, 0x00, size_in_bytes);
-	buffer->size = size_in_bytes;
-	strcpy_s(buffer->name, name);
-
-	std::cout 
-		<< "Buffer '" << name << "' mallocated with " 
-		<< (size_in_bytes / 1024) << " kilobytes." << std::endl;
-}
-
-void memory_buffer_wipe(MemoryBuffer* buffer)
-{
-	memset(buffer->memory, 0x00, buffer->size);
-	std::cout << "Buffer " << buffer->name << " wiped to zero." << std::endl;
-}
-
-void memory_buffer_free(MemoryBuffer* buffer)
-{
-	free(buffer->memory);
-	buffer->size = 0;
-	buffer->memory = nullptr;
-
-	std::cout << "Buffer " << buffer->name << " freed." << std::endl;
-}
-
 glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal) {
 	// Calculate the vector from point1 to the point on the plane
 	glm::vec3 vectorToPoint = point1 - pointOnPlane;

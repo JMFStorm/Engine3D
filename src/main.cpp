@@ -10,7 +10,6 @@
 #include <array>
 #include <iostream>
 #include <fstream>
-#include <vector>
 #include <unordered_map>
 
 #include <glm.hpp>
@@ -24,6 +23,7 @@
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 
+#include "j_buffers.h"
 #include "utils.h"
 
 glm::vec3 lastMousePos(0.0f);
@@ -160,6 +160,7 @@ FontData g_debug_font;
 
 FrameData g_frame_data = {};
 
+constexpr const u64 SCENE_PLANES_MAX_COUNT = 100;
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
@@ -234,7 +235,10 @@ std::unordered_map<char*, int, CharPtrHash, CharPtrEqual> g_texture_menu_map = {
 
 Plane* g_selected_plane = nullptr;
 int g_selected_plane_index = -1;
-std::vector<Plane> g_scene_planes = {};
+
+// std::vector<Plane> g_scene_planes = {};
+MemoryBuffer g_scene_memory = { 0 };
+JArray g_scene_planes;
 
 enum Transformation {
 	Translate,
@@ -922,11 +926,11 @@ bool clicked_scene_space(int x, int y)
 	return x < g_game_metrics.scene_width_px && y < g_game_metrics.scene_height_px;
 }
 
-void delete_plane(int plane_index)
+void delete_plane(s64 plane_index)
 {
-	Plane last_plane = g_scene_planes[g_scene_planes.size() - 1];
-	g_scene_planes[plane_index] = last_plane;
-	g_scene_planes.pop_back();
+	Plane last_plane = *(Plane*)j_array_get(&g_scene_planes, g_scene_planes.items_count - 1);
+	j_array_replace(&g_scene_planes, (byte*)&last_plane, plane_index);
+	j_array_pop_back(&g_scene_planes);
 	g_selected_plane = nullptr;
 	g_selected_plane_index = -1;
 }
@@ -940,13 +944,12 @@ int add_new_plane()
 		.texture = &g_textures[0]
 	};
 
-	g_scene_planes.push_back(new_plane);
-	return g_scene_planes.size() - 1;
+	return j_array_add(&g_scene_planes, (byte*)&new_plane);
 }
 
-void select_plane_index(int index)
+void select_plane_index(s64 index)
 {
-	g_selected_plane = &g_scene_planes[index];
+	g_selected_plane = (Plane*)j_array_get(&g_scene_planes, index);
 	g_selected_plane_index = index;
 }
 
@@ -980,14 +983,14 @@ bool calculate_plane_ray_intersection(
 	return true;
 }
 
-int get_plane_intersection_from_ray(std::vector<Plane>& planes, glm::vec3 ray_origin, glm::vec3 ray_direction)
+int get_plane_intersection_from_ray(JArray planes, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
 	int index = -1;
 	float closest_dist = std::numeric_limits<float>::max();
 
-	for (int i = 0; i < planes.size(); i++)
+	for (int i = 0; i < planes.items_count; i++)
 	{
-		Plane* plane = &planes[i];
+		Plane* plane = (Plane*)j_array_get(&planes, i);
 
 		auto plane_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
 		glm::mat4 rotationMatrix = get_rotation_matrix(plane);
@@ -1075,6 +1078,9 @@ int main(int argc, char* argv[])
 
 	g_user_settings.window_size_px[0] = g_game_metrics.game_width_px;
 	g_user_settings.window_size_px[1] = g_game_metrics.game_height_px;
+
+	memory_buffer_mallocate(&g_scene_memory, sizeof(Plane) * SCENE_PLANES_MAX_COUNT, const_cast<char*>("Scene planes"));
+	g_scene_planes = j_array_init(SCENE_PLANES_MAX_COUNT, sizeof(Plane), g_scene_memory.memory);
 
 	// Init window and context
 	GLFWwindow* window;
@@ -1296,7 +1302,7 @@ int main(int argc, char* argv[])
 
 				if (ImGui::Button("Add plane"))
 				{
-					int new_plane_index = add_new_plane();
+					s64 new_plane_index = add_new_plane();
 					select_plane_index(new_plane_index);
 				}
 
@@ -1705,8 +1711,9 @@ int main(int argc, char* argv[])
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		for (auto& plane : g_scene_planes)
+		for (int i = 0; i < g_scene_planes.items_count; i++)
 		{
+			Plane plane = *(Plane*)j_array_get(&g_scene_planes, i);
 			draw_plane(&plane);
 		}
 
@@ -1781,7 +1788,7 @@ int main(int argc, char* argv[])
 		// Draw selection
 		if (-1 < g_selected_plane_index)
 		{
-			Plane selected_plane = g_scene_planes[g_selected_plane_index];
+			Plane selected_plane = *(Plane*)j_array_get(&g_scene_planes, g_selected_plane_index);
 			auto model = get_model_matrix(&selected_plane);
 
 			glm::vec3 bot_left = selected_plane.translation;

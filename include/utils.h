@@ -1,16 +1,7 @@
+#pragma once
+
 #include <glm.hpp>
 #include <gtc/type_ptr.hpp>
-
-#define KILOBYTES(x) (x * 1024)
-#define MEGABYTES(x) (KILOBYTES(x) * 1024)
-
-typedef unsigned char byte;
-
-typedef struct MemoryBuffer {
-	unsigned long size;
-	byte* memory;
-	char name[32];
-} MemoryBuffer;
 
 enum Axis {
 	X,
@@ -117,12 +108,6 @@ inline glm::mat4 get_rotation_matrix(Plane* plane)
 	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 	return model;
 }
-
-void memory_buffer_mallocate(MemoryBuffer* buffer, unsigned long size_in_bytes, char* name);
-
-void memory_buffer_wipe(MemoryBuffer* buffer);
-
-void memory_buffer_free(MemoryBuffer* buffer);
 
 glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal);
 

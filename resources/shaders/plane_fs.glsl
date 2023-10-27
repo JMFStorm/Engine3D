@@ -40,7 +40,8 @@ void main()
     vec3 reflectDir = reflect(-lightDir, norm);
     float dot1 = dot(viewDir, reflectDir);
     float maxed = max(dot1, 0.0);
-    float spec = pow(maxed, 32.0);
+    float material_specular = 32.0;
+    float spec = pow(maxed, material_specular);
     vec3 specular = vec3(light.specular * spec);
 
     // Final lighting calculation
