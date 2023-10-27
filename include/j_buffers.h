@@ -4,6 +4,8 @@
 #define MEGABYTES(x) (KILOBYTES(x) * 1024)
 
 typedef unsigned char		byte;
+typedef unsigned int		u32;
+typedef int					s32;
 typedef unsigned long long  u64;
 typedef long long			s64;
 
@@ -24,9 +26,19 @@ typedef struct JArray {
 	byte* data;
 } JArray;
 
-JArray j_array_init(s64 max_items, s64 item_size, byte* data_ptr);
+JArray j_array_init(s64 max_items, s64 item_size_bytes, byte* data_ptr);
 s64    j_array_add(JArray* array, byte* element_ptr);
 void   j_array_pop_back(JArray* array);
 void   j_array_swap(JArray* array, s64 index_1, s64 index_2);
 void   j_array_replace(JArray* array, byte* item_ptr, u64 index);
 byte*  j_array_get(JArray* array, s64 index);
+
+typedef struct JStrings {
+	s64 current_chars;
+	s64 strings_count;
+	s64 max_chars;
+	char* data;
+} JStrings;
+
+JStrings j_strings_init(s64 max_chars, char* char_ptr);
+s64 j_strings_add(JStrings* strings, char* char_ptr);

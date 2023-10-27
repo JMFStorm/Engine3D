@@ -165,7 +165,7 @@ MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
 typedef struct GameCamera {
-	glm::vec3 position;
+	glm::vec3 position; 
 	glm::vec3 front_vec;
 	glm::vec3 up_vec;
 	float yaw = -90.0f;	
@@ -189,10 +189,14 @@ char texture_paths[][TEXTURE_PATH_LEN] = {
 	"G:/projects/game/Engine3D/resources/images/tile_bricks_01.png",
 	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
 };
-std::vector<const char*> g_texture_menu_items = {};
+
+constexpr const u64 SCENE_TEXTURES_MAX_COUNT = 50;
+MemoryBuffer g_material_names_memory = { 0 };
+JStrings g_material_names;
 int g_selected_texture_item = 0;
 
-std::vector<Texture> g_textures = {};
+MemoryBuffer g_texture_memory = { 0 };
+JArray g_textures;
 
 typedef struct Light {
 	glm::vec3 position;
@@ -207,9 +211,9 @@ typedef struct Material {
 } Material;
 
 Light g_light = {
-	.position = glm::vec3(0.0f, 1.0f, 0.0f),
-	.diffuse = glm::vec3(0.5f),
-	.specular = 0.5f
+	.position = glm::vec3(0.0f, 4.0f, 0.0f),
+	.diffuse = glm::vec3(0.7f),
+	.specular = 0.25f
 };
 
 Material g_material = {
@@ -236,7 +240,6 @@ std::unordered_map<char*, int, CharPtrHash, CharPtrEqual> g_texture_menu_map = {
 Plane* g_selected_plane = nullptr;
 int g_selected_plane_index = -1;
 
-// std::vector<Plane> g_scene_planes = {};
 MemoryBuffer g_scene_memory = { 0 };
 JArray g_scene_planes;
 
@@ -935,13 +938,13 @@ void delete_plane(s64 plane_index)
 	g_selected_plane_index = -1;
 }
 
-int add_new_plane()
+s64 add_new_plane()
 {
 	Plane new_plane = {
 		.translation = glm::vec3(0.0f, 0.0f, 0.0f),
 		.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
 		.scale = glm::vec3(1.0f, 1.0f, 1.0f),
-		.texture = &g_textures[0]
+		.texture = (Texture*)j_array_get(&g_textures, 0),
 	};
 
 	return j_array_add(&g_scene_planes, (byte*)&new_plane);
@@ -1081,6 +1084,12 @@ int main(int argc, char* argv[])
 
 	memory_buffer_mallocate(&g_scene_memory, sizeof(Plane) * SCENE_PLANES_MAX_COUNT, const_cast<char*>("Scene planes"));
 	g_scene_planes = j_array_init(SCENE_PLANES_MAX_COUNT, sizeof(Plane), g_scene_memory.memory);
+
+	memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
+	g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), g_texture_memory.memory);
+
+	memory_buffer_mallocate(&g_material_names_memory, TEXTURE_FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Material items"));
+	g_material_names = j_strings_init(TEXTURE_FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT, (char*)g_material_names_memory.memory);
 
 	// Init window and context
 	GLFWwindow* window;
@@ -1257,10 +1266,15 @@ int main(int argc, char* argv[])
 		file_name++;
 		ASSERT_TRUE(file_name, "Filename from file path");
 
+		s64 name_len = strlen(file_name);
 		Texture new_texture = { .texture_id = texture_id };
-		strncpy_s(new_texture.file_name, file_name, TEXTURE_FILENAME_LEN);
-		g_textures.push_back(new_texture);
-		g_texture_menu_items.push_back(file_name);
+		memcpy(new_texture.file_name, file_name, name_len);
+		j_array_add(&g_textures, (byte*)&new_texture);
+
+		char str[TEXTURE_FILENAME_LEN] = { 0 };
+		memcpy(str, file_name, name_len);
+
+		j_strings_add(&g_material_names, (char*)&str);
 		g_texture_menu_map[file_name] = i;
 	}
 
@@ -1278,8 +1292,8 @@ int main(int argc, char* argv[])
 
 	glClearColor(0.25f, 0.35f, 0.35f, 1.0f);
 
-	g_scene_camera.position = glm::vec3(0.0f, 0.0f, 3.0f);
-	g_scene_camera.front_vec = glm::vec3(0.0f, 0.0f, -1.0f);
+	g_scene_camera.position = glm::vec3(3.0f, 0.75f, 3.0f);
+	g_scene_camera.front_vec = glm::vec3(-0.5f, -0.15f, -0.5f);
 	g_scene_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
 
 	while (!glfwWindowShouldClose(window))
@@ -1320,9 +1334,11 @@ int main(int argc, char* argv[])
 					ImGui::Text("UV properties");
 					ImGui::Image((ImTextureID)g_selected_plane->texture->texture_id, ImVec2(128, 128));
 
-					if (ImGui::Combo("Texture image", &g_selected_texture_item, g_texture_menu_items.data(), g_texture_menu_items.size()))
+					char* texture_names_ptr = (char*)g_material_names.data;
+
+					if (ImGui::Combo("Texture image", &g_selected_texture_item, texture_names_ptr, g_material_names.strings_count))
 					{
-						g_selected_plane->texture = &g_textures[g_selected_texture_item];
+						g_selected_plane->texture = (Texture*)j_array_get(&g_textures, g_selected_texture_item);
 					}
 
 					ImGui::InputFloat("UV mult", &g_selected_plane->uv_multiplier, 0, 0, "%.2f");
