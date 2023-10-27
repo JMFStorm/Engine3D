@@ -188,6 +188,7 @@ char texture_paths[][TEXTURE_PATH_LEN] = {
 	"G:/projects/game/Engine3D/resources/images/tilemap_floor_01.png",
 	"G:/projects/game/Engine3D/resources/images/tile_bricks_01.png",
 	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
+	"G:/projects/game/Engine3D/resources/images/light_billboard_000.png",
 };
 
 constexpr const u64 SCENE_TEXTURES_MAX_COUNT = 50;
@@ -411,7 +412,7 @@ int load_image_into_texture(const char* image_path, bool use_nearest)
 	return texture;
 }
 
-void draw_billboard(glm::vec3 position, Texture texture)
+void draw_billboard(glm::vec3 position, Texture texture, float scale)
 {
 	glUseProgram(g_billboard_shader);
 	glBindVertexArray(g_billboard_vao);
@@ -431,6 +432,7 @@ void draw_billboard(glm::vec3 position, Texture texture)
 	rotation_matrix[2] = glm::vec4(billboard_dir, 0.0f);
 
 	model = model * rotation_matrix;
+	model = glm::scale(model, glm::vec3(scale));
 
 	glm::mat4 projection = get_projection_matrix();
 	glm::mat4 view = get_view_matrix();
@@ -1756,9 +1758,8 @@ int main(int argc, char* argv[])
 
 		// Debug light
 		{
-			Texture test_tx = *(Texture*)j_array_get(&g_textures, 1);
-			draw_billboard(g_light.position, test_tx);
-			draw_line(g_light.position, g_light.position + glm::vec3(0.2f), glm::vec3(1.0f, 1.0f, 0.0f), 4.0f, 7.0f);
+			Texture light_tx = *(Texture*)j_array_get(&g_textures, 3);
+			draw_billboard(g_light.position, light_tx, 0.35f);
 		}
 
 		// Transformation mode debug lines
