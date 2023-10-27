@@ -56,6 +56,8 @@
     <None Include="resources\shaders\plane_fs.glsl" />
     <None Include="resources\shaders\line_vs.glsl" />
     <None Include="resources\shaders\line_fs.glsl" />
+    <None Include="resources\shaders\billboard_vs.glsl" />
+    <None Include="resources\shaders\billboard_fs.glsl" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lib\glew32.lib" />

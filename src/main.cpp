@@ -43,9 +43,9 @@ int g_line_shader;
 unsigned int g_line_vao;
 unsigned int g_line_vbo;
 
-int g_simple_rectangle_shader;
-unsigned int g_simple_rectangle_vao;
-unsigned int g_simple_rectangle_vbo;
+int g_billboard_shader;
+unsigned int g_billboard_vao;
+unsigned int g_billboard_vbo;
 
 int g_plane_shader;
 unsigned int g_plane_vao;
@@ -165,10 +165,10 @@ MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
 typedef struct GameCamera {
-	glm::vec3 position; 
+	glm::vec3 position;
 	glm::vec3 front_vec;
 	glm::vec3 up_vec;
-	float yaw = -90.0f;	
+	float yaw = -90.0f;
 	float pitch = 0.0f;
 	float fov = 60.0f;
 	float aspect_ratio_horizontal = 1.0f;
@@ -312,7 +312,7 @@ bool check_shader_compile_error(GLuint shader)
 	if (!success)
 	{
 		glGetShaderInfoLog(shader, length, NULL, infoLog);
-		std::cout 
+		std::cout
 			<< "ERROR::SHADER_COMPILATION_ERROR: "
 			<< infoLog << std::endl;
 
@@ -333,7 +333,7 @@ bool check_shader_link_error(GLuint shader)
 	if (!success)
 	{
 		glGetProgramInfoLog(shader, length, NULL, infoLog);
-		std::cout 
+		std::cout
 			<< "ERROR::PROGRAM_LINKING_ERROR: "
 			<< infoLog << std::endl;
 
@@ -411,32 +411,55 @@ int load_image_into_texture(const char* image_path, bool use_nearest)
 	return texture;
 }
 
-void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
+void draw_billboard(glm::vec3 position, Texture texture)
 {
-	glUseProgram(g_simple_rectangle_shader);
-	glBindVertexArray(g_simple_rectangle_vao);
+	glUseProgram(g_billboard_shader);
+	glBindVertexArray(g_billboard_vao);
 
-	float x0 = normalize_screen_px_to_ndc(rect.bot_left_x, g_game_metrics.game_width_px);
-	float y0 = normalize_screen_px_to_ndc(rect.bot_left_y, g_game_metrics.game_height_px);
+	glm::mat4 model = glm::mat4(1.0f);
+	model = glm::translate(model, position);
 
-	float x1 = normalize_screen_px_to_ndc(rect.bot_left_x + rect.width, g_game_metrics.game_width_px);
-	float y1 = normalize_screen_px_to_ndc(rect.bot_left_y + rect.height, g_game_metrics.game_height_px);
+	auto billboard_normal = glm::vec3(0, 0, 1.0f);
+	auto billboard_dir = glm::normalize(g_scene_camera.position - position);
+
+	glm::vec3 right = glm::cross(glm::vec3(0, 1.0f, 0), billboard_dir);
+	glm::vec3 up = glm::cross(billboard_dir, right);
+
+	glm::mat4 rotation_matrix(1.0f);
+	rotation_matrix[0] = glm::vec4(right, 0.0f);
+	rotation_matrix[1] = glm::vec4(up, 0.0f);
+	rotation_matrix[2] = glm::vec4(billboard_dir, 0.0f);
+
+	model = model * rotation_matrix;
+
+	glm::mat4 projection = get_projection_matrix();
+	glm::mat4 view = get_view_matrix();
+
+	unsigned int model_loc = glGetUniformLocation(g_billboard_shader, "model");
+	unsigned int view_loc = glGetUniformLocation(g_billboard_shader, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_billboard_shader, "projection");
+
+	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	float vertices[] =
 	{
-		// Coords		// Color
-		x0, y0, 0.0f,	r, g, b, // bottom left
-		x1, y0, 0.0f,	r, g, b, // bottom right
-		x0, y1, 0.0f,	r, g, b, // top left
-
-		x0, y1, 0.0f,	r, g, b, // top left 
-		x1, y1, 0.0f,	r, g, b, // top right
-		x1, y0, 0.0f,	r, g, b  // bottom right
+		// Coords	
+		-0.5f, -0.5f, 0.0f, // bottom left
+		 0.5f, -0.5f, 0.0f, // bottom right
+		-0.5f,  0.5f, 0.0f, // top left
+			   
+		-0.5f,  0.5f, 0.0f, // top left 
+		 0.5f, -0.5f, 0.0f, // bottom right
+		 0.5f,  0.5f, 0.0f  // top right
 	};
 
-	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rectangle_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, g_billboard_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture.texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	g_frame_data.draw_calls++;
 
@@ -452,7 +475,7 @@ void draw_plane(Plane* mesh)
 	glm::mat4 model = get_model_matrix(mesh);
 	glm::mat4 projection = get_projection_matrix();
 	glm::mat4 view = get_view_matrix();
-	
+
 	unsigned int model_loc = glGetUniformLocation(g_plane_shader, "model");
 	unsigned int view_loc = glGetUniformLocation(g_plane_shader, "view");
 	unsigned int projection_loc = glGetUniformLocation(g_plane_shader, "projection");
@@ -1076,7 +1099,7 @@ int main(int argc, char* argv[])
 	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - right_hand_panel_width;
 	g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
 
-	g_scene_camera.aspect_ratio_horizontal = 
+	g_scene_camera.aspect_ratio_horizontal =
 		(float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
 
 	g_user_settings.window_size_px[0] = g_game_metrics.game_width_px;
@@ -1088,8 +1111,9 @@ int main(int argc, char* argv[])
 	memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
 	g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), g_texture_memory.memory);
 
-	memory_buffer_mallocate(&g_material_names_memory, TEXTURE_FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Material items"));
-	g_material_names = j_strings_init(TEXTURE_FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT, (char*)g_material_names_memory.memory);
+	constexpr const s64 material_names_arr_size = TEXTURE_FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
+	memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material items"));
+	g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
 
 	// Init window and context
 	GLFWwindow* window;
@@ -1149,26 +1173,22 @@ int main(int argc, char* argv[])
 		g_inputs.as_struct.space = ButtonState{ .key = GLFW_KEY_SPACE };
 	}
 
-	// Init simple rectangle shader
+	// Init billboard shader
 	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_fs.glsl";
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/billboard_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/billboard_fs.glsl";
 
-		g_simple_rectangle_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_billboard_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 		{
-			glGenVertexArrays(1, &g_simple_rectangle_vao);
-			glGenBuffers(1, &g_simple_rectangle_vbo);
+			glGenVertexArrays(1, &g_billboard_vao);
+			glGenBuffers(1, &g_billboard_vbo);
 
-			glBindVertexArray(g_simple_rectangle_vao);
-			glBindBuffer(GL_ARRAY_BUFFER, g_simple_rectangle_vbo);
+			glBindVertexArray(g_billboard_vao);
+			glBindBuffer(GL_ARRAY_BUFFER, g_billboard_vbo);
 
 			// Coord attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 			glEnableVertexAttribArray(0);
-
-			// Color attribute
-			glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-			glEnableVertexAttribArray(1);
 		}
 	}
 
@@ -1736,6 +1756,8 @@ int main(int argc, char* argv[])
 
 		// Debug light
 		{
+			Texture test_tx = *(Texture*)j_array_get(&g_textures, 1);
+			draw_billboard(g_light.position, test_tx);
 			draw_line(g_light.position, g_light.position + glm::vec3(0.2f), glm::vec3(1.0f, 1.0f, 0.0f), 4.0f, 7.0f);
 		}
 
