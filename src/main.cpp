@@ -34,6 +34,7 @@ typedef struct UserSettings {
 	int window_size_px[2];
 	float transform_clip = 0.10f;
 	float transform_rotation_clip = 15.0f;
+	glm::vec3 world_ambient = glm::vec3(0.2f, 0.2f, 0.2f);
 } UserSettings;
 
 UserSettings g_user_settings = { 0 };
@@ -191,6 +192,30 @@ std::vector<const char*> g_texture_menu_items = {};
 int g_selected_texture_item = 0;
 
 std::vector<Texture> g_textures = {};
+
+typedef struct Light {
+	glm::vec3 position;
+	glm::vec3 diffuse;
+	glm::vec3 specular;
+} Light;
+
+typedef struct Material {
+	glm::vec3 diffuse;
+	glm::vec3 specular;
+	float shininess;
+} Material;
+
+Light g_light = {
+	.position = glm::vec3(0.0f),
+	.diffuse = glm::vec3(0.8f),
+	.specular = glm::vec3(0.8f)
+};
+
+Material g_material = {
+	.diffuse = glm::vec3(0.8f),
+	.specular = glm::vec3(0.8f),
+	.shininess = 0.5f
+};
 
 // Custom hash function for char*
 struct CharPtrHash {
@@ -412,27 +437,54 @@ void draw_simple_reactangle(Rectangle2D rect, float r, float g, float b)
 	glBindVertexArray(0);
 }
 
-void draw_plane(Plane* plane)
+void draw_plane(Plane* mesh)
 {
 	glUseProgram(g_plane_shader);
 	glBindVertexArray(g_plane_vao);
 
-	glm::mat4 model = get_model_matrix(plane);
+	glm::mat4 model = get_model_matrix(mesh);
 	glm::mat4 projection = get_projection_matrix();
 	glm::mat4 view = get_view_matrix();
 	
 	unsigned int model_loc = glGetUniformLocation(g_plane_shader, "model");
 	unsigned int view_loc = glGetUniformLocation(g_plane_shader, "view");
 	unsigned int projection_loc = glGetUniformLocation(g_plane_shader, "projection");
+
 	unsigned int uv_loc = glGetUniformLocation(g_plane_shader, "uv_multiplier");
+	unsigned int normal_loc = glGetUniformLocation(g_plane_shader, "normal_vec3");
+	unsigned int ambient_loc = glGetUniformLocation(g_plane_shader, "ambientLight");
+	unsigned int camera_view_loc = glGetUniformLocation(g_plane_shader, "viewPos");
+
+	unsigned int light_pos_loc = glGetUniformLocation(g_plane_shader, "light.position");
+	unsigned int light_diff_loc = glGetUniformLocation(g_plane_shader, "light.diffuse");
+	unsigned int light_spec_loc = glGetUniformLocation(g_plane_shader, "light.specular");
+
+	unsigned int material_diff_loc = glGetUniformLocation(g_plane_shader, "material.diffuse");
+	unsigned int material_spec_loc = glGetUniformLocation(g_plane_shader, "material.specular");
+	unsigned int material_shine_loc = glGetUniformLocation(g_plane_shader, "material.shininess");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
-	glUniform1f(uv_loc, plane->uv_multiplier);
+	glUniform1f(uv_loc, mesh->uv_multiplier);
+
+	glm::vec3 normal = glm::vec3(0, 1.0f, 0);
+	normal = model * glm::vec4(normal, 1.0f);
+
+	glUniform3f(normal_loc, normal[0], normal[1], normal[2]);
+	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
+	glUniform3f(camera_view_loc, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
+
+	glUniform3f(light_pos_loc, g_light.position.x, g_light.position.y, g_light.position.z);
+	glUniform3f(light_diff_loc, g_light.diffuse.x, g_light.diffuse.y, g_light.diffuse.z);
+	glUniform3f(light_spec_loc, g_light.specular.x, g_light.specular.y, g_light.specular.z);
+
+	glUniform3f(material_diff_loc, g_material.diffuse.x, g_material.diffuse.y, g_material.diffuse.z);
+	glUniform3f(material_spec_loc, g_material.specular.x, g_material.specular.y, g_material.specular.z);
+	glUniform1f(material_shine_loc, g_material.shininess);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, plane->texture->texture_id);
+	glBindTexture(GL_TEXTURE_2D, mesh->texture->texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	g_frame_data.draw_calls++;
 
@@ -551,10 +603,13 @@ void draw_selection_arrows(glm::vec3 position)
 	}
 	else
 	{
-		glm::mat4 rotation_mat = get_rotation_matrix(g_selected_plane);
-		vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
-		vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
-		vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
+		if (g_transform_mode.transformation == Transformation::Scale)
+		{
+			glm::mat4 rotation_mat = get_rotation_matrix(g_selected_plane);
+			vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
+			vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
+			vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
+		}
 
 		auto end_x = position + vec_x;
 		auto end_y = position + vec_y;
@@ -1132,7 +1187,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	// Init plane shader
+	// Init mesh shader
 	{
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/plane_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/plane_fs.glsl";
@@ -1147,14 +1202,14 @@ int main(int argc, char* argv[])
 
 			float vertices[] =
 			{
-				// Coords				// UV
-				1.0f, 0.0f, 0.0f,		1.0f, 1.0f, // top right
-				0.0f, 0.0f, 0.0f,		0.0f, 1.0f, // top left
-				0.0f, 0.0f, 1.0f,		0.0f, 0.0f, // bot left
-
-				1.0f, 0.0f, 0.0f,		1.0f, 1.0f, // top right
-				0.0f, 0.0f, 1.0f,		0.0f, 0.0f, // bot left 
-				1.0f, 0.0f, 1.0f,		1.0f, 0.0f  // bot right
+				// Coords				// UV		
+				1.0f, 0.0f, 0.0f,		1.0f, 1.0f,	 // top right
+				0.0f, 0.0f, 0.0f,		0.0f, 1.0f,	 // top left
+				0.0f, 0.0f, 1.0f,		0.0f, 0.0f,	 // bot left
+													
+				1.0f, 0.0f, 0.0f,		1.0f, 1.0f,	 // top right
+				0.0f, 0.0f, 1.0f,		0.0f, 0.0f,	 // bot left 
+				1.0f, 0.0f, 1.0f,		1.0f, 0.0f	 // bot right
 			};
 
 			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -1272,6 +1327,18 @@ int main(int argc, char* argv[])
 				ImGui::Text("Editor settings");
 				ImGui::InputFloat("Transform clip", &g_user_settings.transform_clip, 0, 0, "%.2f");
 				ImGui::InputFloat("Rotation clip", &g_user_settings.transform_rotation_clip, 0, 0, "%.2f");
+
+				ImGui::Text("Scene settings");
+				ImGui::Text("Light");
+				ImGui::InputFloat3("Global ambient", &g_user_settings.world_ambient[0], "%.3f");
+				ImGui::InputFloat3("Light pos", &g_light.position[0], "%.2f");
+				ImGui::InputFloat3("Light specular", &g_light.specular[0], "%.2f");
+				ImGui::InputFloat3("Light diffuse", &g_light.diffuse[0], "%.2f");
+
+				ImGui::Text("Material");
+				ImGui::InputFloat3("Material specular", &g_material.specular[0], "%.2f");
+				ImGui::InputFloat3("Material diffuse", &g_material.diffuse[0], "%.2f");
+				ImGui::InputFloat("Material shine", &g_material.shininess, 0, 0, "%.2f");
 
 				ImGui::Text("Game window");
 				ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);
@@ -1643,6 +1710,11 @@ int main(int argc, char* argv[])
 		for (auto& plane : g_scene_planes)
 		{
 			draw_plane(&plane);
+		}
+
+		// Debug light
+		{
+			draw_line(g_light.position, g_light.position + glm::vec3(0.2f), glm::vec3(1.0f, 1.0f, 0.0f), 4.0f, 7.0f);
 		}
 
 		// Transformation mode debug lines
