@@ -34,7 +34,7 @@ typedef struct UserSettings {
 	int window_size_px[2];
 	float transform_clip = 0.10f;
 	float transform_rotation_clip = 15.0f;
-	glm::vec3 world_ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+	glm::vec3 world_ambient = glm::vec3(0.1f, 0.1f, 0.1f);
 } UserSettings;
 
 UserSettings g_user_settings = { 0 };
@@ -196,7 +196,7 @@ std::vector<Texture> g_textures = {};
 typedef struct Light {
 	glm::vec3 position;
 	glm::vec3 diffuse;
-	glm::vec3 specular;
+	float specular;
 } Light;
 
 typedef struct Material {
@@ -206,9 +206,9 @@ typedef struct Material {
 } Material;
 
 Light g_light = {
-	.position = glm::vec3(0.0f),
-	.diffuse = glm::vec3(0.8f),
-	.specular = glm::vec3(0.8f)
+	.position = glm::vec3(0.0f, 1.0f, 0.0f),
+	.diffuse = glm::vec3(0.5f),
+	.specular = 0.5f
 };
 
 Material g_material = {
@@ -469,15 +469,13 @@ void draw_plane(Plane* mesh)
 	glUniform1f(uv_loc, mesh->uv_multiplier);
 
 	glm::vec3 normal = glm::vec3(0, 1.0f, 0);
-	normal = model * glm::vec4(normal, 1.0f);
-
 	glUniform3f(normal_loc, normal[0], normal[1], normal[2]);
 	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
 	glUniform3f(camera_view_loc, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 
 	glUniform3f(light_pos_loc, g_light.position.x, g_light.position.y, g_light.position.z);
 	glUniform3f(light_diff_loc, g_light.diffuse.x, g_light.diffuse.y, g_light.diffuse.z);
-	glUniform3f(light_spec_loc, g_light.specular.x, g_light.specular.y, g_light.specular.z);
+	glUniform1f(light_spec_loc, g_light.specular);
 
 	glUniform3f(material_diff_loc, g_material.diffuse.x, g_material.diffuse.y, g_material.diffuse.z);
 	glUniform3f(material_spec_loc, g_material.specular.x, g_material.specular.y, g_material.specular.z);
@@ -1332,7 +1330,7 @@ int main(int argc, char* argv[])
 				ImGui::Text("Light");
 				ImGui::InputFloat3("Global ambient", &g_user_settings.world_ambient[0], "%.3f");
 				ImGui::InputFloat3("Light pos", &g_light.position[0], "%.2f");
-				ImGui::InputFloat3("Light specular", &g_light.specular[0], "%.2f");
+				ImGui::InputFloat("Light specular", &g_light.specular, 0, 0, "%.2f");
 				ImGui::InputFloat3("Light diffuse", &g_light.diffuse[0], "%.2f");
 
 				ImGui::Text("Material");

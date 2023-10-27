@@ -3,7 +3,7 @@
 struct Light {
     vec3 position;
     vec3 diffuse;
-    vec3 specular;
+    float specular;
 };
 
 struct Material {
@@ -34,12 +34,14 @@ void main()
 
     // Diffuse component
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = light.diffuse * (diff * material.diffuse);
+    vec3 diffuse = light.diffuse * diff;
 
     // Specular component
     vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-    vec3 specular = light.specular * (spec * material.specular);
+    float dot1 = dot(viewDir, reflectDir);
+    float maxed = max(dot1, 0.0);
+    float spec = pow(maxed, 32.0);
+    vec3 specular = vec3(light.specular * spec);
 
     // Final lighting calculation
     vec3 light_result = ambientLight + diffuse + specular;
