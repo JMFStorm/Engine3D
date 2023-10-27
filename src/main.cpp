@@ -1293,7 +1293,8 @@ int main(int argc, char* argv[])
 	glClearColor(0.25f, 0.35f, 0.35f, 1.0f);
 
 	g_scene_camera.position = glm::vec3(3.0f, 0.75f, 3.0f);
-	g_scene_camera.front_vec = glm::vec3(-0.5f, -0.15f, -0.5f);
+	g_scene_camera.yaw = -135;
+	g_scene_camera.front_vec = glm::vec3(-0.5f, 0.0f, -0.5f);
 	g_scene_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
 
 	while (!glfwWindowShouldClose(window))
