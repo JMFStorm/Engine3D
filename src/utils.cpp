@@ -74,13 +74,13 @@ std::array<glm::vec3, 2> get_axis_xor_normals(Axis axis)
 	return result;
 }
 
-std::array<float, 2> get_plane_axis_xor_rotations(Axis axis, Plane* plane)
+std::array<float, 2> get_plane_axis_xor_rotations(Axis axis, Mesh* mesh)
 {
 	std::array<float, 2> result{};
 
-	auto rotation_x = plane->rotation.x;
-	auto rotation_y = plane->rotation.y;
-	auto rotation_z = plane->rotation.z;
+	auto rotation_x = mesh->rotation.x;
+	auto rotation_y = mesh->rotation.y;
+	auto rotation_z = mesh->rotation.z;
 
 	if (axis == Axis::X)
 	{
@@ -167,12 +167,12 @@ void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis)
 	}
 }
 
-glm::vec3 get_plane_middle_point(Plane plane)
+glm::vec3 get_plane_middle_point(Mesh mesh)
 {
-	glm::mat4 rotation = get_rotation_matrix(&plane);
-	glm::vec3 scale_rotated = rotation * glm::vec4(plane.scale, 1.0f);
+	glm::mat4 rotation = get_rotation_matrix(&mesh);
+	glm::vec3 scale_rotated = rotation * glm::vec4(mesh.scale, 1.0f);
 	scale_rotated = scale_rotated / 2.0f;
 	scale_rotated.y = 0.0f;
-	glm::vec3 result = plane.translation + scale_rotated;
+	glm::vec3 result = mesh.translation + scale_rotated;
 	return result;
 }

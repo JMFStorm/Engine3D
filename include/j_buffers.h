@@ -34,6 +34,7 @@ void   j_array_replace(JArray* array, byte* item_ptr, u64 index);
 byte*  j_array_get(JArray* array, s64 index);
 
 typedef struct JStrings {
+	s64 byte_alignment;
 	s64 current_chars;
 	s64 strings_count;
 	s64 max_chars;

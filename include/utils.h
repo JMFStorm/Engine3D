@@ -17,13 +17,13 @@ typedef struct Texture {
 	int texture_id;
 } Texture;
 
-typedef struct Plane {
+typedef struct Mesh {
 	glm::vec3 translation;
 	glm::vec3 rotation;
 	glm::vec3 scale;
 	Texture* texture;
 	float uv_multiplier = 1.0f;
-} Plane;
+} Mesh;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
 
@@ -76,36 +76,36 @@ inline glm::vec3 clip_vec3(glm::vec3 vec3, float clip_amount)
 	return glm::vec3(rounded_x, rounded_y, rounded_z);
 }
 
-inline glm::mat4 get_model_matrix(Plane* plane)
+inline glm::mat4 get_model_matrix(Mesh* mesh)
 {
 	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::translate(model, plane->translation);
+	model = glm::translate(model, mesh->translation);
 
-	glm::quat quaternionX = glm::angleAxis(glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::quat quaternionY = glm::angleAxis(glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::quat quaternionZ = glm::angleAxis(glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::quat quaternionX = glm::angleAxis(glm::radians(mesh->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat quaternionY = glm::angleAxis(glm::radians(mesh->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::quat quaternionZ = glm::angleAxis(glm::radians(mesh->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
 
 	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
 	model = model * rotation_matrix;
-	model = glm::scale(model, plane->scale);
+	model = glm::scale(model, mesh->scale);
 	return model;
 }
 
-inline glm::mat4 get_rotation_matrix(Plane* plane)
+inline glm::mat4 get_rotation_matrix(Mesh* mesh)
 {
-	glm::quat quaternionX = glm::angleAxis(glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::quat quaternionY = glm::angleAxis(glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::quat quaternionZ = glm::angleAxis(glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::quat quaternionX = glm::angleAxis(glm::radians(mesh->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat quaternionY = glm::angleAxis(glm::radians(mesh->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::quat quaternionZ = glm::angleAxis(glm::radians(mesh->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
 	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
 
 	return rotation_matrix;
 
 	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::rotate(model, glm::radians(plane->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(plane->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	model = glm::rotate(model, glm::radians(mesh->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(mesh->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(mesh->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 	return model;
 }
 
@@ -113,7 +113,7 @@ glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& point
 
 std::array<glm::vec3, 2> get_axis_xor_normals(Axis axis);
 
-std::array<float, 2> get_plane_axis_xor_rotations(Axis axis, Plane* plane);
+std::array<float, 2> get_plane_axis_xor_rotations(Axis axis, Mesh* mesh);
 
 glm::vec3 get_normal_for_axis(Axis axis);
 
@@ -123,4 +123,5 @@ glm::vec3 get_vec_for_largest_dot_product(glm::vec3 direction_compare, glm::vec3
 
 void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis);
 
-glm::vec3 get_plane_middle_point(Plane plane);
+glm::vec3 get_plane_middle_point(Mesh mesh);
+

@@ -49,9 +49,9 @@ int g_billboard_shader;
 unsigned int g_billboard_vao;
 unsigned int g_billboard_vbo;
 
-int g_plane_shader;
-unsigned int g_plane_vao;
-unsigned int g_plane_vbo;
+int g_mesh_shader;
+unsigned int g_mesh_vao;
+unsigned int g_mesh_vbo;
 
 int g_ui_text_shader;
 unsigned int g_ui_text_vao;
@@ -162,7 +162,7 @@ FontData g_debug_font;
 
 FrameData g_frame_data = {};
 
-constexpr const u64 SCENE_PLANES_MAX_COUNT = 100;
+constexpr const u64 SCENE_MESHES_MAX_COUNT = 100;
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
@@ -242,11 +242,11 @@ struct CharPtrEqual {
 };
 std::unordered_map<char*, int, CharPtrHash, CharPtrEqual> g_texture_menu_map = {};
 
-Plane* g_selected_plane = nullptr;
-int g_selected_plane_index = -1;
+Mesh* g_selected_mesh = nullptr;
+int g_selected_mesh_index = -1;
 
 MemoryBuffer g_scene_memory = { 0 };
-JArray g_scene_planes;
+JArray g_scene_meshes;
 
 enum Transformation {
 	Translate,
@@ -458,33 +458,32 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 	glBindVertexArray(0);
 }
 
-void draw_plane(Plane* mesh)
+void draw_mesh(Mesh* mesh)
 {
-	glUseProgram(g_plane_shader);
-	glBindVertexArray(g_plane_vao);
+	glUseProgram(g_mesh_shader);
+	glBindVertexArray(g_mesh_vao);
 
 	glm::mat4 model = get_model_matrix(mesh);
 	glm::mat4 projection = get_projection_matrix();
 	glm::mat4 view = get_view_matrix();
 
-	unsigned int model_loc = glGetUniformLocation(g_plane_shader, "model");
-	unsigned int view_loc = glGetUniformLocation(g_plane_shader, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_plane_shader, "projection");
+	unsigned int model_loc = glGetUniformLocation(g_mesh_shader, "model");
+	unsigned int view_loc = glGetUniformLocation(g_mesh_shader, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader, "projection");
 
-	unsigned int use_texture_loc = glGetUniformLocation(g_plane_shader, "use_texture");
-	unsigned int uv_loc = glGetUniformLocation(g_plane_shader, "uv_multiplier");
-	unsigned int normal_loc = glGetUniformLocation(g_plane_shader, "normal_vec3");
-	unsigned int ambient_loc = glGetUniformLocation(g_plane_shader, "ambientLight");
-	unsigned int camera_view_loc = glGetUniformLocation(g_plane_shader, "viewPos");
+	unsigned int use_texture_loc = glGetUniformLocation(g_mesh_shader, "use_texture");
+	unsigned int uv_loc = glGetUniformLocation(g_mesh_shader, "uv_multiplier");
+	unsigned int ambient_loc = glGetUniformLocation(g_mesh_shader, "ambientLight");
+	unsigned int camera_view_loc = glGetUniformLocation(g_mesh_shader, "viewPos");
 
-	unsigned int light_pos_loc = glGetUniformLocation(g_plane_shader, "light.position");
-	unsigned int light_diff_loc = glGetUniformLocation(g_plane_shader, "light.diffuse");
-	unsigned int light_spec_loc = glGetUniformLocation(g_plane_shader, "light.specular");
+	unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, "light.position");
+	unsigned int light_diff_loc = glGetUniformLocation(g_mesh_shader, "light.diffuse");
+	unsigned int light_spec_loc = glGetUniformLocation(g_mesh_shader, "light.specular");
 
-	unsigned int material_amb_loc = glGetUniformLocation(g_plane_shader, "material.ambient");
-	unsigned int material_diff_loc = glGetUniformLocation(g_plane_shader, "material.diffuse");
-	unsigned int material_spec_loc = glGetUniformLocation(g_plane_shader, "material.specular");
-	unsigned int material_shine_loc = glGetUniformLocation(g_plane_shader, "material.shininess");
+	unsigned int material_amb_loc = glGetUniformLocation(g_mesh_shader, "material.ambient");
+	unsigned int material_diff_loc = glGetUniformLocation(g_mesh_shader, "material.diffuse");
+	unsigned int material_spec_loc = glGetUniformLocation(g_mesh_shader, "material.specular");
+	unsigned int material_shine_loc = glGetUniformLocation(g_mesh_shader, "material.shininess");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
@@ -492,8 +491,6 @@ void draw_plane(Plane* mesh)
 	glUniform1f(uv_loc, mesh->uv_multiplier);
 	glUniform1i(use_texture_loc, true);
 
-	glm::vec3 normal = glm::vec3(0, 1.0f, 0);
-	glUniform3f(normal_loc, normal[0], normal[1], normal[2]);
 	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
 	glUniform3f(camera_view_loc, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 
@@ -628,7 +625,7 @@ void draw_selection_arrows(glm::vec3 position)
 	{
 		if (g_transform_mode.transformation == Transformation::Scale)
 		{
-			glm::mat4 rotation_mat = get_rotation_matrix(g_selected_plane);
+			glm::mat4 rotation_mat = get_rotation_matrix(g_selected_mesh);
 			vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
 			vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
 			vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
@@ -947,37 +944,37 @@ bool clicked_scene_space(int x, int y)
 	return x < g_game_metrics.scene_width_px && y < g_game_metrics.scene_height_px;
 }
 
-void delete_plane(s64 plane_index)
+void delete_mesh(s64 plane_index)
 {
-	Plane last_plane = *(Plane*)j_array_get(&g_scene_planes, g_scene_planes.items_count - 1);
-	j_array_replace(&g_scene_planes, (byte*)&last_plane, plane_index);
-	j_array_pop_back(&g_scene_planes);
-	g_selected_plane = nullptr;
-	g_selected_plane_index = -1;
+	Mesh last_plane = *(Mesh*)j_array_get(&g_scene_meshes, g_scene_meshes.items_count - 1);
+	j_array_replace(&g_scene_meshes, (byte*)&last_plane, plane_index);
+	j_array_pop_back(&g_scene_meshes);
+	g_selected_mesh = nullptr;
+	g_selected_mesh_index = -1;
 }
 
-s64 add_new_plane()
+s64 add_new_mesh()
 {
-	Plane new_plane = {
+	Mesh new_mesh = {
 		.translation = glm::vec3(0.0f, 0.0f, 0.0f),
 		.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
 		.scale = glm::vec3(1.0f, 1.0f, 1.0f),
 		.texture = (Texture*)j_array_get(&g_textures, 0),
 	};
 
-	return j_array_add(&g_scene_planes, (byte*)&new_plane);
+	return j_array_add(&g_scene_meshes, (byte*)&new_mesh);
 }
 
-void select_plane_index(s64 index)
+void select_mesh_index(s64 index)
 {
-	g_selected_plane = (Plane*)j_array_get(&g_scene_planes, index);
-	g_selected_plane_index = index;
+	g_selected_mesh = (Mesh*)j_array_get(&g_scene_meshes, index);
+	g_selected_mesh_index = index;
 }
 
-void deselect_current_plane()
+void deselect_current_mesh()
 {
-	g_selected_plane = nullptr;
-	g_selected_plane_index = -1;
+	g_selected_mesh = nullptr;
+	g_selected_mesh_index = -1;
 }
 
 bool calculate_plane_ray_intersection(
@@ -1004,14 +1001,14 @@ bool calculate_plane_ray_intersection(
 	return true;
 }
 
-int get_plane_intersection_from_ray(JArray planes, glm::vec3 ray_origin, glm::vec3 ray_direction)
+int get_plane_intersection_from_ray(JArray meshes, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
 	int index = -1;
 	float closest_dist = std::numeric_limits<float>::max();
 
-	for (int i = 0; i < planes.items_count; i++)
+	for (int i = 0; i < meshes.items_count; i++)
 	{
-		Plane* plane = (Plane*)j_array_get(&planes, i);
+		Mesh* plane = (Mesh*)j_array_get(&meshes, i);
 
 		auto plane_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
 		glm::mat4 rotationMatrix = get_rotation_matrix(plane);
@@ -1100,8 +1097,8 @@ int main(int argc, char* argv[])
 	g_user_settings.window_size_px[0] = g_game_metrics.game_width_px;
 	g_user_settings.window_size_px[1] = g_game_metrics.game_height_px;
 
-	memory_buffer_mallocate(&g_scene_memory, sizeof(Plane) * SCENE_PLANES_MAX_COUNT, const_cast<char*>("Scene planes"));
-	g_scene_planes = j_array_init(SCENE_PLANES_MAX_COUNT, sizeof(Plane), g_scene_memory.memory);
+	memory_buffer_mallocate(&g_scene_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
+	g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), g_scene_memory.memory);
 
 	memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
 	g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), g_texture_memory.memory);
@@ -1238,35 +1235,39 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/plane_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/plane_fs.glsl";
 
-		g_plane_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_mesh_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 		{
-			glGenVertexArrays(1, &g_plane_vao);
-			glBindVertexArray(g_plane_vao);
+			glGenVertexArrays(1, &g_mesh_vao);
+			glBindVertexArray(g_mesh_vao);
 
-			glGenBuffers(1, &g_plane_vbo);
-			glBindBuffer(GL_ARRAY_BUFFER, g_plane_vbo);
+			glGenBuffers(1, &g_mesh_vbo);
+			glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
 
 			float vertices[] =
 			{
-				// Coords				// UV		
-				1.0f, 0.0f, 0.0f,		1.0f, 1.0f,	 // top right
-				0.0f, 0.0f, 0.0f,		0.0f, 1.0f,	 // top left
-				0.0f, 0.0f, 1.0f,		0.0f, 0.0f,	 // bot left
-													
-				1.0f, 0.0f, 0.0f,		1.0f, 1.0f,	 // top right
-				0.0f, 0.0f, 1.0f,		0.0f, 0.0f,	 // bot left 
-				1.0f, 0.0f, 1.0f,		1.0f, 0.0f	 // bot right
+				// Coords			// UV		 // Plane normal
+				1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top right
+				0.0f, 0.0f, 0.0f,	0.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top left
+				0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, 1.0f, 0.0f, // bot left
+																   
+				1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top right
+				0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, 1.0f, 0.0f, // bot left 
+				1.0f, 0.0f, 1.0f,	1.0f, 0.0f,	 0.0f, 1.0f, 0.0f  // bot right
 			};
 
 			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 			// Coord attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 			glEnableVertexAttribArray(0);
 
 			// UV attribute
-			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
 			glEnableVertexAttribArray(1);
+
+			// Normal attribute
+			glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+			glEnableVertexAttribArray(2);
 		}
 	}
 
@@ -1350,32 +1351,32 @@ int main(int argc, char* argv[])
 
 				if (ImGui::Button("Add plane"))
 				{
-					s64 new_plane_index = add_new_plane();
-					select_plane_index(new_plane_index);
+					s64 new_mesh_index = add_new_mesh();
+					select_mesh_index(new_mesh_index);
 				}
 
-				char selected_plane_str[24];
-				sprintf_s(selected_plane_str, "Plane index: %d", g_selected_plane_index);
-				ImGui::Text(selected_plane_str);
+				char selected_mesh_str[24];
+				sprintf_s(selected_mesh_str, "Plane index: %d", g_selected_mesh_index);
+				ImGui::Text(selected_mesh_str);
 
-				if (g_selected_plane != nullptr)
+				if (g_selected_mesh != nullptr)
 				{
 					ImGui::Text("Mesh properties");
-					ImGui::InputFloat3("Translation", &g_selected_plane->translation[0], "%.2f");
-					ImGui::InputFloat3("Rotation", &g_selected_plane->rotation[0], "%.2f");
-					ImGui::InputFloat3("Scale", &g_selected_plane->scale[0], "%.2f");
+					ImGui::InputFloat3("Translation", &g_selected_mesh->translation[0], "%.2f");
+					ImGui::InputFloat3("Rotation", &g_selected_mesh->rotation[0], "%.2f");
+					ImGui::InputFloat3("Scale", &g_selected_mesh->scale[0], "%.2f");
 
 					ImGui::Text("UV properties");
-					ImGui::Image((ImTextureID)g_selected_plane->texture->texture_id, ImVec2(128, 128));
+					ImGui::Image((ImTextureID)g_selected_mesh->texture->texture_id, ImVec2(128, 128));
 
 					char* texture_names_ptr = (char*)g_material_names.data;
 
 					if (ImGui::Combo("Texture image", &g_selected_texture_item, texture_names_ptr, g_material_names.strings_count))
 					{
-						g_selected_plane->texture = (Texture*)j_array_get(&g_textures, g_selected_texture_item);
+						g_selected_mesh->texture = (Texture*)j_array_get(&g_textures, g_selected_texture_item);
 					}
 
-					ImGui::InputFloat("UV mult", &g_selected_plane->uv_multiplier, 0, 0, "%.2f");
+					ImGui::InputFloat("UV mult", &g_selected_mesh->uv_multiplier, 0, 0, "%.2f");
 				}
 
 				ImGui::Text("Editor settings");
@@ -1483,15 +1484,15 @@ int main(int argc, char* argv[])
 					g_debug_click_camera_pos = glm::vec3(0.0f);
 				}
 
-				int selected_plane_i = get_plane_intersection_from_ray(g_scene_planes, ray_origin, ray_direction);
+				int selected_plane_i = get_plane_intersection_from_ray(g_scene_meshes, ray_origin, ray_direction);
 
 				if (selected_plane_i != -1)
 				{
-					select_plane_index(selected_plane_i);
+					select_mesh_index(selected_plane_i);
 				}
 				else
 				{
-					deselect_current_plane();
+					deselect_current_mesh();
 				}
 			}
 		}
@@ -1559,13 +1560,13 @@ int main(int argc, char* argv[])
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 
-		if (g_inputs.as_struct.del.pressed && g_selected_plane != nullptr)
+		if (g_inputs.as_struct.del.pressed && g_selected_mesh != nullptr)
 		{
-			delete_plane(g_selected_plane_index);
+			delete_mesh(g_selected_mesh_index);
 		}
 
 		// Transformation mode start
-		if (g_selected_plane != nullptr
+		if (g_selected_mesh != nullptr
 			&& (g_inputs.as_struct.z.pressed || g_inputs.as_struct.x.pressed || g_inputs.as_struct.c.pressed))
 		{
 			g_transform_mode.is_active = true;
@@ -1584,7 +1585,7 @@ int main(int argc, char* argv[])
 
 				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,
-					g_selected_plane->translation,
+					g_selected_mesh->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
@@ -1592,7 +1593,7 @@ int main(int argc, char* argv[])
 				if (intersection)
 				{
 					g_prev_intersection = intersection_point;
-					g_new_translation = g_selected_plane->translation;
+					g_new_translation = g_selected_mesh->translation;
 				}
 				else
 				{
@@ -1601,7 +1602,7 @@ int main(int argc, char* argv[])
 			}
 			else if (g_transform_mode.transformation == Transformation::Scale)
 			{
-				glm::mat4 model = get_rotation_matrix(g_selected_plane);
+				glm::mat4 model = get_rotation_matrix(g_selected_mesh);
 
 				use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
 				use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
@@ -1610,7 +1611,7 @@ int main(int argc, char* argv[])
 
 				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,
-					g_selected_plane->translation,
+					g_selected_mesh->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
@@ -1620,9 +1621,9 @@ int main(int argc, char* argv[])
 					glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
 					used_normal = model * glm::vec4(used_normal, 1.0f);
 
-					glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, g_selected_plane->translation, used_normal);
+					glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, g_selected_mesh->translation, used_normal);
 					g_prev_point_on_scale_plane = point_on_scale_plane;
-					g_new_scale = g_selected_plane->scale;
+					g_new_scale = g_selected_mesh->scale;
 				}
 				else
 				{
@@ -1635,7 +1636,7 @@ int main(int argc, char* argv[])
 
 				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,
-					g_selected_plane->translation,
+					g_selected_mesh->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
@@ -1643,7 +1644,7 @@ int main(int argc, char* argv[])
 				if (intersection)
 				{
 					g_prev_intersection = intersection_point;
-					g_new_rotation = g_selected_plane->rotation;
+					g_new_rotation = g_selected_mesh->rotation;
 				}
 				else
 				{
@@ -1665,7 +1666,7 @@ int main(int argc, char* argv[])
 
 			bool intersection = calculate_plane_ray_intersection(
 				g_normal_for_ray_intersect,
-				g_selected_plane->translation,
+				g_selected_mesh->translation,
 				g_scene_camera.position,
 				g_used_transform_ray,
 				intersection_point);
@@ -1680,20 +1681,20 @@ int main(int argc, char* argv[])
 
 				if (0.0f < g_user_settings.transform_clip)
 				{
-					g_selected_plane->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
+					g_selected_mesh->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
 				}
 				else
 				{
-					g_selected_plane->translation = g_new_translation;
+					g_selected_mesh->translation = g_new_translation;
 				}
 			}
 			else if (intersection && g_transform_mode.transformation == Transformation::Scale)
 			{
-				glm::mat4 rotation_mat4 = get_rotation_matrix(g_selected_plane);
+				glm::mat4 rotation_mat4 = get_rotation_matrix(g_selected_mesh);
 				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
 
 				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
-				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, g_selected_plane->translation, used_normal);
+				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, g_selected_mesh->translation, used_normal);
 				g_point_on_scale_plane = point_on_scale_plane;
 
 				// Reverse the rotation by applying the inverse rotation matrix to the vector
@@ -1707,17 +1708,17 @@ int main(int argc, char* argv[])
 
 				if (0.0f < g_user_settings.transform_clip)
 				{
-					g_selected_plane->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
+					g_selected_mesh->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
 				}
 				else
 				{
-					g_selected_plane->scale = g_new_scale;
+					g_selected_mesh->scale = g_new_scale;
 				}
 			}
 			else if (intersection && g_transform_mode.transformation == Transformation::Rotate)
 			{
-				glm::vec3 prev_vec	   = glm::normalize(g_prev_intersection - g_selected_plane->translation);
-				glm::vec3 current_vec  = glm::normalize(g_debug_plane_intersection - g_selected_plane->translation);
+				glm::vec3 prev_vec	   = glm::normalize(g_prev_intersection - g_selected_mesh->translation);
+				glm::vec3 current_vec  = glm::normalize(g_debug_plane_intersection - g_selected_mesh->translation);
 
 				g_prev_intersection = g_debug_plane_intersection;
 
@@ -1743,16 +1744,16 @@ int main(int argc, char* argv[])
 
 					if (0.0f < g_user_settings.transform_rotation_clip)
 					{
-						g_selected_plane->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
+						g_selected_mesh->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
 					}
 					else
 					{
-						g_selected_plane->rotation = g_new_rotation;
+						g_selected_mesh->rotation = g_new_rotation;
 					}
 
-					g_selected_plane->rotation.x = float_modulus_operation(g_selected_plane->rotation.x, 360.0f);
-					g_selected_plane->rotation.y = float_modulus_operation(g_selected_plane->rotation.y, 360.0f);
-					g_selected_plane->rotation.z = float_modulus_operation(g_selected_plane->rotation.z, 360.0f);
+					g_selected_mesh->rotation.x = float_modulus_operation(g_selected_mesh->rotation.x, 360.0f);
+					g_selected_mesh->rotation.y = float_modulus_operation(g_selected_mesh->rotation.y, 360.0f);
+					g_selected_mesh->rotation.z = float_modulus_operation(g_selected_mesh->rotation.z, 360.0f);
 				}
 			}
 		}
@@ -1762,10 +1763,10 @@ int main(int argc, char* argv[])
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		for (int i = 0; i < g_scene_planes.items_count; i++)
+		for (int i = 0; i < g_scene_meshes.items_count; i++)
 		{
-			Plane plane = *(Plane*)j_array_get(&g_scene_planes, i);
-			draw_plane(&plane);
+			Mesh plane = *(Mesh*)j_array_get(&g_scene_meshes, i);
+			draw_mesh(&plane);
 		}
 
 		// Debug light
@@ -1775,16 +1776,16 @@ int main(int argc, char* argv[])
 		}
 
 		// Transformation mode debug lines
-		if (g_selected_plane != nullptr && g_transform_mode.is_active)
+		if (g_selected_mesh != nullptr && g_transform_mode.is_active)
 		{
-			draw_line(g_debug_plane_intersection, g_selected_plane->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
+			draw_line(g_debug_plane_intersection, g_selected_mesh->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
 
-			glm::vec3 end = glm::vec3(g_selected_plane->translation);
+			glm::vec3 end = glm::vec3(g_selected_mesh->translation);
 
 			// Scale mode
 			if (g_transform_mode.transformation == Transformation::Scale)
 			{
-				glm::mat4 rotation_mat4 = get_rotation_matrix(g_selected_plane);
+				glm::mat4 rotation_mat4 = get_rotation_matrix(g_selected_mesh);
 				glm::vec3 used_normal = glm::vec3(0);
 
 				if (g_transform_mode.axis == Axis::X)
@@ -1801,7 +1802,7 @@ int main(int argc, char* argv[])
 				}
 
 				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
-				end = closest_point_on_plane(g_debug_plane_intersection, g_selected_plane->translation, used_normal);
+				end = closest_point_on_plane(g_debug_plane_intersection, g_selected_mesh->translation, used_normal);
 			}
 
 			// Translate mode
@@ -1824,7 +1825,7 @@ int main(int argc, char* argv[])
 			// Rotate mode
 			if (g_transform_mode.transformation == Transformation::Rotate)
 			{
-				end = get_plane_middle_point(*g_selected_plane);
+				end = get_plane_middle_point(*g_selected_mesh);
 			}
 
 			draw_line(g_debug_plane_intersection, end, glm::vec3(0.0f, 1.0f, 0.0f), 2.0f, 2.0f);
@@ -1838,9 +1839,9 @@ int main(int argc, char* argv[])
 		}
 
 		// Draw selection
-		if (-1 < g_selected_plane_index)
+		if (-1 < g_selected_mesh_index)
 		{
-			Plane selected_plane = *(Plane*)j_array_get(&g_scene_planes, g_selected_plane_index);
+			Mesh selected_plane = *(Mesh*)j_array_get(&g_scene_meshes, g_selected_mesh_index);
 			auto model = get_model_matrix(&selected_plane);
 
 			glm::vec3 bot_left = selected_plane.translation;

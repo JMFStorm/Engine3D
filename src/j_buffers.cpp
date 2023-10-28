@@ -79,10 +79,11 @@ void j_array_replace(JArray* array, byte* item_ptr, u64 index)
 JStrings j_strings_init(s64 max_chars, char* char_ptr)
 {
 	JStrings strings = {
+		.byte_alignment = 0,
 		.current_chars = 0,
 		.strings_count = 0,
 		.max_chars = max_chars,
-		.data = char_ptr
+		.data = char_ptr,
 	};
 	return strings;
 }
