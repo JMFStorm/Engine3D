@@ -503,9 +503,94 @@ void draw_mesh(Mesh* mesh)
 	glUniform3f(material_spec_loc, g_material.specular.x, g_material.specular.y, g_material.specular.z);
 	glUniform1f(material_shine_loc, g_material.shininess);
 
+	s64 draw_indicies = 0;
+
+	if (mesh->mesh_type == PrimitiveType::Plane)
+	{
+		float vertices[] =
+		{
+			// Coords			// UV		 // Plane normal
+			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top right
+			0.0f, 0.0f, 0.0f,	0.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top left
+			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, 1.0f, 0.0f, // bot left
+
+			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top right
+			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, 1.0f, 0.0f, // bot left 
+			1.0f, 0.0f, 1.0f,	1.0f, 0.0f,	 0.0f, 1.0f, 0.0f  // bot right
+		};
+
+		draw_indicies = 6;
+		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	}
+	else if (mesh->mesh_type == PrimitiveType::Cube)
+	{
+		float vertices[] =
+		{
+			 // Coords				 // UV			 // Plane normal
+			 // Ceiling
+			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  1.0f, 0.0f, // top right
+			-0.5f,  0.5f, -0.5f,	 0.0f, 1.0f,	 0.0f,  1.0f, 0.0f, // top left
+			-0.5f,  0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  1.0f, 0.0f, // bot left
+								 				    
+			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  1.0f, 0.0f, // top right
+			-0.5f,  0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  1.0f, 0.0f, // bot left 
+			 0.5f,  0.5f,  0.5f,	 1.0f, 0.0f,	 0.0f,  1.0f, 0.0f, // bot right
+								 
+			 // Floor
+			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, // bot left 
+			 0.5f, -0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, // top right
+			 0.5f, -0.5f,  0.5f,	 1.0f, 0.0f,	 0.0f, -1.0f, 0.0f, // bot right
+
+			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, // bot left
+			-0.5f, -0.5f, -0.5f,	 0.0f, 1.0f,	 0.0f, -1.0f, 0.0f, // top left
+			 0.5f, -0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, // top right
+
+			 // North
+			-0.5f, -0.5f, -0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f, -1.0f, // bot left 
+			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f, -1.0f, // top right
+			 0.5f, -0.5f, -0.5f,	 1.0f, 0.0f,	 0.0f,  0.0f, -1.0f, // bot right
+
+			-0.5f, -0.5f, -0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f, -1.0f, // bot left
+			-0.5f,  0.5f, -0.5f,	 0.0f, 1.0f,	 0.0f,  0.0f, -1.0f, // top left
+			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f, -1.0f, // top right
+
+			 // South
+			 0.5f,  0.5f,  0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f,  1.0f, // top right
+			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f,  1.0f, // bot left 
+			 0.5f, -0.5f,  0.5f,	 1.0f, 0.0f,	 0.0f,  0.0f,  1.0f, // bot right
+			
+			-0.5f,  0.5f,  0.5f,	 0.0f, 1.0f,	 0.0f,  0.0f,  1.0f, // top left
+			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f,  1.0f, // bot left
+			 0.5f,  0.5f,  0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f,  1.0f, // top right
+
+			 // West
+			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	-1.0f,  0.0f,  0.0f, // bot left 
+			-0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	-1.0f,  0.0f,  0.0f, // top right
+			-0.5f, -0.5f, -0.5f,	 1.0f, 0.0f,	-1.0f,  0.0f,  0.0f, // bot right
+			
+			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	-1.0f,  0.0f,  0.0f, // bot left
+			-0.5f,  0.5f,  0.5f,	 0.0f, 1.0f,	-1.0f,  0.0f,  0.0f, // top left
+			-0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	-1.0f,  0.0f,  0.0f, // top right
+
+			 // East
+			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top right
+			 0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 1.0f,  0.0f,  0.0f, // bot left 
+			 0.5f, -0.5f, -0.5f,	 1.0f, 0.0f,	 1.0f,  0.0f,  0.0f, // bot right
+			
+			 0.5f,  0.5f,  0.5f,	 0.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top left
+			 0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 1.0f,  0.0f,  0.0f, // bot left
+			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top right
+		};
+
+		draw_indicies = 40;
+		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	}
+
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, mesh->texture->texture_id);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glDrawArrays(GL_TRIANGLES, 0, draw_indicies);
 	g_frame_data.draw_calls++;
 
 	glUseProgram(0);
@@ -953,13 +1038,14 @@ void delete_mesh(s64 plane_index)
 	g_selected_mesh_index = -1;
 }
 
-s64 add_new_mesh()
+s64 add_new_mesh(PrimitiveType type)
 {
 	Mesh new_mesh = {
 		.translation = glm::vec3(0.0f, 0.0f, 0.0f),
 		.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
 		.scale = glm::vec3(1.0f, 1.0f, 1.0f),
 		.texture = (Texture*)j_array_get(&g_textures, 0),
+		.mesh_type = type
 	};
 
 	return j_array_add(&g_scene_meshes, (byte*)&new_mesh);
@@ -1232,8 +1318,8 @@ int main(int argc, char* argv[])
 
 	// Init mesh shader
 	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/plane_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/plane_fs.glsl";
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_fs.glsl";
 
 		g_mesh_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 		{
@@ -1242,20 +1328,6 @@ int main(int argc, char* argv[])
 
 			glGenBuffers(1, &g_mesh_vbo);
 			glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
-
-			float vertices[] =
-			{
-				// Coords			// UV		 // Plane normal
-				1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top right
-				0.0f, 0.0f, 0.0f,	0.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top left
-				0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, 1.0f, 0.0f, // bot left
-																   
-				1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top right
-				0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, 1.0f, 0.0f, // bot left 
-				1.0f, 0.0f, 1.0f,	1.0f, 0.0f,	 0.0f, 1.0f, 0.0f  // bot right
-			};
-
-			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 			// Coord attribute
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
@@ -1351,7 +1423,13 @@ int main(int argc, char* argv[])
 
 				if (ImGui::Button("Add plane"))
 				{
-					s64 new_mesh_index = add_new_mesh();
+					s64 new_mesh_index = add_new_mesh(PrimitiveType::Plane);
+					select_mesh_index(new_mesh_index);
+				}
+
+				if (ImGui::Button("Add Cube"))
+				{
+					s64 new_mesh_index = add_new_mesh(PrimitiveType::Cube);
 					select_mesh_index(new_mesh_index);
 				}
 
@@ -1465,9 +1543,7 @@ int main(int argc, char* argv[])
 
 			if (clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y))
 			{
-				std::cout << "Mouse click - x:" << g_frame_data.mouse_x
-					<< " y:" << g_frame_data.mouse_y
-					<< std::endl;
+				printf("Mouse click x: %d y: %d\n", (s32)g_frame_data.mouse_x, (s32)g_frame_data.mouse_y);
 
 				glm::vec3 ray_origin = g_scene_camera.position;
 				glm::vec3 ray_direction = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
@@ -1483,6 +1559,8 @@ int main(int argc, char* argv[])
 					g_debug_click_ray_normal = glm::vec3(0.0f);
 					g_debug_click_camera_pos = glm::vec3(0.0f);
 				}
+
+				// @TODO: Select cubes
 
 				int selected_plane_i = get_plane_intersection_from_ray(g_scene_meshes, ray_origin, ray_direction);
 
@@ -1841,10 +1919,10 @@ int main(int argc, char* argv[])
 		// Draw selection
 		if (-1 < g_selected_mesh_index)
 		{
-			Mesh selected_plane = *(Mesh*)j_array_get(&g_scene_meshes, g_selected_mesh_index);
-			auto model = get_model_matrix(&selected_plane);
+			Mesh selected_mesh= *(Mesh*)j_array_get(&g_scene_meshes, g_selected_mesh_index);
+			auto model = get_model_matrix(&selected_mesh);
 
-			glm::vec3 bot_left = selected_plane.translation;
+			glm::vec3 bot_left = selected_mesh.translation;
 			glm::vec3 bot_right = glm::vec3(0.0f, 0, 1.0f);
 			glm::vec3 top_left  = glm::vec3(1.0f, 0, 0.0f);
 			glm::vec3 top_right = glm::vec3(1.0f, 0, 1.0f);
@@ -1858,7 +1936,7 @@ int main(int argc, char* argv[])
 			draw_line_ontop(new_top_right, glm::vec3(new_top_left),  glm::vec3(1.0f), 2.0f);
 			draw_line_ontop(new_top_right, glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
 
-			draw_selection_arrows(selected_plane.translation);
+			draw_selection_arrows(selected_mesh.translation);
 		}
 
 		// Click ray

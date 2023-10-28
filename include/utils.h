@@ -12,6 +12,11 @@ enum Axis {
 constexpr const int TEXTURE_PATH_LEN = 128;
 constexpr const int TEXTURE_FILENAME_LEN = TEXTURE_PATH_LEN / 2;
 
+enum PrimitiveType {
+	Plane,
+	Cube
+};
+
 typedef struct Texture {
 	char file_name[TEXTURE_FILENAME_LEN] = { 0 };
 	int texture_id;
@@ -22,6 +27,7 @@ typedef struct Mesh {
 	glm::vec3 rotation;
 	glm::vec3 scale;
 	Texture* texture;
+	PrimitiveType mesh_type;
 	float uv_multiplier = 1.0f;
 } Mesh;
 
