@@ -26,6 +26,8 @@
 #include "j_buffers.h"
 #include "utils.h"
 
+using namespace glm;
+
 glm::vec3 lastMousePos(0.0f);
 
 constexpr int right_hand_panel_width = 400;
@@ -206,6 +208,7 @@ typedef struct Light {
 } Light;
 
 typedef struct Material {
+	glm::vec3 ambient;
 	glm::vec3 diffuse;
 	glm::vec3 specular;
 	float shininess;
@@ -213,14 +216,15 @@ typedef struct Material {
 
 Light g_light = {
 	.position = glm::vec3(0.0f, 4.0f, 0.0f),
-	.diffuse = glm::vec3(0.7f),
-	.specular = 0.25f
+	.diffuse = glm::vec3(1.0f),
+	.specular = 1.0f
 };
 
 Material g_material = {
-	.diffuse = glm::vec3(0.8f),
-	.specular = glm::vec3(0.8f),
-	.shininess = 0.5f
+	.ambient = glm::vec3(1.0f),
+	.diffuse = glm::vec3(1.0f),
+	.specular = glm::vec3(0.1f),
+	.shininess = 32.0f
 };
 
 // Custom hash function for char*
@@ -491,6 +495,7 @@ void draw_plane(Plane* mesh)
 	unsigned int light_diff_loc = glGetUniformLocation(g_plane_shader, "light.diffuse");
 	unsigned int light_spec_loc = glGetUniformLocation(g_plane_shader, "light.specular");
 
+	unsigned int material_amb_loc = glGetUniformLocation(g_plane_shader, "material.ambient");
 	unsigned int material_diff_loc = glGetUniformLocation(g_plane_shader, "material.diffuse");
 	unsigned int material_spec_loc = glGetUniformLocation(g_plane_shader, "material.specular");
 	unsigned int material_shine_loc = glGetUniformLocation(g_plane_shader, "material.shininess");
@@ -509,6 +514,7 @@ void draw_plane(Plane* mesh)
 	glUniform3f(light_diff_loc, g_light.diffuse.x, g_light.diffuse.y, g_light.diffuse.z);
 	glUniform1f(light_spec_loc, g_light.specular);
 
+	glUniform3f(material_amb_loc, g_material.ambient.x, g_material.ambient.y, g_material.ambient.z);
 	glUniform3f(material_diff_loc, g_material.diffuse.x, g_material.diffuse.y, g_material.diffuse.z);
 	glUniform3f(material_spec_loc, g_material.specular.x, g_material.specular.y, g_material.specular.z);
 	glUniform1f(material_shine_loc, g_material.shininess);
@@ -1374,14 +1380,15 @@ int main(int argc, char* argv[])
 				ImGui::Text("Scene settings");
 				ImGui::Text("Light");
 				ImGui::InputFloat3("Global ambient", &g_user_settings.world_ambient[0], "%.3f");
-				ImGui::InputFloat3("Light pos", &g_light.position[0], "%.2f");
-				ImGui::InputFloat("Light specular", &g_light.specular, 0, 0, "%.2f");
-				ImGui::InputFloat3("Light diffuse", &g_light.diffuse[0], "%.2f");
+				ImGui::InputFloat3("Light pos", &g_light.position[0], "%.3f");
+				ImGui::InputFloat("Light specular", &g_light.specular, 0, 0, "%.3f");
+				ImGui::InputFloat3("Light diffuse", &g_light.diffuse[0], "%.3f");
 
 				ImGui::Text("Material");
-				ImGui::InputFloat3("Material specular", &g_material.specular[0], "%.2f");
-				ImGui::InputFloat3("Material diffuse", &g_material.diffuse[0], "%.2f");
-				ImGui::InputFloat("Material shine", &g_material.shininess, 0, 0, "%.2f");
+				ImGui::InputFloat3("Material ambient", &g_material.ambient[0], "%.3f");
+				ImGui::InputFloat3("Material specular", &g_material.specular[0], "%.3f");
+				ImGui::InputFloat3("Material diffuse", &g_material.diffuse[0], "%.3f");
+				ImGui::InputFloat("Material shine", &g_material.shininess, 0, 0, "%.3f");
 
 				ImGui::Text("Game window");
 				ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);

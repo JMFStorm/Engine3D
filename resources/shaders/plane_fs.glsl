@@ -7,6 +7,7 @@ struct Light {
 };
 
 struct Material {
+    vec3 ambient;
     vec3 diffuse;
     vec3 specular;
     float shininess;
@@ -27,25 +28,22 @@ out vec4 FragColor;
 
 void main()
 {
-    // Calculate lighting
+    // ambient
+    vec3 ambient = ambientLight * material.ambient;
+
+    // diffuse
     vec3 norm = normalize(fragNormal);
     vec3 lightDir = normalize(light.position - fragPos);
-    vec3 viewDir = normalize(viewPos - fragPos);
-
-    // Diffuse component
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = light.diffuse * diff;
+    vec3 diffuse = light.diffuse * (diff * material.diffuse);
 
-    // Specular component
-    vec3 reflectDir = reflect(-lightDir, norm);
-    float dot1 = dot(viewDir, reflectDir);
-    float maxed = max(dot1, 0.0);
-    float material_specular = 32.0;
-    float spec = pow(maxed, material_specular);
-    vec3 specular = vec3(light.specular * spec);
+    // specular
+    vec3 viewDir = normalize(viewPos - fragPos);
+    vec3 reflectDir = reflect(-lightDir, norm);  
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+    vec3 specular = light.specular * (spec * material.specular); 
 
-    // Final lighting calculation
-    vec3 light_result = ambientLight + diffuse + specular;
-
+    // light result
+    vec3 light_result = ambient + diffuse + specular;
 	FragColor = texture(texture1, TexCoord) * vec4(light_result, 1.0);
 }
