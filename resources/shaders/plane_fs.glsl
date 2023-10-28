@@ -17,6 +17,7 @@ in vec3 fragPos;    // Fragment position in world space
 in vec3 fragNormal; // Normal in world space
 in vec2 TexCoord;
 
+uniform bool use_texture;
 uniform sampler2D texture1;
 uniform vec3 viewPos; // Camera (view) position
 
@@ -43,7 +44,15 @@ void main()
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
     vec3 specular = light.specular * (spec * material.specular); 
 
-    // light result
-    vec3 light_result = ambient + diffuse + specular;
-	FragColor = texture(texture1, TexCoord) * vec4(light_result, 1.0);
+    // Result
+    vec3 color_result = ambient + diffuse + specular;
+
+    if (use_texture)
+    {
+       FragColor = texture(texture1, TexCoord) * vec4(color_result, 1.0);
+    }
+    else
+    {
+        FragColor = vec4(color_result, 1.0);
+    }
 }

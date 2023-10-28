@@ -449,21 +449,6 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
-	float vertices[] =
-	{
-		// Coords	
-		-0.5f, -0.5f, 0.0f, // bottom left
-		 0.5f, -0.5f, 0.0f, // bottom right
-		-0.5f,  0.5f, 0.0f, // top left
-			   
-		-0.5f,  0.5f, 0.0f, // top left 
-		 0.5f, -0.5f, 0.0f, // bottom right
-		 0.5f,  0.5f, 0.0f  // top right
-	};
-
-	glBindBuffer(GL_ARRAY_BUFFER, g_billboard_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture.texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -486,6 +471,7 @@ void draw_plane(Plane* mesh)
 	unsigned int view_loc = glGetUniformLocation(g_plane_shader, "view");
 	unsigned int projection_loc = glGetUniformLocation(g_plane_shader, "projection");
 
+	unsigned int use_texture_loc = glGetUniformLocation(g_plane_shader, "use_texture");
 	unsigned int uv_loc = glGetUniformLocation(g_plane_shader, "uv_multiplier");
 	unsigned int normal_loc = glGetUniformLocation(g_plane_shader, "normal_vec3");
 	unsigned int ambient_loc = glGetUniformLocation(g_plane_shader, "ambientLight");
@@ -504,6 +490,7 @@ void draw_plane(Plane* mesh)
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 	glUniform1f(uv_loc, mesh->uv_multiplier);
+	glUniform1i(use_texture_loc, true);
 
 	glm::vec3 normal = glm::vec3(0, 1.0f, 0);
 	glUniform3f(normal_loc, normal[0], normal[1], normal[2]);
@@ -1194,9 +1181,27 @@ int main(int argc, char* argv[])
 			glBindVertexArray(g_billboard_vao);
 			glBindBuffer(GL_ARRAY_BUFFER, g_billboard_vbo);
 
+			float vertices[] =
+			{
+				// Coords			 // UVs
+				-0.5f, -0.5f, 0.0f,	 0.0f, 0.0f, // bottom left
+				 0.5f, -0.5f, 0.0f,	 1.0f, 0.0f, // bottom right
+				-0.5f,  0.5f, 0.0f,	 0.0f, 1.0f, // top left
+										
+				-0.5f,  0.5f, 0.0f,	 0.0f, 1.0f, // top left 
+				 0.5f, -0.5f, 0.0f,	 1.0f, 0.0f, // bottom right
+				 0.5f,  0.5f, 0.0f,	 1.0f, 1.0f  // top right
+			};
+
+			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
 			// Coord attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
 			glEnableVertexAttribArray(0);
+
+			// UV attribute
+			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+			glEnableVertexAttribArray(1);
 		}
 	}
 
