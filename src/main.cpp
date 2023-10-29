@@ -1795,43 +1795,52 @@ int main(int argc, char* argv[])
 			}
 			else if (intersection && g_transform_mode.transformation == Transformation::Rotate)
 			{
-				glm::vec3 prev_vec	   = glm::normalize(g_prev_intersection - g_selected_mesh->translation);
-				glm::vec3 current_vec  = glm::normalize(g_debug_plane_intersection - g_selected_mesh->translation);
+				auto new_line = g_debug_plane_intersection - g_selected_mesh->translation;
 
-				g_prev_intersection = g_debug_plane_intersection;
-
-				bool equal = glm::all(glm::equal(prev_vec, current_vec));
-
-				if (!equal)
+				if (0.15f < glm::length(new_line))
 				{
-					// Calculate the rotation axis using the cross product of the unit vectors
-					glm::vec3 rotation_axis_cross = glm::normalize(glm::cross(prev_vec, current_vec));
+					glm::vec3 prev_vec = glm::normalize(g_prev_intersection - g_selected_mesh->translation);
+					glm::vec3 current_vec = glm::normalize(new_line);
 
-					// Calculate the rotation angle in radians
-					float angle = glm::acos(glm::dot(glm::normalize(prev_vec), glm::normalize(current_vec)));
+					g_prev_intersection = g_debug_plane_intersection;
 
-					// Create the rotation matrix
-					glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis_cross);
+					bool equal = glm::all(glm::equal(prev_vec, current_vec));
 
-					// Extract the rotation as a quaternion
-					glm::quat rotation_quaternion = rotation_matrix;
-
-					// Convert the quaternion to Euler angles
-					glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
-					g_new_rotation += eulerAngles;
-
-					if (0.0f < g_user_settings.transform_rotation_clip)
+					if (!equal)
 					{
-						g_selected_mesh->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
-					}
-					else
-					{
-						g_selected_mesh->rotation = g_new_rotation;
-					}
+						// Calculate the rotation axis using the cross product of the unit vectors
+						glm::vec3 rotation_axis_cross = glm::normalize(glm::cross(prev_vec, current_vec));
 
-					g_selected_mesh->rotation.x = float_modulus_operation(g_selected_mesh->rotation.x, 360.0f);
-					g_selected_mesh->rotation.y = float_modulus_operation(g_selected_mesh->rotation.y, 360.0f);
-					g_selected_mesh->rotation.z = float_modulus_operation(g_selected_mesh->rotation.z, 360.0f);
+						// Calculate the rotation angle in radians
+						float angle = glm::acos(glm::dot(glm::normalize(prev_vec), glm::normalize(current_vec)));
+
+						// Create the rotation matrix
+						glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis_cross);
+
+						// Extract the rotation as a quaternion
+						glm::quat rotation_quaternion = rotation_matrix;
+
+						// Convert the quaternion to Euler angles
+						glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
+
+						if (!(glm::isnan(eulerAngles.x) || glm::isnan(eulerAngles.y) || glm::isnan(eulerAngles.z)))
+						{
+							g_new_rotation += eulerAngles;
+
+							if (0.0f < g_user_settings.transform_rotation_clip)
+							{
+								g_selected_mesh->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
+							}
+							else
+							{
+								g_selected_mesh->rotation = g_new_rotation;
+							}
+
+							g_selected_mesh->rotation.x = float_modulus_operation(g_selected_mesh->rotation.x, 360.0f);
+							g_selected_mesh->rotation.y = float_modulus_operation(g_selected_mesh->rotation.y, 360.0f);
+							g_selected_mesh->rotation.z = float_modulus_operation(g_selected_mesh->rotation.z, 360.0f);
+						}
+					}
 				}
 			}
 		}
