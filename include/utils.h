@@ -118,6 +118,16 @@ inline glm::mat4 get_rotation_matrix(Mesh* mesh)
 	return rotation_matrix;
 }
 
+inline float get_vec3_val_by_axis(glm::vec3 vec, Axis axis)
+{
+	if (axis == Axis::X) return vec.x;
+	if (axis == Axis::Y) return vec.y;
+	if (axis == Axis::Z) return vec.z;
+	return 0.0f;
+}
+
+void get_axis_xor(Axis axis, Axis xor_axises[]);
+
 glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal);
 
 std::array<glm::vec3, 2> get_axis_xor_normals(Axis axis);

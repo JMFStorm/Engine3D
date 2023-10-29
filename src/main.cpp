@@ -34,7 +34,7 @@ constexpr int right_hand_panel_width = 400;
 
 typedef struct UserSettings {
 	int window_size_px[2];
-	float transform_clip = 0.10f;
+	float transform_clip = 0.25f;
 	float transform_rotation_clip = 15.0f;
 	glm::vec3 world_ambient = glm::vec3(0.1f, 0.1f, 0.1f);
 } UserSettings;
@@ -1032,7 +1032,7 @@ bool clicked_scene_space(int x, int y)
 void delete_mesh(s64 plane_index)
 {
 	Mesh* last_plane = j_array_get(&g_scene_meshes, g_scene_meshes.items_count - 1);
-	j_array_replace(&g_scene_meshes, last_plane, plane_index);
+	j_array_replace(&g_scene_meshes, *last_plane, plane_index);
 	j_array_pop_back(&g_scene_meshes);
 	g_selected_mesh = nullptr;
 	g_selected_mesh_index = -1;
@@ -1040,54 +1040,35 @@ void delete_mesh(s64 plane_index)
 
 s64 add_new_mesh(PrimitiveType type)
 {
+	s64 texture_index = 0;
+	Texture* texture_ptr = j_array_get(&g_textures, texture_index);
+
 	Mesh new_mesh = {
 		.translation = glm::vec3(0.0f, 0.0f, 0.0f),
 		.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
 		.scale = glm::vec3(1.0f, 1.0f, 1.0f),
-		.texture = (Texture*)j_array_get(&g_textures, 0),
+		.texture = texture_ptr,
 		.mesh_type = type
 	};
 
-	return j_array_add(&g_scene_meshes, &new_mesh);
+	g_selected_texture_item = texture_index;
+	s64 new_index = j_array_add(&g_scene_meshes, new_mesh);
+	return new_index;
 }
 
 void select_mesh_index(s64 index)
 {
-	g_selected_mesh = (Mesh*)j_array_get(&g_scene_meshes, index);
+	g_selected_mesh = j_array_get(&g_scene_meshes, index);
 	g_selected_mesh_index = index;
+
+	auto selected_texture_name = g_texture_menu_map[g_selected_mesh->texture->file_name];
+	g_selected_texture_item = selected_texture_name;
 }
 
 void deselect_current_mesh()
 {
 	g_selected_mesh = nullptr;
 	g_selected_mesh_index = -1;
-}
-
-inline float get_vec3_val_by_axis(glm::vec3 vec, Axis axis)
-{
-	if (axis == Axis::X) return vec.x;
-	if (axis == Axis::Y) return vec.y;
-	if (axis == Axis::Z) return vec.z;
-	return 0.0f;
-}
-
-void get_axis_xor(Axis axis, Axis xor_axises[])
-{
-	if (axis == Axis::X)
-	{
-		xor_axises[0] = Axis::Y;
-		xor_axises[1] = Axis::Z;
-	}
-	else if (axis == Axis::Y)
-	{
-		xor_axises[0] = Axis::X;
-		xor_axises[1] = Axis::Z;
-	}
-	else if (axis == Axis::Z)
-	{
-		xor_axises[0] = Axis::X;
-		xor_axises[1] = Axis::Y;
-	}
 }
 
 bool calculate_plane_ray_intersection(
@@ -1494,7 +1475,7 @@ int main(int argc, char* argv[])
 		s64 name_len = strlen(file_name);
 		Texture new_texture = { .texture_id = texture_id };
 		memcpy(new_texture.file_name, file_name, name_len);
-		j_array_add(&g_textures, &new_texture);
+		j_array_add(&g_textures, new_texture);
 
 		char str[TEXTURE_FILENAME_LEN] = { 0 };
 		memcpy(str, file_name, name_len);
@@ -1967,12 +1948,12 @@ int main(int argc, char* argv[])
 
 		for (int i = 0; i < g_scene_meshes.items_count; i++)
 		{
-			Mesh plane = *(Mesh*)j_array_get(&g_scene_meshes, i);
+			Mesh plane = *j_array_get(&g_scene_meshes, i);
 			draw_mesh(&plane);
 		}
 
 		// Draw lights
-		Texture light_tx = *(Texture*)j_array_get(&g_textures, 3);
+		Texture light_tx = *j_array_get(&g_textures, 3);
 		draw_billboard(g_light.position, light_tx, 0.35f);
 
 		// Transformation mode debug lines
@@ -2007,23 +1988,30 @@ int main(int argc, char* argv[])
 		// Draw selection
 		if (-1 < g_selected_mesh_index)
 		{
-			Mesh selected_mesh= *(Mesh*)j_array_get(&g_scene_meshes, g_selected_mesh_index);
+			Mesh selected_mesh = *j_array_get(&g_scene_meshes, g_selected_mesh_index);
 			auto model = get_model_matrix(&selected_mesh);
-			
-			glm::vec3 bot_left = selected_mesh.translation;
-			glm::vec3 bot_right = glm::vec3(0.0f, 0, 1.0f);
-			glm::vec3 top_left  = glm::vec3(1.0f, 0, 0.0f);
-			glm::vec3 top_right = glm::vec3(1.0f, 0, 1.0f);
-			
-			glm::vec4 new_bot_right = model * glm::vec4(bot_right, 1.0f);
-			glm::vec4 new_top_left  = model * glm::vec4(top_left,  1.0f);
-			glm::vec4 new_top_right = model * glm::vec4(top_right, 1.0f);
-			
-			draw_line_ontop(bot_left,	   glm::vec3(new_top_left),  glm::vec3(1.0f), 2.0f);
-			draw_line_ontop(bot_left,	   glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
-			draw_line_ontop(new_top_right, glm::vec3(new_top_left),  glm::vec3(1.0f), 2.0f);
-			draw_line_ontop(new_top_right, glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
-			
+
+			if (selected_mesh.mesh_type == PrimitiveType::Plane)
+			{
+				glm::vec3 bot_left  = selected_mesh.translation;
+				glm::vec3 bot_right = glm::vec3(0.0f, 0, 1.0f);
+				glm::vec3 top_left  = glm::vec3(1.0f, 0, 0.0f);
+				glm::vec3 top_right = glm::vec3(1.0f, 0, 1.0f);
+
+				glm::vec4 new_bot_right = model * glm::vec4(bot_right, 1.0f);
+				glm::vec4 new_top_left  = model * glm::vec4(top_left, 1.0f);
+				glm::vec4 new_top_right = model * glm::vec4(top_right, 1.0f);
+
+				draw_line_ontop(bot_left, glm::vec3(new_top_left), glm::vec3(1.0f), 2.0f);
+				draw_line_ontop(bot_left, glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
+				draw_line_ontop(new_top_right, glm::vec3(new_top_left), glm::vec3(1.0f), 2.0f);
+				draw_line_ontop(new_top_right, glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
+			}
+			else if (selected_mesh.mesh_type == PrimitiveType::Cube)
+			{
+				// @TODO
+			}
+
 			draw_selection_arrows(selected_mesh.translation);
 		}
 

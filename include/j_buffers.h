@@ -34,12 +34,12 @@ JArray<T> j_array_init(s64 max_items, s64 item_size_bytes, T* data_ptr)
 }
 
 template <typename T>
-s64 j_array_add(JArray<T>* array, T* element_ptr)
+s64 j_array_add(JArray<T>* array, T element)
 {
 	// Always reserve one slot for swaps
 	ASSERT_TRUE(array->items_count + 1 < array->max_items, "Array has item capacity left\n");
 	void* array_ptr = &array->data[array->items_count * array->item_size_bytes];
-	memcpy(array_ptr, element_ptr, array->item_size_bytes);
+	memcpy(array_ptr, &element, array->item_size_bytes);
 	array->items_count++;
 	return array->items_count - 1;
 }
@@ -60,21 +60,11 @@ void j_array_pop_back(JArray<T>* array)
 }
 
 template <typename T>
-void j_array_swap(JArray<T>* array, s64 index_1, s64 index_2)
-{
-	s64 unused_index = array->items_count + 1;
-	void* temp_ptr = &array->data[unused_index];
-	memcpy(temp_ptr, &array->data[index_1], array->item_size_bytes);
-	memcpy(&array->data[index_1], &array->data[index_2], array->item_size_bytes);
-	memcpy(&array->data[index_2], temp_ptr, array->item_size_bytes);
-}
-
-template <typename T>
-void j_array_replace(JArray<T>* array, T* item_ptr, u64 index)
+void j_array_replace(JArray<T>* array, T new_element, u64 index)
 {
 	ASSERT_TRUE(index <= array->items_count - 1, "Array item index is included");
 	void* dest = &array->data[index * array->item_size_bytes];
-	memcpy(dest, item_ptr, array->item_size_bytes);
+	memcpy(dest, &new_element, array->item_size_bytes);
 }
 
 typedef struct JStrings {

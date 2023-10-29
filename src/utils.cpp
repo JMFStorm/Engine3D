@@ -176,3 +176,22 @@ glm::vec3 get_plane_middle_point(Mesh mesh)
 	glm::vec3 result = mesh.translation + scale_rotated;
 	return result;
 }
+
+void get_axis_xor(Axis axis, Axis xor_axises[])
+{
+	if (axis == Axis::X)
+	{
+		xor_axises[0] = Axis::Y;
+		xor_axises[1] = Axis::Z;
+	}
+	else if (axis == Axis::Y)
+	{
+		xor_axises[0] = Axis::X;
+		xor_axises[1] = Axis::Z;
+	}
+	else if (axis == Axis::Z)
+	{
+		xor_axises[0] = Axis::X;
+		xor_axises[1] = Axis::Y;
+	}
+}
