@@ -1063,15 +1063,42 @@ void deselect_current_mesh()
 	g_selected_mesh_index = -1;
 }
 
+inline float get_vec3_val_by_axis(glm::vec3 vec, Axis axis)
+{
+	if (axis == Axis::X) return vec.x;
+	if (axis == Axis::Y) return vec.y;
+	if (axis == Axis::Z) return vec.z;
+	return 0.0f;
+}
+
+void get_axis_xor(Axis axis, Axis xor_axises[])
+{
+	if (axis == Axis::X)
+	{
+		xor_axises[0] = Axis::Y;
+		xor_axises[1] = Axis::Z;
+	}
+	else if (axis == Axis::Y)
+	{
+		xor_axises[0] = Axis::X;
+		xor_axises[1] = Axis::Z;
+	}
+	else if (axis == Axis::Z)
+	{
+		xor_axises[0] = Axis::X;
+		xor_axises[1] = Axis::Y;
+	}
+}
+
 bool calculate_plane_ray_intersection(
 	glm::vec3 plane_normal,
-	glm::vec3 plane_position,
+	glm::vec3 point_in_plane,
 	glm::vec3 ray_origin,
 	glm::vec3 ray_direction,
 	glm::vec3& result)
 {
 	// Calculate the D coefficient of the plane equation
-	float D = -glm::dot(plane_normal, plane_position);
+	float D = -glm::dot(plane_normal, point_in_plane);
 
 	// Calculate t where the ray intersects the plane
 	float t = -(glm::dot(plane_normal, ray_origin) + D) / glm::dot(plane_normal, ray_direction);
@@ -1087,50 +1114,139 @@ bool calculate_plane_ray_intersection(
 	return true;
 }
 
+bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir)
+{
+	constexpr const s64 CUBE_PLANES_COUNT = 6;
+	bool got_selected = false;
+	float closest_select = std::numeric_limits<float>::max();
+
+	glm::vec3 cube_normals[CUBE_PLANES_COUNT] = {
+		glm::vec3(0.0f,  1.0f,  0.0f),
+		glm::vec3(0.0f, -1.0f,  0.0f),
+		glm::vec3(1.0f,  0.0f,  0.0f),
+		glm::vec3(-1.0f,  0.0f,  0.0f),
+		glm::vec3(0.0f,  0.0f,  1.0f),
+		glm::vec3(0.0f,  0.0f, -1.0f)
+	};
+
+	Axis plane_axises[CUBE_PLANES_COUNT] = {
+		Axis::Y,
+		Axis::Y,
+		Axis::X,
+		Axis::X,
+		Axis::Z,
+		Axis::Z
+	};
+
+	glm::mat4 rotation_matrix = get_rotation_matrix(cube);
+
+	for (int j = 0; j < CUBE_PLANES_COUNT; j++)
+	{
+		auto current_normal = cube_normals[j];
+		auto current_axis = plane_axises[j];
+
+		auto plane_normal = glm::vec3(rotation_matrix * glm::vec4(current_normal, 1.0f));
+		plane_normal = glm::normalize(plane_normal);
+
+		glm::vec3 intersection_point = glm::vec3(0);
+
+		float plane_scale = get_vec3_val_by_axis(cube->scale, current_axis);
+		vec3 plane_middle_point = cube->translation + plane_normal * plane_scale * 0.5f;
+
+		bool intersection = calculate_plane_ray_intersection(
+			plane_normal, plane_middle_point, ray_o, ray_dir, intersection_point);
+
+		if (!intersection) continue;
+
+		glm::vec3 intersection_vec3 = intersection_point - plane_middle_point;
+		glm::vec3 relative_position = intersection_vec3 - glm::vec3(rotation_matrix[3]);
+		glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotation_matrix);
+		glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
+
+		Axis xor_axises[2] = {};
+		get_axis_xor(current_axis, xor_axises);
+
+		float abs1 = std::abs(get_vec3_val_by_axis(local_intersection_point, xor_axises[0]));
+		float abs2 = std::abs(get_vec3_val_by_axis(local_intersection_point, xor_axises[1]));
+
+		bool intersect_1 = abs1 <= get_vec3_val_by_axis(cube->scale, xor_axises[0]) * 0.5f;
+		bool intersect_2 = abs2 <= get_vec3_val_by_axis(cube->scale, xor_axises[1]) * 0.5f;
+
+		if (intersect_1 && intersect_2)
+		{
+			float dist = glm::length(ray_o - intersection_point);
+
+			if (dist < closest_select)
+			{
+				*select_dist = dist;
+				closest_select = dist;
+			}
+
+			got_selected = true;
+		}
+	}
+
+	return got_selected;
+}
+
 int get_mesh_selection_index(JArray<Mesh> meshes, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
-	int index = -1;
-	float closest_dist = std::numeric_limits<float>::max();
+	s64 index = -1;
+	float closest_selection = std::numeric_limits<float>::max();
 
 	for (int i = 0; i < meshes.items_count; i++)
 	{
-		Mesh* plane = (Mesh*)j_array_get(&meshes, i);
-		
-		auto plane_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
-		glm::mat4 rotationMatrix = get_rotation_matrix(plane);
-		
-		auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up_vector, 1.0f));
-		planeNormal = glm::normalize(planeNormal);
-		
-		glm::vec3 intersection_point = glm::vec3(0);
-		
-		bool intersection = calculate_plane_ray_intersection(
-			planeNormal, plane->translation, ray_origin, ray_direction, intersection_point);
-		
-		if (!intersection) continue;
-		
-		glm::vec3 intersection_vec3 = intersection_point - plane->translation;
-		
-		// Calculate the relative position of the intersection point with respect to the plane's origin
-		glm::vec3 relative_position = intersection_vec3 - glm::vec3(rotationMatrix[3]);
-		
-		// Calculate the inverse of the plane's rotation matrix
-		glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotationMatrix);
-		
-		// Apply the inverse rotation matrix to convert the point from world space to local space
-		glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
-		
-		bool intersect_x = 0.0f <= local_intersection_point.x && local_intersection_point.x <= plane->scale.x;
-		bool intersect_z = 0.0f <= local_intersection_point.z && local_intersection_point.z <= plane->scale.z;
-		
-		if (intersect_x && intersect_z)
+		Mesh* mesh = j_array_get(&meshes, i);
+
+		if (mesh->mesh_type == PrimitiveType::Plane)
 		{
-			float dist = glm::length(ray_origin - plane->translation);
-		
-			if (dist < closest_dist)
+			auto plane_up = glm::vec3(0.0f, 1.0f, 0.0f);
+			glm::mat4 rotationMatrix = get_rotation_matrix(mesh);
+
+			auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up, 1.0f));
+			planeNormal = glm::normalize(planeNormal);
+
+			glm::vec3 intersection_point = glm::vec3(0);
+
+			bool intersection = calculate_plane_ray_intersection(
+				planeNormal, mesh->translation, ray_origin, ray_direction, intersection_point);
+
+			if (!intersection) continue;
+
+			glm::vec3 intersection_vec3 = intersection_point - mesh->translation;
+
+			// Calculate the relative position of the intersection point with respect to the plane's origin
+			glm::vec3 relative_position = intersection_vec3 - glm::vec3(rotationMatrix[3]);
+
+			// Calculate the inverse of the plane's rotation matrix
+			glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotationMatrix);
+
+			// Apply the inverse rotation matrix to convert the point from world space to local space
+			glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
+
+			bool intersect_x = 0.0f <= local_intersection_point.x && local_intersection_point.x <= mesh->scale.x;
+			bool intersect_z = 0.0f <= local_intersection_point.z && local_intersection_point.z <= mesh->scale.z;
+
+			if (intersect_x && intersect_z)
 			{
-				closest_dist = dist;
+				float dist = glm::length(ray_origin - intersection_point);
+
+				if (dist < closest_selection)
+				{
+					closest_selection = dist;
+					index = i;
+				}
+			}
+		}
+		else if (mesh->mesh_type == PrimitiveType::Cube)
+		{
+			float select_dist;
+			bool selected_cube = get_cube_selection(mesh, &select_dist, ray_origin, ray_direction);
+
+			if (selected_cube && select_dist < closest_selection)
+			{
 				index = i;
+				closest_selection = select_dist;
 			}
 		}
 	}
@@ -1546,8 +1662,6 @@ int main(int argc, char* argv[])
 
 			if (clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y))
 			{
-				printf("Mouse click x: %d y: %d\n", (s32)g_frame_data.mouse_x, (s32)g_frame_data.mouse_y);
-
 				glm::vec3 ray_origin = g_scene_camera.position;
 				glm::vec3 ray_direction = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
@@ -1563,13 +1677,11 @@ int main(int argc, char* argv[])
 					g_debug_click_camera_pos = glm::vec3(0.0f);
 				}
 
-				// @TODO: Select cubes
+				int select_index = get_mesh_selection_index(g_scene_meshes, ray_origin, ray_direction);
 
-				int selected_mesh_i = get_mesh_selection_index(g_scene_meshes, ray_origin, ray_direction);
-
-				if (selected_mesh_i != -1)
+				if (select_index != -1)
 				{
-					select_mesh_index(selected_mesh_i);
+					select_mesh_index(select_index);
 				}
 				else
 				{
@@ -1859,11 +1971,9 @@ int main(int argc, char* argv[])
 			draw_mesh(&plane);
 		}
 
-		// Debug light
-		{
-			Texture light_tx = *(Texture*)j_array_get(&g_textures, 3);
-			draw_billboard(g_light.position, light_tx, 0.35f);
-		}
+		// Draw lights
+		Texture light_tx = *(Texture*)j_array_get(&g_textures, 3);
+		draw_billboard(g_light.position, light_tx, 0.35f);
 
 		// Transformation mode debug lines
 		if (g_selected_mesh != nullptr && g_transform_mode.is_active)
