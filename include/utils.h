@@ -3,6 +3,15 @@
 #include <glm.hpp>
 #include <gtc/type_ptr.hpp>
 
+#define KILOBYTES(x) (x * 1024)
+#define MEGABYTES(x) (KILOBYTES(x) * 1024)
+
+typedef unsigned char		byte;
+typedef unsigned int		u32;
+typedef int					s32;
+typedef unsigned long long  u64;
+typedef long long			s64;
+
 enum Axis {
 	X,
 	Y,
@@ -17,19 +26,19 @@ enum PrimitiveType {
 	Cube
 };
 
-typedef struct Texture {
+struct Texture {
 	char file_name[TEXTURE_FILENAME_LEN] = { 0 };
 	int texture_id;
-} Texture;
+};
 
-typedef struct Mesh {
+struct Mesh {
 	glm::vec3 translation;
 	glm::vec3 rotation;
 	glm::vec3 scale;
 	Texture* texture;
 	PrimitiveType mesh_type;
 	float uv_multiplier = 1.0f;
-} Mesh;
+};
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
 

@@ -162,7 +162,7 @@ FontData g_debug_font;
 
 FrameData g_frame_data = {};
 
-constexpr const u64 SCENE_MESHES_MAX_COUNT = 100;
+constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
@@ -193,13 +193,13 @@ char texture_paths[][TEXTURE_PATH_LEN] = {
 	"G:/projects/game/Engine3D/resources/images/light_billboard_000.png",
 };
 
-constexpr const u64 SCENE_TEXTURES_MAX_COUNT = 50;
+constexpr const s64 SCENE_TEXTURES_MAX_COUNT = 50;
 MemoryBuffer g_material_names_memory = { 0 };
 JStrings g_material_names;
 int g_selected_texture_item = 0;
 
 MemoryBuffer g_texture_memory = { 0 };
-JArray g_textures;
+JArray<Texture> g_textures;
 
 typedef struct Light {
 	glm::vec3 position;
@@ -246,7 +246,7 @@ Mesh* g_selected_mesh = nullptr;
 int g_selected_mesh_index = -1;
 
 MemoryBuffer g_scene_memory = { 0 };
-JArray g_scene_meshes;
+JArray<Mesh> g_scene_meshes;
 
 enum Transformation {
 	Translate,
@@ -1031,8 +1031,8 @@ bool clicked_scene_space(int x, int y)
 
 void delete_mesh(s64 plane_index)
 {
-	Mesh last_plane = *(Mesh*)j_array_get(&g_scene_meshes, g_scene_meshes.items_count - 1);
-	j_array_replace(&g_scene_meshes, (byte*)&last_plane, plane_index);
+	Mesh* last_plane = j_array_get(&g_scene_meshes, g_scene_meshes.items_count - 1);
+	j_array_replace(&g_scene_meshes, last_plane, plane_index);
 	j_array_pop_back(&g_scene_meshes);
 	g_selected_mesh = nullptr;
 	g_selected_mesh_index = -1;
@@ -1048,7 +1048,7 @@ s64 add_new_mesh(PrimitiveType type)
 		.mesh_type = type
 	};
 
-	return j_array_add(&g_scene_meshes, (byte*)&new_mesh);
+	return j_array_add(&g_scene_meshes, &new_mesh);
 }
 
 void select_mesh_index(s64 index)
@@ -1087,7 +1087,7 @@ bool calculate_plane_ray_intersection(
 	return true;
 }
 
-int get_plane_intersection_from_ray(JArray meshes, glm::vec3 ray_origin, glm::vec3 ray_direction)
+int get_mesh_selection_index(JArray<Mesh> meshes, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
 	int index = -1;
 	float closest_dist = std::numeric_limits<float>::max();
@@ -1095,38 +1095,38 @@ int get_plane_intersection_from_ray(JArray meshes, glm::vec3 ray_origin, glm::ve
 	for (int i = 0; i < meshes.items_count; i++)
 	{
 		Mesh* plane = (Mesh*)j_array_get(&meshes, i);
-
+		
 		auto plane_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
 		glm::mat4 rotationMatrix = get_rotation_matrix(plane);
-
+		
 		auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up_vector, 1.0f));
 		planeNormal = glm::normalize(planeNormal);
-
+		
 		glm::vec3 intersection_point = glm::vec3(0);
-
+		
 		bool intersection = calculate_plane_ray_intersection(
 			planeNormal, plane->translation, ray_origin, ray_direction, intersection_point);
-
+		
 		if (!intersection) continue;
-
+		
 		glm::vec3 intersection_vec3 = intersection_point - plane->translation;
-
+		
 		// Calculate the relative position of the intersection point with respect to the plane's origin
 		glm::vec3 relative_position = intersection_vec3 - glm::vec3(rotationMatrix[3]);
-
+		
 		// Calculate the inverse of the plane's rotation matrix
 		glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotationMatrix);
-
+		
 		// Apply the inverse rotation matrix to convert the point from world space to local space
 		glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
-
+		
 		bool intersect_x = 0.0f <= local_intersection_point.x && local_intersection_point.x <= plane->scale.x;
 		bool intersect_z = 0.0f <= local_intersection_point.z && local_intersection_point.z <= plane->scale.z;
-
+		
 		if (intersect_x && intersect_z)
 		{
 			float dist = glm::length(ray_origin - plane->translation);
-
+		
 			if (dist < closest_dist)
 			{
 				closest_dist = dist;
@@ -1169,29 +1169,32 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 
 int main(int argc, char* argv[])
 {
-	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
+	// Init settings & buffers
+	{
+		memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
 
-	g_game_metrics.game_width_px = 1900;
-	g_game_metrics.game_height_px = 1200;
+		g_game_metrics.game_width_px = 1900;
+		g_game_metrics.game_height_px = 1200;
 
-	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - right_hand_panel_width;
-	g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
+		g_game_metrics.scene_width_px = g_game_metrics.game_width_px - right_hand_panel_width;
+		g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
 
-	g_scene_camera.aspect_ratio_horizontal =
-		(float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
+		g_scene_camera.aspect_ratio_horizontal =
+			(float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
 
-	g_user_settings.window_size_px[0] = g_game_metrics.game_width_px;
-	g_user_settings.window_size_px[1] = g_game_metrics.game_height_px;
+		g_user_settings.window_size_px[0] = g_game_metrics.game_width_px;
+		g_user_settings.window_size_px[1] = g_game_metrics.game_height_px;
 
-	memory_buffer_mallocate(&g_scene_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
-	g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), g_scene_memory.memory);
+		memory_buffer_mallocate(&g_scene_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
+		g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), (Mesh*)g_scene_memory.memory);
 
-	memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
-	g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), g_texture_memory.memory);
+		memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
+		g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture),(Texture*)g_texture_memory.memory);
 
-	constexpr const s64 material_names_arr_size = TEXTURE_FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
-	memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material items"));
-	g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
+		constexpr const s64 material_names_arr_size = TEXTURE_FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
+		memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material items"));
+		g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
+	}
 
 	// Init window and context
 	GLFWwindow* window;
@@ -1375,7 +1378,7 @@ int main(int argc, char* argv[])
 		s64 name_len = strlen(file_name);
 		Texture new_texture = { .texture_id = texture_id };
 		memcpy(new_texture.file_name, file_name, name_len);
-		j_array_add(&g_textures, (byte*)&new_texture);
+		j_array_add(&g_textures, &new_texture);
 
 		char str[TEXTURE_FILENAME_LEN] = { 0 };
 		memcpy(str, file_name, name_len);
@@ -1562,11 +1565,11 @@ int main(int argc, char* argv[])
 
 				// @TODO: Select cubes
 
-				int selected_plane_i = get_plane_intersection_from_ray(g_scene_meshes, ray_origin, ray_direction);
+				int selected_mesh_i = get_mesh_selection_index(g_scene_meshes, ray_origin, ray_direction);
 
-				if (selected_plane_i != -1)
+				if (selected_mesh_i != -1)
 				{
-					select_mesh_index(selected_plane_i);
+					select_mesh_index(selected_mesh_i);
 				}
 				else
 				{
@@ -1865,57 +1868,23 @@ int main(int argc, char* argv[])
 		// Transformation mode debug lines
 		if (g_selected_mesh != nullptr && g_transform_mode.is_active)
 		{
-			draw_line(g_debug_plane_intersection, g_selected_mesh->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
-
-			glm::vec3 end = glm::vec3(g_selected_mesh->translation);
-
 			// Scale mode
 			if (g_transform_mode.transformation == Transformation::Scale)
 			{
-				glm::mat4 rotation_mat4 = get_rotation_matrix(g_selected_mesh);
-				glm::vec3 used_normal = glm::vec3(0);
 
-				if (g_transform_mode.axis == Axis::X)
-				{
-					used_normal = glm::vec3(1.0f, 0, 0);
-				}
-				if (g_transform_mode.axis == Axis::Y)
-				{
-					used_normal = glm::vec3(0, 1.0f, 0);
-				}
-				if (g_transform_mode.axis == Axis::Z)
-				{
-					used_normal = glm::vec3(0, 0, 1.0f);
-				}
-
-				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
-				end = closest_point_on_plane(g_debug_plane_intersection, g_selected_mesh->translation, used_normal);
 			}
 
 			// Translate mode
 			if (g_transform_mode.transformation == Transformation::Translate)
 			{
-				if (g_transform_mode.axis == Axis::X)
-				{
-					end.x = g_debug_plane_intersection.x;
-				}
-				if (g_transform_mode.axis == Axis::Y)
-				{
-					end.y = g_debug_plane_intersection.y;
-				}
-				if (g_transform_mode.axis == Axis::Z)
-				{
-					end.z = g_debug_plane_intersection.z;
-				}
+
 			}
 
 			// Rotate mode
 			if (g_transform_mode.transformation == Transformation::Rotate)
 			{
-				end = get_plane_middle_point(*g_selected_mesh);
+				draw_line(g_debug_plane_intersection, g_selected_mesh->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
 			}
-
-			draw_line(g_debug_plane_intersection, end, glm::vec3(0.0f, 1.0f, 0.0f), 2.0f, 2.0f);
 		}
 
 		// Coordinate lines
@@ -1930,21 +1899,21 @@ int main(int argc, char* argv[])
 		{
 			Mesh selected_mesh= *(Mesh*)j_array_get(&g_scene_meshes, g_selected_mesh_index);
 			auto model = get_model_matrix(&selected_mesh);
-
+			
 			glm::vec3 bot_left = selected_mesh.translation;
 			glm::vec3 bot_right = glm::vec3(0.0f, 0, 1.0f);
 			glm::vec3 top_left  = glm::vec3(1.0f, 0, 0.0f);
 			glm::vec3 top_right = glm::vec3(1.0f, 0, 1.0f);
-
+			
 			glm::vec4 new_bot_right = model * glm::vec4(bot_right, 1.0f);
 			glm::vec4 new_top_left  = model * glm::vec4(top_left,  1.0f);
 			glm::vec4 new_top_right = model * glm::vec4(top_right, 1.0f);
-
+			
 			draw_line_ontop(bot_left,	   glm::vec3(new_top_left),  glm::vec3(1.0f), 2.0f);
 			draw_line_ontop(bot_left,	   glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
 			draw_line_ontop(new_top_right, glm::vec3(new_top_left),  glm::vec3(1.0f), 2.0f);
 			draw_line_ontop(new_top_right, glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
-
+			
 			draw_selection_arrows(selected_mesh.translation);
 		}
 
