@@ -116,12 +116,6 @@ inline glm::mat4 get_rotation_matrix(Mesh* mesh)
 	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
 
 	return rotation_matrix;
-
-	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::rotate(model, glm::radians(mesh->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(mesh->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(mesh->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-	return model;
 }
 
 glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal);
