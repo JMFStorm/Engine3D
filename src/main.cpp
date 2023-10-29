@@ -28,18 +28,24 @@
 
 using namespace glm;
 
+GLFWwindow* g_window;
 glm::vec3 lastMousePos(0.0f);
 
 constexpr int right_hand_panel_width = 400;
 
 typedef struct UserSettings {
 	int window_size_px[2];
-	float transform_clip = 0.25f;
-	float transform_rotation_clip = 15.0f;
-	glm::vec3 world_ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+	float transform_clip;
+	float transform_rotation_clip;
+	glm::vec3 world_ambient;
 } UserSettings;
 
-UserSettings g_user_settings = { 0 };
+UserSettings g_user_settings = { 
+	.window_size_px = { 1900, 1200 },
+	.transform_clip = 0.25f,
+	.transform_rotation_clip = 15.0f,
+	.world_ambient = glm::vec3(0.1f, 0.1f, 0.1f)
+};
 
 int g_line_shader;
 unsigned int g_line_vao;
@@ -195,7 +201,7 @@ char texture_paths[][TEXTURE_PATH_LEN] = {
 
 constexpr const s64 SCENE_TEXTURES_MAX_COUNT = 50;
 MemoryBuffer g_material_names_memory = { 0 };
-JStrings g_material_names;
+JStringArray g_material_names;
 int g_selected_texture_item = 0;
 
 MemoryBuffer g_texture_memory = { 0 };
@@ -994,20 +1000,22 @@ void load_font(FontData* font_data, int font_height_px, const char* font_path)
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 }
 
+inline void ResizeWindowAreaData(s64 width_px, s64 height_px)
+{
+	g_game_metrics.game_width_px = width_px;
+	g_game_metrics.game_height_px = height_px;
+
+	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - right_hand_panel_width;
+	g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
+
+	g_scene_camera.aspect_ratio_horizontal =
+		(float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
+}
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-	float horizontal_aspect = (float)width / (float)height;
-	g_game_metrics.aspect_ratio_horizontal = horizontal_aspect;
-	g_scene_camera.aspect_ratio_horizontal = horizontal_aspect;
-
-	g_game_metrics.game_width_px = width;
-	g_game_metrics.game_height_px = height;
-
-	g_game_metrics.scene_width_px = width - right_hand_panel_width;
-	g_game_metrics.scene_height_px = height;
-
+	ResizeWindowAreaData(width, height);
 	glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
-
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, (float)height);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 }
@@ -1060,7 +1068,6 @@ void select_mesh_index(s64 index)
 {
 	g_selected_mesh = j_array_get(&g_scene_meshes, index);
 	g_selected_mesh_index = index;
-
 	auto selected_texture_name = g_texture_menu_map[g_selected_mesh->texture->file_name];
 	g_selected_texture_item = selected_texture_name;
 }
@@ -1266,21 +1273,9 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 
 int main(int argc, char* argv[])
 {
-	// Init settings & buffers
+	// Init buffers
 	{
 		memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
-
-		g_game_metrics.game_width_px = 1900;
-		g_game_metrics.game_height_px = 1200;
-
-		g_game_metrics.scene_width_px = g_game_metrics.game_width_px - right_hand_panel_width;
-		g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
-
-		g_scene_camera.aspect_ratio_horizontal =
-			(float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
-
-		g_user_settings.window_size_px[0] = g_game_metrics.game_width_px;
-		g_user_settings.window_size_px[1] = g_game_metrics.game_height_px;
 
 		memory_buffer_mallocate(&g_scene_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
 		g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), (Mesh*)g_scene_memory.memory);
@@ -1294,24 +1289,23 @@ int main(int argc, char* argv[])
 	}
 
 	// Init window and context
-	GLFWwindow* window;
 	{
 		int glfw_init_result = glfwInit();
 		ASSERT_TRUE(glfw_init_result == GLFW_TRUE, "glfw init");
 
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-		window = glfwCreateWindow(g_game_metrics.game_width_px, g_game_metrics.game_height_px, "My Window", NULL, NULL);
-		ASSERT_TRUE(window, "window creation");
+		g_window = glfwCreateWindow(640, 400, "JMF Engine3D", NULL, NULL);
+		ASSERT_TRUE(g_window, "Window creation");
 
-		glfwMakeContextCurrent(window);
-		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-		glfwSetCursorPosCallback(window, mouse_move_callback);
-
-		glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+		glfwMakeContextCurrent(g_window);
+		glfwSetFramebufferSizeCallback(g_window, framebuffer_size_callback);
+		glfwSetCursorPosCallback(g_window, mouse_move_callback);
 
 		int glew_init_result = glewInit();
 		ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
+
+		glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 	}
 
 	// Init ImGui
@@ -1321,7 +1315,7 @@ int main(int argc, char* argv[])
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-		ImGui_ImplGlfw_InitForOpenGL(window, true);
+		ImGui_ImplGlfw_InitForOpenGL(g_window, true);
 		ImGui_ImplOpenGL3_Init("#version 330 core");
 	}
 
@@ -1480,7 +1474,7 @@ int main(int argc, char* argv[])
 		char str[TEXTURE_FILENAME_LEN] = { 0 };
 		memcpy(str, file_name, name_len);
 
-		j_strings_add(&g_material_names, (char*)&str);
+		j_strings_add(&g_material_names, (char*)str);
 		g_texture_menu_map[file_name] = i;
 	}
 
@@ -1503,7 +1497,7 @@ int main(int argc, char* argv[])
 	g_scene_camera.front_vec = glm::vec3(-0.5f, 0.0f, -0.5f);
 	g_scene_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
 
-	while (!glfwWindowShouldClose(window))
+	while (!glfwWindowShouldClose(g_window))
 	{
 		glfwPollEvents();
 
@@ -1579,7 +1573,7 @@ int main(int argc, char* argv[])
 
 				if (ImGui::Button("Apply changes"))
 				{
-					glfwSetWindowSize(window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
+					glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 				}
 
 				ImGui::End();
@@ -1591,18 +1585,18 @@ int main(int argc, char* argv[])
 		{
 			g_frame_data.mouse_clicked = false;
 
-			if (glfwGetKey(window, g_inputs.as_struct.esc.key) == GLFW_PRESS)
+			if (glfwGetKey(g_window, g_inputs.as_struct.esc.key) == GLFW_PRESS)
 			{
-				glfwSetWindowShouldClose(window, true);
+				glfwSetWindowShouldClose(g_window, true);
 			}
 
 			int key_state;
 
-			key_state = glfwGetMouseButton(window, g_inputs.as_struct.mouse1.key);
+			key_state = glfwGetMouseButton(g_window, g_inputs.as_struct.mouse1.key);
 			g_inputs.as_struct.mouse1.pressed = !g_inputs.as_struct.mouse1.is_down && key_state == GLFW_PRESS;
 			g_inputs.as_struct.mouse1.is_down = key_state == GLFW_PRESS;
 
-			key_state = glfwGetMouseButton(window, g_inputs.as_struct.mouse2.key);
+			key_state = glfwGetMouseButton(g_window, g_inputs.as_struct.mouse2.key);
 			g_inputs.as_struct.mouse2.pressed = !g_inputs.as_struct.mouse2.is_down && key_state == GLFW_PRESS;
 			g_inputs.as_struct.mouse2.is_down = key_state == GLFW_PRESS;
 
@@ -1611,7 +1605,7 @@ int main(int argc, char* argv[])
 			for (int i = 2; i < buttons_count - 1; i++) // Skip 2 mouse buttons
 			{
 				ButtonState* button = &g_inputs.as_array[i];
-				set_button_state(window, button);
+				set_button_state(g_window, button);
 			}
 		}
 
@@ -1623,7 +1617,7 @@ int main(int argc, char* argv[])
 		g_frame_data.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time);
 
 		double xpos, ypos;
-		glfwGetCursorPos(window, &xpos, &ypos);
+		glfwGetCursorPos(g_window, &xpos, &ypos);
 
 		g_frame_data.mouse_x = xpos;
 		g_frame_data.mouse_y = ypos;
@@ -1686,7 +1680,7 @@ int main(int argc, char* argv[])
 
 		if (g_camera_move_mode)
 		{
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 			g_mouse_movement_x *= g_scene_camera.look_sensitivity;
 			g_mouse_movement_y *= g_scene_camera.look_sensitivity;
@@ -1731,7 +1725,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+			glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 
 		if (g_inputs.as_struct.del.pressed && g_selected_mesh != nullptr)
@@ -2062,7 +2056,7 @@ int main(int argc, char* argv[])
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-		glfwSwapBuffers(window);
+		glfwSwapBuffers(g_window);
 		g_game_metrics.frames++;
 		g_game_metrics.fps_frames++;
 		g_frame_data.draw_calls = 0;

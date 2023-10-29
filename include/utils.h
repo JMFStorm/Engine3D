@@ -11,6 +11,8 @@ typedef unsigned int		u32;
 typedef int					s32;
 typedef unsigned long long  u64;
 typedef long long			s64;
+typedef float				f32;
+typedef double				f64;
 
 enum Axis {
 	X,
@@ -26,19 +28,19 @@ enum PrimitiveType {
 	Cube
 };
 
-struct Texture {
+typedef struct Texture {
 	char file_name[TEXTURE_FILENAME_LEN] = { 0 };
 	int texture_id;
-};
+} Texture;
 
-struct Mesh {
+typedef struct Mesh {
 	glm::vec3 translation;
 	glm::vec3 rotation;
 	glm::vec3 scale;
 	Texture* texture;
 	PrimitiveType mesh_type;
 	float uv_multiplier = 1.0f;
-};
+} Mesh;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
 

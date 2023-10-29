@@ -67,13 +67,18 @@ void j_array_replace(JArray<T>* array, T new_element, u64 index)
 	memcpy(dest, &new_element, array->item_size_bytes);
 }
 
-typedef struct JStrings {
+typedef struct JString {
+	s64 str_len;
+	char* str_ptr;
+} JString;
+
+typedef struct JStringArray {
 	s64 byte_alignment;
 	s64 current_chars;
 	s64 strings_count;
 	s64 max_chars;
 	char* data;
-} JStrings;
+} JStringArray;
 
-JStrings j_strings_init(s64 max_chars, char* char_ptr);
-s64 j_strings_add(JStrings* strings, char* char_ptr);
+JStringArray j_strings_init(s64 max_chars, char* char_ptr);
+JString j_strings_add(JStringArray* strings, char* char_ptr);
