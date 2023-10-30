@@ -44,8 +44,12 @@ UserSettings g_user_settings = {
 	.window_size_px = { 1900, 1200 },
 	.transform_clip = 0.25f,
 	.transform_rotation_clip = 15.0f,
-	.world_ambient = glm::vec3(0.1f, 0.1f, 0.1f)
+	.world_ambient = glm::vec3(0.2f),
 };
+
+int g_wireframe_shader;
+unsigned int g_wireframe_vao;
+unsigned int g_wireframe_vbo;
 
 int g_line_shader;
 unsigned int g_line_vao;
@@ -597,6 +601,128 @@ void draw_mesh(Mesh* mesh)
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, mesh->texture->texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, draw_indicies);
+	g_frame_data.draw_calls++;
+
+	glUseProgram(0);
+	glBindVertexArray(0);
+}
+
+void draw_mesh_wireframe(Mesh *mesh, glm::vec3 color)
+{
+	glUseProgram(g_wireframe_shader);
+	glBindVertexArray(g_wireframe_vao);
+
+	glm::mat4 model = get_model_matrix(mesh);
+	glm::mat4 projection = get_projection_matrix();
+	glm::mat4 view = get_view_matrix();
+
+	unsigned int model_loc = glGetUniformLocation(g_wireframe_shader, "model");
+	unsigned int view_loc = glGetUniformLocation(g_wireframe_shader, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_wireframe_shader, "projection");
+	unsigned int color_loc = glGetUniformLocation(g_wireframe_shader, "color");
+
+	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
+	glUniform3f(color_loc, color.r, color.g, color.b);
+
+	s64 draw_indicies = 0;
+
+	if (mesh->mesh_type == PrimitiveType::Plane)
+	{
+		float vertices[] =
+		{
+			// Coords		
+			1.0f, 0.0f, 0.0f, // top right
+			0.0f, 0.0f, 0.0f, // top left
+			0.0f, 0.0f, 1.0f, // bot left
+							
+			1.0f, 0.0f, 0.0f, // top right
+			0.0f, 0.0f, 1.0f, // bot left 
+			1.0f, 0.0f, 1.0f, // bot right
+
+			0.0f, 0.0f, 0.0f, // top left
+			1.0f, 0.0f, 0.0f, // top right
+			0.0f, 0.0f, 1.0f, // bot left
+
+			0.0f, 0.0f, 1.0f, // bot left 
+			1.0f, 0.0f, 0.0f, // top right
+			1.0f, 0.0f, 1.0f  // bot right
+		};
+
+		draw_indicies = 12;
+		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	}
+	else if (mesh->mesh_type == PrimitiveType::Cube)
+	{
+		float vertices[] =
+		{
+			// Coords		
+			// Ceiling
+			0.5f,  0.5f, -0.5f, // top right
+		   -0.5f,  0.5f, -0.5f, // top left
+		   -0.5f,  0.5f,  0.5f, // bot left
+							    
+			0.5f,  0.5f, -0.5f, // top right
+		   -0.5f,  0.5f,  0.5f, // bot left 
+			0.5f,  0.5f,  0.5f, // bot right
+							    
+			// Floor		    
+		   -0.5f, -0.5f,  0.5f, // bot left 
+			0.5f, -0.5f, -0.5f, // top right
+			0.5f, -0.5f,  0.5f, // bot right
+							    
+		   -0.5f, -0.5f,  0.5f, // bot left
+		   -0.5f, -0.5f, -0.5f, // top left
+			0.5f, -0.5f, -0.5f, // top right
+
+			// North
+		   -0.5f, -0.5f, -0.5f, // bot left 
+			0.5f,  0.5f, -0.5f, // top right
+			0.5f, -0.5f, -0.5f, // bot right
+
+		   -0.5f, -0.5f, -0.5f, // bot left
+		   -0.5f,  0.5f, -0.5f, // top left
+			0.5f,  0.5f, -0.5f, // top right
+
+			// South
+			0.5f,  0.5f,  0.5f, // top right
+		   -0.5f, -0.5f,  0.5f, // bot left 
+			0.5f, -0.5f,  0.5f, // bot right
+
+		   -0.5f,  0.5f,  0.5f, // top left
+		   -0.5f, -0.5f,  0.5f, // bot left
+			0.5f,  0.5f,  0.5f, // top right
+
+			// West
+		   -0.5f, -0.5f,  0.5f, // bot left 
+		   -0.5f,  0.5f, -0.5f, // top right
+		   -0.5f, -0.5f, -0.5f, // bot right
+
+		   -0.5f, -0.5f,  0.5f, // bot left
+		   -0.5f,  0.5f,  0.5f, // top left
+		   -0.5f,  0.5f, -0.5f, // top right
+
+		   // East
+		   0.5f,  0.5f, -0.5f, // top right
+		   0.5f, -0.5f,  0.5f, // bot left 
+		   0.5f, -0.5f, -0.5f, // bot right
+
+		   0.5f,  0.5f,  0.5f, // top left
+		   0.5f, -0.5f,  0.5f, // bot left
+		   0.5f,  0.5f, -0.5f  // top right
+		};
+
+		draw_indicies = 40;
+		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	}
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glLineWidth(1.5f);
+	glDrawArrays(GL_TRIANGLES, 0, draw_indicies);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	g_frame_data.draw_calls++;
 
 	glUseProgram(0);
@@ -1437,6 +1563,25 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	// Init wireframe shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_fs.glsl";
+
+		g_wireframe_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		{
+			glGenVertexArrays(1, &g_wireframe_vao);
+			glBindVertexArray(g_wireframe_vao);
+
+			glGenBuffers(1, &g_wireframe_vbo);
+			glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
+
+			// Coord attribute
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+			glEnableVertexAttribArray(0);
+		}
+	}
+
 	// Init line shader
 	{
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_vs.glsl";
@@ -1987,23 +2132,11 @@ int main(int argc, char* argv[])
 
 			if (selected_mesh.mesh_type == PrimitiveType::Plane)
 			{
-				glm::vec3 bot_left  = selected_mesh.translation;
-				glm::vec3 bot_right = glm::vec3(0.0f, 0, 1.0f);
-				glm::vec3 top_left  = glm::vec3(1.0f, 0, 0.0f);
-				glm::vec3 top_right = glm::vec3(1.0f, 0, 1.0f);
-
-				glm::vec4 new_bot_right = model * glm::vec4(bot_right, 1.0f);
-				glm::vec4 new_top_left  = model * glm::vec4(top_left, 1.0f);
-				glm::vec4 new_top_right = model * glm::vec4(top_right, 1.0f);
-
-				draw_line_ontop(bot_left, glm::vec3(new_top_left), glm::vec3(1.0f), 2.0f);
-				draw_line_ontop(bot_left, glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
-				draw_line_ontop(new_top_right, glm::vec3(new_top_left), glm::vec3(1.0f), 2.0f);
-				draw_line_ontop(new_top_right, glm::vec3(new_bot_right), glm::vec3(1.0f), 2.0f);
+				draw_mesh_wireframe(&selected_mesh, glm::vec3(1.0f));
 			}
 			else if (selected_mesh.mesh_type == PrimitiveType::Cube)
 			{
-				// @TODO
+				draw_mesh_wireframe(&selected_mesh, glm::vec3(1.0f));
 			}
 
 			draw_selection_arrows(selected_mesh.translation);

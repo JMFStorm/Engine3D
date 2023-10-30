@@ -166,6 +166,8 @@
     <None Include="resources\shaders\simple_reactangle_vs.glsl" />
     <None Include="resources\shaders\ui_text_fs.glsl" />
     <None Include="resources\shaders\ui_text_vs.glsl" />
+    <None Include="resources\shaders\wireframe_fs.glsl" />
+    <None Include="resources\shaders\wireframe_vs.glsl" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lib\freetype.lib" />
