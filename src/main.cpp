@@ -9,6 +9,7 @@
 
 #include <array>
 #include <iostream>
+#include <filesystem>
 #include <fstream>
 #include <unordered_map>
 
@@ -180,17 +181,35 @@ typedef struct GameCamera {
 	glm::vec3 position;
 	glm::vec3 front_vec;
 	glm::vec3 up_vec;
-	float yaw = -90.0f;
-	float pitch = 0.0f;
-	float fov = 60.0f;
-	float aspect_ratio_horizontal = 1.0f;
-	float look_sensitivity = 0.1f;
-	float move_speed = 5.0f;
-	float near_clip = 0.1f;
-	float far_clip = 100.0f;
+	float yaw;
+	float pitch;
+	float fov;
+	float aspect_ratio_horizontal;
+	float look_sensitivity;
+	float move_speed;
+	float near_clip;
+	float far_clip;
 } GameCamera;
 
-GameCamera g_scene_camera = {};
+GameCamera scene_camera_init()
+{
+	GameCamera cam = {
+		.position = vec3(0),
+		.front_vec = vec3(1,0,0),
+		.up_vec = vec3(0,1,0),
+		.yaw = 0.0f,
+		.pitch = 0.0f,
+		.fov = 60.0f,
+		.aspect_ratio_horizontal = 1.0f,
+		.look_sensitivity = 0.1f,
+		.move_speed = 5.0f,
+		.near_clip = 0.1f,
+		.far_clip = 100.0f,
+	};
+	return cam;
+}
+
+GameCamera g_scene_camera;
 bool g_camera_move_mode = false;
 
 float g_mouse_movement_x = 0;
@@ -1397,6 +1416,77 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
+void save_scene()
+{
+	std::ofstream output_file("scene_01.jmap", std::ios::binary);
+	ASSERT_TRUE(output_file.is_open(), ".jmap file opened for save");
+
+	GameCamera data = g_scene_camera;
+
+	// Header
+	output_file.write(".jmap", 5);
+
+	// Scene camera
+	output_file.write(reinterpret_cast<char*>(&data), sizeof(data));
+
+	// Mesh count
+	output_file.write(reinterpret_cast<char*>(&g_scene_meshes.items_count), sizeof(s64));
+
+	// Mesh data
+	for (int i = 0; i < g_scene_meshes.items_count; i++)
+	{
+		Mesh m_data = *j_array_get(&g_scene_meshes, i);
+		output_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
+	}
+
+	output_file.close();
+
+	printf("Scene saved.\n");
+}
+
+void load_scene()
+{
+	const char* filename = "scene_01.jmap";
+
+	if (!std::filesystem::exists(filename))
+	{
+		printf(".jmap file not found.\n");
+		g_scene_camera = scene_camera_init();
+		return;
+	}
+
+	std::ifstream input_file(filename, std::ios::binary);
+	ASSERT_TRUE(input_file.is_open(), ".jmap file opened for load");
+
+	// Header
+	char header[6] = { 0 };
+	input_file.read(header, 5);
+	int xx = strcmp(header, ".jmap");
+	ASSERT_TRUE(strcmp(header, ".jmap") == 0, ".jmap file has valid header");
+
+	// Scene camera
+	GameCamera cam_data = {};
+	input_file.read(reinterpret_cast<char*>(&cam_data), sizeof(cam_data));
+	g_scene_camera = cam_data;
+
+	// Mesh count
+	s64 mesh_count = 0;
+	input_file.read(reinterpret_cast<char*>(&mesh_count), sizeof(s64));
+
+	// Mesh data
+	for (int i = 0; i < mesh_count; i++)
+	{
+		Mesh m_data;
+		input_file.read(reinterpret_cast<char*>(&m_data), sizeof(m_data));
+		m_data.texture = j_array_get(&g_textures, 0);
+		j_array_add(&g_scene_meshes, m_data);
+	}
+
+	input_file.close();
+
+	printf("Scene loaded.\n");
+}
+
 int main(int argc, char* argv[])
 {
 	// Init buffers
@@ -1430,8 +1520,6 @@ int main(int argc, char* argv[])
 
 		int glew_init_result = glewInit();
 		ASSERT_TRUE(glew_init_result == GLEW_OK, "glew init");
-
-		glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 	}
 
 	// Init ImGui
@@ -1635,10 +1723,8 @@ int main(int argc, char* argv[])
 
 	glClearColor(0.25f, 0.35f, 0.35f, 1.0f);
 
-	g_scene_camera.position = glm::vec3(3.0f, 0.75f, 3.0f);
-	g_scene_camera.yaw = -135;
-	g_scene_camera.front_vec = glm::vec3(-0.5f, 0.0f, -0.5f);
-	g_scene_camera.up_vec = glm::vec3(0.0f, 1.0f, 0.0f);
+	load_scene();
+	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 
 	while (!glfwWindowShouldClose(g_window))
 	{
@@ -1788,6 +1874,11 @@ int main(int argc, char* argv[])
 			g_game_metrics.fps = g_game_metrics.fps_frames;
 			g_game_metrics.fps_frames = 0;
 			g_game_metrics.fps_prev_second = current_game_second;
+		}
+
+		if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.s.pressed)
+		{
+			save_scene();
 		}
 
 		if (g_inputs.as_struct.mouse1.pressed)
