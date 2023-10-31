@@ -215,7 +215,7 @@ bool g_camera_move_mode = false;
 float g_mouse_movement_x = 0;
 float g_mouse_movement_y = 0;
 
-const char* billboard_image_path = "G:/projects/game/Engine3D/resources/images/light_billboard_000.png";
+const char* billboard_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\light_billboard_000.png";
 
 char material_paths[][FILE_PATH_LEN] = {
 	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
@@ -1531,7 +1531,7 @@ void load_scene()
 Texture texture_load_from_filepath(char* path)
 {
 	int texture_id = load_image_into_texture_id(path, true);
-	char* file_name = strrchr(const_cast<char*>(path), '/');
+	char* file_name = strrchr(const_cast<char*>(path), '\\');
 	file_name++;
 	ASSERT_TRUE(file_name, "Filename from file path");
 	s64 name_len = strlen(file_name);
@@ -1748,24 +1748,33 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	// Init textures
+	// Init textures/materials
 	{
 		pointlight_texture = texture_load_from_filepath(const_cast<char*>(billboard_image_path));
 
-		s64 materials_count = sizeof(material_paths) / FILE_PATH_LEN;
+		std::filesystem::path directory_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
+		ASSERT_TRUE(std::filesystem::is_directory(directory_path), "Valid materials directory");
+		const char* material_ext = ".jmat";
 
-		for (int i = 0; i < materials_count; i++)
+		s64 material_index = 0;
+
+		for (const auto& entry : std::filesystem::directory_iterator(directory_path))
 		{
-			char* path = material_paths[i];
-			Texture new_texture = texture_load_from_filepath(const_cast<char*>(path));
+			bool valid_file = entry.is_regular_file() && entry.path().extension() == material_ext;
+			if (!valid_file) continue;
+
+			auto filename = entry.path().stem().filename().string();
+			auto filepath = directory_path.string() + "\\" + filename + ".png";
+
+			Texture new_texture = texture_load_from_filepath(const_cast<char*>(filepath.c_str()));
 			Texture* new_texture_prt = j_array_add(&g_textures, new_texture);
 
 			Material new_material = material_init(new_texture_prt);
 			Material* new_material_prt = j_array_add(&g_materials, new_material);
 
 			char* new_str = j_strings_add(&g_material_names, new_texture.file_name);
-			g_materials_index_map[new_str] = i;
-			printf("Whaat %s - %d\n", new_texture.file_name, i);
+			g_materials_index_map[new_str] = material_index++;
+			printf("Material added: %s.\n", filename.c_str());
 		}
 	}
 
