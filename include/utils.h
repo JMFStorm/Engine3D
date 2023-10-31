@@ -20,8 +20,8 @@ enum Axis {
 	Z
 };
 
-constexpr const int TEXTURE_PATH_LEN = 128;
-constexpr const int TEXTURE_FILENAME_LEN = TEXTURE_PATH_LEN / 2;
+constexpr const int FILE_PATH_LEN = 128;
+constexpr const int TEXTURE_FILENAME_LEN = FILE_PATH_LEN / 2;
 
 enum PrimitiveType {
 	Plane,

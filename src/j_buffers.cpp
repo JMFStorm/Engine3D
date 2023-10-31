@@ -35,7 +35,7 @@ JStringArray j_strings_init(s64 max_chars, char* char_ptr)
 	return strings;
 }
 
-JString j_strings_add(JStringArray* strings, char* char_ptr)
+char* j_strings_add(JStringArray* strings, char* char_ptr)
 {
 	s64 str_len = strlen(char_ptr) + 1;
 	ASSERT_TRUE(str_len <= strings->max_chars, "Strings has capacity left");
@@ -45,9 +45,5 @@ JString j_strings_add(JStringArray* strings, char* char_ptr)
 	memcpy(str_ptr, char_ptr, str_len);
 	strings->current_chars += str_len;
 
-	JString j_string = {
-		.str_len = str_len - 1,
-		.str_ptr = str_ptr,
-	};
-	return j_string;
+	return str_ptr;
 }

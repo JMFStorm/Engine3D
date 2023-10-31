@@ -215,14 +215,15 @@ bool g_camera_move_mode = false;
 float g_mouse_movement_x = 0;
 float g_mouse_movement_y = 0;
 
-char texture_paths[][TEXTURE_PATH_LEN] = {
-	"G:/projects/game/Engine3D/resources/images/tilemap_floor_01.png",
-	"G:/projects/game/Engine3D/resources/images/tile_bricks_01.png",
+const char* billboard_image_path = "G:/projects/game/Engine3D/resources/images/light_billboard_000.png";
+
+char material_paths[][FILE_PATH_LEN] = {
 	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
-	"G:/projects/game/Engine3D/resources/images/light_billboard_000.png",
+	"G:/projects/game/Engine3D/resources/materials/tilemap_floor_01.png",
+	"G:/projects/game/Engine3D/resources/materials/tile_bricks_01.png"
 };
 
-constexpr const s64 SCENE_TEXTURES_MAX_COUNT = 50;
+constexpr const s64 SCENE_TEXTURES_MAX_COUNT = 100;
 MemoryBuffer g_material_names_memory = { 0 };
 JStringArray g_material_names;
 int g_selected_texture_item = 0;
@@ -256,6 +257,8 @@ Material g_material = {
 	.shininess = 32.0f
 };
 
+Texture pointlight_texture;
+
 // Custom hash function for char*
 struct CharPtrHash {
 	std::size_t operator()(const char* str) const {
@@ -269,7 +272,7 @@ struct CharPtrEqual {
 		return std::strcmp(a, b) == 0;
 	}
 };
-std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_textures_index_map = {};
+std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map = {};
 
 Mesh* g_selected_mesh = nullptr;
 int g_selected_mesh_index = -1;
@@ -415,7 +418,7 @@ int compile_shader(const char* vertex_shader_path, const char* fragment_shader_p
 	return shader_id;
 }
 
-int load_image_into_texture(const char* image_path, bool use_nearest)
+int load_image_into_texture_id(const char* image_path, bool use_nearest)
 {
 	unsigned int texture;
 	int x, y, n;
@@ -1213,7 +1216,7 @@ void select_mesh_index(s64 index)
 {
 	g_selected_mesh = j_array_get(&g_scene_meshes, index);
 	g_selected_mesh_index = index;
-	auto selected_texture_name = g_textures_index_map[g_selected_mesh->texture->file_name];
+	auto selected_texture_name = g_materials_index_map[g_selected_mesh->texture->file_name];
 	g_selected_texture_item = selected_texture_name;
 }
 
@@ -1432,7 +1435,7 @@ inline MeshData mesh_serialize(Mesh* mesh)
 
 inline Mesh mesh_deserailize(MeshData data)
 {
-	s64 texture_index = g_textures_index_map[data.texture_file_name];
+	s64 texture_index = g_materials_index_map[data.texture_file_name];
 	Texture* m_texture = j_array_get(&g_textures, texture_index);
 	Mesh mesh = {
 		.translation = data.translation,
@@ -1515,6 +1518,21 @@ void load_scene()
 	input_file.close();
 
 	printf("Scene loaded.\n");
+}
+
+Texture texture_load_from_filepath(char* path)
+{
+	int texture_id = load_image_into_texture_id(path, true);
+	char* file_name = strrchr(const_cast<char*>(path), '/');
+	file_name++;
+	ASSERT_TRUE(file_name, "Filename from file path");
+	s64 name_len = strlen(file_name);
+	Texture texture = {
+		.file_name = "",
+		.texture_id = texture_id,
+	};
+	memcpy(texture.file_name, file_name, name_len);
+	return texture;
 }
 
 int main(int argc, char* argv[])
@@ -1720,25 +1738,21 @@ int main(int argc, char* argv[])
 	}
 
 	// Init textures
-	for (int i = 0; i < (sizeof(texture_paths) / TEXTURE_PATH_LEN); i++)
 	{
-		char* path = texture_paths[i];
-		int texture_id = load_image_into_texture(path, true);
+		pointlight_texture = texture_load_from_filepath(const_cast<char*>(billboard_image_path));
 
-		char* file_name = strrchr(path, '/');
-		file_name++;
-		ASSERT_TRUE(file_name, "Filename from file path");
+		s64 materials_count = sizeof(material_paths) / FILE_PATH_LEN;
 
-		s64 name_len = strlen(file_name);
-		Texture new_texture = { .texture_id = texture_id };
-		memcpy(new_texture.file_name, file_name, name_len);
-		j_array_add(&g_textures, new_texture);
+		for (int i = 0; i < materials_count; i++)
+		{
+			char* path = material_paths[i];
+			Texture new_texture = texture_load_from_filepath(const_cast<char*>(path));
+			j_array_add(&g_textures, new_texture);
 
-		char str[TEXTURE_FILENAME_LEN] = { 0 };
-		memcpy(str, file_name, name_len);
-
-		j_strings_add(&g_material_names, (char*)str);
-		g_textures_index_map[file_name] = i;
+			char* new_str = j_strings_add(&g_material_names, new_texture.file_name);
+			g_materials_index_map[new_str] = i;
+			printf("Whaat %s - %d\n", new_texture.file_name, i);
+		}
 	}
 
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
@@ -1818,7 +1832,7 @@ int main(int argc, char* argv[])
 
 					char* texture_names_ptr = (char*)g_material_names.data;
 
-					if (ImGui::Combo("Texture image", &g_selected_texture_item, texture_names_ptr, g_material_names.strings_count))
+					if (ImGui::Combo("Material", &g_selected_texture_item, texture_names_ptr, g_material_names.strings_count))
 					{
 						g_selected_mesh->texture = (Texture*)j_array_get(&g_textures, g_selected_texture_item);
 					}
@@ -2234,8 +2248,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Draw lights
-		Texture light_tx = *j_array_get(&g_textures, 3);
-		draw_billboard(g_light.position, light_tx, 0.35f);
+		draw_billboard(g_light.position, pointlight_texture, 0.35f);
 
 		// Transformation mode debug lines
 		if (g_selected_mesh != nullptr && g_transform_mode.is_active)

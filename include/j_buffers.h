@@ -81,4 +81,4 @@ typedef struct JStringArray {
 } JStringArray;
 
 JStringArray j_strings_init(s64 max_chars, char* char_ptr);
-JString j_strings_add(JStringArray* strings, char* char_ptr);
+char* j_strings_add(JStringArray* strings, char* char_ptr);
