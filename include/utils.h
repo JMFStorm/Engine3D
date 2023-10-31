@@ -29,7 +29,7 @@ enum PrimitiveType {
 };
 
 typedef struct Texture {
-	char file_name[TEXTURE_FILENAME_LEN] = { 0 };
+	char file_name[TEXTURE_FILENAME_LEN];
 	int texture_id;
 } Texture;
 
@@ -39,8 +39,17 @@ typedef struct Mesh {
 	glm::vec3 scale;
 	Texture* texture;
 	PrimitiveType mesh_type;
-	float uv_multiplier = 1.0f;
+	float uv_multiplier;
 } Mesh;
+
+typedef struct MeshData {
+	glm::vec3 translation;
+	glm::vec3 rotation;
+	glm::vec3 scale;
+	char texture_file_name[TEXTURE_FILENAME_LEN];
+	PrimitiveType mesh_type;
+	float uv_multiplier;
+} MeshData;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
 

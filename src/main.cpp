@@ -269,7 +269,7 @@ struct CharPtrEqual {
 		return std::strcmp(a, b) == 0;
 	}
 };
-std::unordered_map<char*, int, CharPtrHash, CharPtrEqual> g_texture_menu_map = {};
+std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_textures_index_map = {};
 
 Mesh* g_selected_mesh = nullptr;
 int g_selected_mesh_index = -1;
@@ -1213,7 +1213,7 @@ void select_mesh_index(s64 index)
 {
 	g_selected_mesh = j_array_get(&g_scene_meshes, index);
 	g_selected_mesh_index = index;
-	auto selected_texture_name = g_texture_menu_map[g_selected_mesh->texture->file_name];
+	auto selected_texture_name = g_textures_index_map[g_selected_mesh->texture->file_name];
 	g_selected_texture_item = selected_texture_name;
 }
 
@@ -1416,6 +1416,35 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
+inline MeshData mesh_serialize(Mesh* mesh)
+{
+	MeshData data = {
+		.translation = mesh->translation,
+		.rotation = mesh->rotation,
+		.scale = mesh->scale,
+		.texture_file_name = "",
+		.mesh_type = mesh->mesh_type,
+		.uv_multiplier = mesh->uv_multiplier,
+	};
+	strcpy_s(data.texture_file_name, mesh->texture->file_name);
+	return data;
+}
+
+inline Mesh mesh_deserailize(MeshData data)
+{
+	s64 texture_index = g_textures_index_map[data.texture_file_name];
+	Texture* m_texture = j_array_get(&g_textures, texture_index);
+	Mesh mesh = {
+		.translation = data.translation,
+		.rotation = data.rotation,
+		.scale = data.scale,
+		.texture = m_texture,
+		.mesh_type = data.mesh_type,
+		.uv_multiplier = data.uv_multiplier,
+	};
+	return mesh;
+}
+
 void save_scene()
 {
 	std::ofstream output_file("scene_01.jmap", std::ios::binary);
@@ -1435,7 +1464,8 @@ void save_scene()
 	// Mesh data
 	for (int i = 0; i < g_scene_meshes.items_count; i++)
 	{
-		Mesh m_data = *j_array_get(&g_scene_meshes, i);
+		Mesh* mesh_ptr = j_array_get(&g_scene_meshes, i);
+		MeshData m_data = mesh_serialize(mesh_ptr);
 		output_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
 	}
 
@@ -1476,10 +1506,10 @@ void load_scene()
 	// Mesh data
 	for (int i = 0; i < mesh_count; i++)
 	{
-		Mesh m_data;
+		MeshData m_data;
 		input_file.read(reinterpret_cast<char*>(&m_data), sizeof(m_data));
-		m_data.texture = j_array_get(&g_textures, 0);
-		j_array_add(&g_scene_meshes, m_data);
+		Mesh mesh = mesh_deserailize(m_data);
+		j_array_add(&g_scene_meshes, mesh);
 	}
 
 	input_file.close();
@@ -1708,7 +1738,7 @@ int main(int argc, char* argv[])
 		memcpy(str, file_name, name_len);
 
 		j_strings_add(&g_material_names, (char*)str);
-		g_texture_menu_map[file_name] = i;
+		g_textures_index_map[file_name] = i;
 	}
 
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
