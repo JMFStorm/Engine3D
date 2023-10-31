@@ -34,21 +34,21 @@ JArray<T> j_array_init(s64 max_items, s64 item_size_bytes, T* data_ptr)
 }
 
 template <typename T>
-s64 j_array_add(JArray<T>* array, T element)
+T* j_array_add(JArray<T>* array, T element)
 {
 	// Always reserve one slot for swaps
 	ASSERT_TRUE(array->items_count + 1 < array->max_items, "Array has item capacity left\n");
-	void* array_ptr = &array->data[array->items_count * array->item_size_bytes];
+	T* array_ptr = &array->data[array->items_count];
 	memcpy(array_ptr, &element, array->item_size_bytes);
 	array->items_count++;
-	return array->items_count - 1;
+	return array_ptr;
 }
 
 template <typename T>
 T* j_array_get(JArray<T>* array, s64 index)
 {
 	s64 used_index = index % array->max_items;
-	T* item = &array->data[used_index * array->item_size_bytes];
+	T* item = &array->data[used_index];
 	return item;
 }
 
@@ -63,7 +63,7 @@ template <typename T>
 void j_array_replace(JArray<T>* array, T new_element, u64 index)
 {
 	ASSERT_TRUE(index <= array->items_count - 1, "Array item index is included");
-	void* dest = &array->data[index * array->item_size_bytes];
+	T* dest = &array->data[index];
 	memcpy(dest, &new_element, array->item_size_bytes);
 }
 

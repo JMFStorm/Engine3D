@@ -21,7 +21,7 @@ enum Axis {
 };
 
 constexpr const int FILE_PATH_LEN = 128;
-constexpr const int TEXTURE_FILENAME_LEN = FILE_PATH_LEN / 2;
+constexpr const int FILENAME_LEN = FILE_PATH_LEN / 2;
 
 enum PrimitiveType {
 	Plane,
@@ -29,26 +29,34 @@ enum PrimitiveType {
 };
 
 typedef struct Texture {
-	char file_name[TEXTURE_FILENAME_LEN];
-	int texture_id;
+	char file_name[FILENAME_LEN];
+	s64 gpu_id;
 } Texture;
+
+typedef struct Material {
+	glm::vec3 ambient;
+	glm::vec3 diffuse;
+	glm::vec3 specular;
+	Texture* texture;
+	f32 shininess;
+} Material;
 
 typedef struct Mesh {
 	glm::vec3 translation;
 	glm::vec3 rotation;
 	glm::vec3 scale;
-	Texture* texture;
+	Material* material;
 	PrimitiveType mesh_type;
-	float uv_multiplier;
+	f32 uv_multiplier;
 } Mesh;
 
 typedef struct MeshData {
+	char material_name[FILENAME_LEN];
 	glm::vec3 translation;
 	glm::vec3 rotation;
 	glm::vec3 scale;
-	char texture_file_name[TEXTURE_FILENAME_LEN];
 	PrimitiveType mesh_type;
-	float uv_multiplier;
+	f32 uv_multiplier;
 } MeshData;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);

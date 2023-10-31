@@ -231,18 +231,14 @@ int g_selected_texture_item = 0;
 MemoryBuffer g_texture_memory = { 0 };
 JArray<Texture> g_textures;
 
+MemoryBuffer g_materials_memory = { 0 };
+JArray<Material> g_materials;
+
 typedef struct Light {
 	glm::vec3 position;
 	glm::vec3 diffuse;
 	float specular;
 } Light;
-
-typedef struct Material {
-	glm::vec3 ambient;
-	glm::vec3 diffuse;
-	glm::vec3 specular;
-	float shininess;
-} Material;
 
 Light g_light = {
 	.position = glm::vec3(0.0f, 4.0f, 0.0f),
@@ -482,7 +478,7 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture.texture_id);
+	glBindTexture(GL_TEXTURE_2D, texture.gpu_id);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	g_frame_data.draw_calls++;
 
@@ -621,7 +617,7 @@ void draw_mesh(Mesh* mesh)
 	}
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, mesh->texture->texture_id);
+	glBindTexture(GL_TEXTURE_2D, mesh->material->texture->gpu_id);
 	glDrawArrays(GL_TRIANGLES, 0, draw_indicies);
 	g_frame_data.draw_calls++;
 
@@ -1197,10 +1193,10 @@ void delete_mesh(s64 plane_index)
 
 s64 add_new_mesh(Mesh new_mesh)
 {
-	s64 texture_index = 0;
-	Texture* texture_ptr = j_array_get(&g_textures, texture_index);
-	g_selected_texture_item = texture_index;
-	s64 new_index = j_array_add(&g_scene_meshes, new_mesh);
+	s64 material_index = g_materials_index_map[new_mesh.material->texture->file_name];
+	g_selected_texture_item = material_index;
+	j_array_add(&g_scene_meshes, new_mesh);
+	s64 new_index = g_scene_meshes.items_count - 1;
 	return new_index;
 }
 
@@ -1216,7 +1212,7 @@ void select_mesh_index(s64 index)
 {
 	g_selected_mesh = j_array_get(&g_scene_meshes, index);
 	g_selected_mesh_index = index;
-	auto selected_texture_name = g_materials_index_map[g_selected_mesh->texture->file_name];
+	auto selected_texture_name = g_materials_index_map[g_selected_mesh->material->texture->file_name];
 	g_selected_texture_item = selected_texture_name;
 }
 
@@ -1419,29 +1415,41 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
+Material material_init(Texture* texture_ptr)
+{
+	Material material = {
+		.ambient = vec3(1),
+		.diffuse = vec3(1),
+		.specular = vec3(1),
+		.texture = texture_ptr,
+		.shininess = 32.0f,
+	};
+	return material;
+}
+
 inline MeshData mesh_serialize(Mesh* mesh)
 {
 	MeshData data = {
+		.material_name = "",
 		.translation = mesh->translation,
 		.rotation = mesh->rotation,
 		.scale = mesh->scale,
-		.texture_file_name = "",
 		.mesh_type = mesh->mesh_type,
 		.uv_multiplier = mesh->uv_multiplier,
 	};
-	strcpy_s(data.texture_file_name, mesh->texture->file_name);
+	strcpy_s(data.material_name, mesh->material->texture->file_name);
 	return data;
 }
 
 inline Mesh mesh_deserailize(MeshData data)
 {
-	s64 texture_index = g_materials_index_map[data.texture_file_name];
-	Texture* m_texture = j_array_get(&g_textures, texture_index);
+	s64 material_index = g_materials_index_map[data.material_name];
+	Material* material_ptr = j_array_get(&g_materials, material_index);
 	Mesh mesh = {
 		.translation = data.translation,
 		.rotation = data.rotation,
 		.scale = data.scale,
-		.texture = m_texture,
+		.material = material_ptr,
 		.mesh_type = data.mesh_type,
 		.uv_multiplier = data.uv_multiplier,
 	};
@@ -1529,7 +1537,7 @@ Texture texture_load_from_filepath(char* path)
 	s64 name_len = strlen(file_name);
 	Texture texture = {
 		.file_name = "",
-		.texture_id = texture_id,
+		.gpu_id = texture_id,
 	};
 	memcpy(texture.file_name, file_name, name_len);
 	return texture;
@@ -1547,7 +1555,10 @@ int main(int argc, char* argv[])
 		memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
 		g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture),(Texture*)g_texture_memory.memory);
 
-		constexpr const s64 material_names_arr_size = TEXTURE_FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
+		memory_buffer_mallocate(&g_materials_memory, sizeof(Material) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Materials"));
+		g_materials = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Material), (Material*)g_materials_memory.memory);
+
+		constexpr const s64 material_names_arr_size = FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
 		memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material items"));
 		g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
 	}
@@ -1747,7 +1758,10 @@ int main(int argc, char* argv[])
 		{
 			char* path = material_paths[i];
 			Texture new_texture = texture_load_from_filepath(const_cast<char*>(path));
-			j_array_add(&g_textures, new_texture);
+			Texture* new_texture_prt = j_array_add(&g_textures, new_texture);
+
+			Material new_material = material_init(new_texture_prt);
+			Material* new_material_prt = j_array_add(&g_materials, new_material);
 
 			char* new_str = j_strings_add(&g_material_names, new_texture.file_name);
 			g_materials_index_map[new_str] = i;
@@ -1794,7 +1808,7 @@ int main(int argc, char* argv[])
 						.translation = vec3(0),
 						.rotation = vec3(0),
 						.scale = vec3(1.0f),
-						.texture = j_array_get(&g_textures, 0),
+						.material = j_array_get(&g_materials, 1),
 						.mesh_type = PrimitiveType::Plane,
 						.uv_multiplier = 1.0f,
 					};
@@ -1808,7 +1822,7 @@ int main(int argc, char* argv[])
 						.translation = vec3(0),
 						.rotation = vec3(0),
 						.scale = vec3(1.0f),
-						.texture = j_array_get(&g_textures, 0),
+						.material = j_array_get(&g_materials, 1),
 						.mesh_type = PrimitiveType::Cube,
 						.uv_multiplier = 1.0f,
 					};
@@ -1828,13 +1842,13 @@ int main(int argc, char* argv[])
 					ImGui::InputFloat3("Scale", &g_selected_mesh->scale[0], "%.2f");
 
 					ImGui::Text("UV properties");
-					ImGui::Image((ImTextureID)g_selected_mesh->texture->texture_id, ImVec2(128, 128));
+					ImGui::Image((ImTextureID)g_selected_mesh->material->texture->gpu_id, ImVec2(128, 128));
 
 					char* texture_names_ptr = (char*)g_material_names.data;
 
 					if (ImGui::Combo("Material", &g_selected_texture_item, texture_names_ptr, g_material_names.strings_count))
 					{
-						g_selected_mesh->texture = (Texture*)j_array_get(&g_textures, g_selected_texture_item);
+						g_selected_mesh->material = j_array_get(&g_materials, g_selected_texture_item);
 					}
 
 					ImGui::InputFloat("UV mult", &g_selected_mesh->uv_multiplier, 0, 0, "%.2f");
