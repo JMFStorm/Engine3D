@@ -932,6 +932,7 @@ void draw_ui_text(FontData* font_data, float red, float green, float blue)
 	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
 	glBufferData(GL_ARRAY_BUFFER, g_text_buffer_size, g_ui_text_vertex_buffer.memory, GL_DYNAMIC_DRAW);
 
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
 	glDrawArrays(GL_TRIANGLES, 0, g_text_buffer_size);
 
@@ -1172,22 +1173,21 @@ void delete_mesh(s64 plane_index)
 	g_selected_mesh_index = -1;
 }
 
-s64 add_new_mesh(PrimitiveType type)
+s64 add_new_mesh(Mesh new_mesh)
 {
 	s64 texture_index = 0;
 	Texture* texture_ptr = j_array_get(&g_textures, texture_index);
-
-	Mesh new_mesh = {
-		.translation = glm::vec3(0.0f, 0.0f, 0.0f),
-		.rotation = glm::vec3(0.0f, 0.0f, 0.0f),
-		.scale = glm::vec3(1.0f, 1.0f, 1.0f),
-		.texture = texture_ptr,
-		.mesh_type = type
-	};
-
 	g_selected_texture_item = texture_index;
 	s64 new_index = j_array_add(&g_scene_meshes, new_mesh);
 	return new_index;
+}
+
+void duplicate_mesh(s64 plane_index)
+{
+	Mesh mesh_copy = *j_array_get(&g_scene_meshes, plane_index);
+	s64 index = add_new_mesh(mesh_copy);
+	g_selected_mesh = j_array_get(&g_scene_meshes, index);
+	g_selected_mesh_index = index;
 }
 
 void select_mesh_index(s64 index)
@@ -1627,10 +1627,8 @@ int main(int argc, char* argv[])
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 
 	glEnable(GL_DEPTH_TEST);
-
 	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	
+
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 	glFrontFace(GL_CCW);
@@ -1662,13 +1660,29 @@ int main(int argc, char* argv[])
 
 				if (ImGui::Button("Add plane"))
 				{
-					s64 new_mesh_index = add_new_mesh(PrimitiveType::Plane);
+					Mesh new_plane = {
+						.translation = vec3(0),
+						.rotation = vec3(0),
+						.scale = vec3(1.0f),
+						.texture = j_array_get(&g_textures, 0),
+						.mesh_type = PrimitiveType::Plane,
+						.uv_multiplier = 1.0f,
+					};
+					s64 new_mesh_index = add_new_mesh(new_plane);
 					select_mesh_index(new_mesh_index);
 				}
 
 				if (ImGui::Button("Add Cube"))
 				{
-					s64 new_mesh_index = add_new_mesh(PrimitiveType::Cube);
+					Mesh new_cube = {
+						.translation = vec3(0),
+						.rotation = vec3(0),
+						.scale = vec3(1.0f),
+						.texture = j_array_get(&g_textures, 0),
+						.mesh_type = PrimitiveType::Cube,
+						.uv_multiplier = 1.0f,
+					};
+					s64 new_mesh_index = add_new_mesh(new_cube);
 					select_mesh_index(new_mesh_index);
 				}
 
@@ -1873,9 +1887,16 @@ int main(int argc, char* argv[])
 			glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 
-		if (g_inputs.as_struct.del.pressed && g_selected_mesh != nullptr)
+		if (g_selected_mesh != nullptr)
 		{
-			delete_mesh(g_selected_mesh_index);
+			if (g_inputs.as_struct.del.pressed)
+			{
+				delete_mesh(g_selected_mesh_index);
+			}
+			else if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.d.pressed)
+			{
+				duplicate_mesh(g_selected_mesh_index);
+			}
 		}
 
 		// Transformation mode start
