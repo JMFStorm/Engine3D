@@ -34,10 +34,9 @@ typedef struct Texture {
 } Texture;
 
 typedef struct Material {
-	glm::vec3 ambient;
-	glm::vec3 diffuse;
-	glm::vec3 specular;
-	Texture* texture;
+	Texture* color_texture;
+	Texture* specular_texture;
+	f32 specular_mult;
 	f32 shininess;
 } Material;
 

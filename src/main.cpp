@@ -243,14 +243,7 @@ typedef struct Light {
 Light g_light = {
 	.position = glm::vec3(0.0f, 4.0f, 0.0f),
 	.diffuse = glm::vec3(1.0f),
-	.specular = 1.0f
-};
-
-Material g_material = {
-	.ambient = glm::vec3(1.0f),
-	.diffuse = glm::vec3(1.0f),
-	.specular = glm::vec3(0.1f),
-	.shininess = 32.0f
+	.specular = 0.25f
 };
 
 Texture pointlight_texture;
@@ -498,25 +491,28 @@ void draw_mesh(Mesh* mesh)
 	unsigned int model_loc = glGetUniformLocation(g_mesh_shader, "model");
 	unsigned int view_loc = glGetUniformLocation(g_mesh_shader, "view");
 	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader, "projection");
-
-	unsigned int use_texture_loc = glGetUniformLocation(g_mesh_shader, "use_texture");
-	unsigned int uv_loc = glGetUniformLocation(g_mesh_shader, "uv_multiplier");
-	unsigned int ambient_loc = glGetUniformLocation(g_mesh_shader, "ambientLight");
 	unsigned int camera_view_loc = glGetUniformLocation(g_mesh_shader, "viewPos");
 
+	unsigned int ambient_loc = glGetUniformLocation(g_mesh_shader, "ambientLight");
 	unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, "light.position");
 	unsigned int light_diff_loc = glGetUniformLocation(g_mesh_shader, "light.diffuse");
 	unsigned int light_spec_loc = glGetUniformLocation(g_mesh_shader, "light.specular");
 
-	unsigned int material_amb_loc = glGetUniformLocation(g_mesh_shader, "material.ambient");
-	unsigned int material_diff_loc = glGetUniformLocation(g_mesh_shader, "material.diffuse");
-	unsigned int material_spec_loc = glGetUniformLocation(g_mesh_shader, "material.specular");
+	unsigned int use_texture_loc = glGetUniformLocation(g_mesh_shader, "use_texture");
+	unsigned int use_gloss_texture_loc = glGetUniformLocation(g_mesh_shader, "use_specular_texture");
+	unsigned int uv_loc = glGetUniformLocation(g_mesh_shader, "uv_multiplier");
+
+	unsigned int color_texture_loc = glGetUniformLocation(g_mesh_shader, "material.color_texture");
+	unsigned int specular_texture_loc = glGetUniformLocation(g_mesh_shader, "material.specular_texture");
+	unsigned int specular_multiplier_loc = glGetUniformLocation(g_mesh_shader, "material.specular_mult");
 	unsigned int material_shine_loc = glGetUniformLocation(g_mesh_shader, "material.shininess");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
+
 	glUniform1f(uv_loc, mesh->uv_multiplier);
+	glUniform1i(color_texture_loc, 0);
 	glUniform1i(use_texture_loc, true);
 
 	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
@@ -526,10 +522,9 @@ void draw_mesh(Mesh* mesh)
 	glUniform3f(light_diff_loc, g_light.diffuse.x, g_light.diffuse.y, g_light.diffuse.z);
 	glUniform1f(light_spec_loc, g_light.specular);
 
-	glUniform3f(material_amb_loc, g_material.ambient.x, g_material.ambient.y, g_material.ambient.z);
-	glUniform3f(material_diff_loc, g_material.diffuse.x, g_material.diffuse.y, g_material.diffuse.z);
-	glUniform3f(material_spec_loc, g_material.specular.x, g_material.specular.y, g_material.specular.z);
-	glUniform1f(material_shine_loc, g_material.shininess);
+	Material* material = mesh->material;
+	glUniform1f(material_shine_loc, material->shininess);
+	glUniform1f(specular_multiplier_loc, material->specular_mult);
 
 	s64 draw_indicies = 0;
 
@@ -616,8 +611,19 @@ void draw_mesh(Mesh* mesh)
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
 
+	bool use_specular_texture = mesh->material->specular_texture != nullptr;
+	glUniform1i(use_gloss_texture_loc, use_specular_texture);
+
+	if (use_specular_texture)
+	{
+		glUniform1i(specular_texture_loc, 1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, mesh->material->specular_texture->gpu_id);
+	}
+
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, mesh->material->texture->gpu_id);
+	glBindTexture(GL_TEXTURE_2D, mesh->material->color_texture->gpu_id);
+
 	glDrawArrays(GL_TRIANGLES, 0, draw_indicies);
 	g_frame_data.draw_calls++;
 
@@ -1193,7 +1199,7 @@ void delete_mesh(s64 plane_index)
 
 s64 add_new_mesh(Mesh new_mesh)
 {
-	s64 material_index = g_materials_index_map[new_mesh.material->texture->file_name];
+	s64 material_index = g_materials_index_map[new_mesh.material->color_texture->file_name];
 	g_selected_texture_item = material_index;
 	j_array_add(&g_scene_meshes, new_mesh);
 	s64 new_index = g_scene_meshes.items_count - 1;
@@ -1212,7 +1218,7 @@ void select_mesh_index(s64 index)
 {
 	g_selected_mesh = j_array_get(&g_scene_meshes, index);
 	g_selected_mesh_index = index;
-	auto selected_texture_name = g_materials_index_map[g_selected_mesh->material->texture->file_name];
+	auto selected_texture_name = g_materials_index_map[g_selected_mesh->material->color_texture->file_name];
 	g_selected_texture_item = selected_texture_name;
 }
 
@@ -1415,13 +1421,12 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
-Material material_init(Texture* texture_ptr)
+Material material_init(Texture* color_ptr, Texture* specular_ptr)
 {
 	Material material = {
-		.ambient = vec3(1),
-		.diffuse = vec3(1),
-		.specular = vec3(1),
-		.texture = texture_ptr,
+		.color_texture = color_ptr,
+		.specular_texture = specular_ptr,
+		.specular_mult = 1.0f,
 		.shininess = 32.0f,
 	};
 	return material;
@@ -1437,7 +1442,7 @@ inline MeshData mesh_serialize(Mesh* mesh)
 		.mesh_type = mesh->mesh_type,
 		.uv_multiplier = mesh->uv_multiplier,
 	};
-	strcpy_s(data.material_name, mesh->material->texture->file_name);
+	strcpy_s(data.material_name, mesh->material->color_texture->file_name);
 	return data;
 }
 
@@ -1766,13 +1771,23 @@ int main(int argc, char* argv[])
 			auto filename = entry.path().stem().filename().string();
 			auto filepath = directory_path.string() + "\\" + filename + ".png";
 
-			Texture new_texture = texture_load_from_filepath(const_cast<char*>(filepath.c_str()));
-			Texture* new_texture_prt = j_array_add(&g_textures, new_texture);
+			Texture color_texture = texture_load_from_filepath(const_cast<char*>(filepath.c_str()));
+			Texture* color_texture_prt = j_array_add(&g_textures, color_texture);
 
-			Material new_material = material_init(new_texture_prt);
+			Texture* specular_texture_ptr = nullptr;
+			auto specular_filepath = directory_path.string() + "\\" + filename + "_specular.png";
+			std::ifstream gloss_file(specular_filepath);
+
+			if (gloss_file.good())
+			{
+				Texture specular_texture = texture_load_from_filepath(const_cast<char*>(specular_filepath.c_str()));
+				specular_texture_ptr = j_array_add(&g_textures, specular_texture);
+			}
+
+			Material new_material = material_init(color_texture_prt, specular_texture_ptr);
 			Material* new_material_prt = j_array_add(&g_materials, new_material);
 
-			char* new_str = j_strings_add(&g_material_names, new_texture.file_name);
+			char* new_str = j_strings_add(&g_material_names, color_texture.file_name);
 			g_materials_index_map[new_str] = material_index++;
 			printf("Material added: %s.\n", filename.c_str());
 		}
@@ -1850,8 +1865,8 @@ int main(int argc, char* argv[])
 					ImGui::InputFloat3("Rotation", &g_selected_mesh->rotation[0], "%.2f");
 					ImGui::InputFloat3("Scale", &g_selected_mesh->scale[0], "%.2f");
 
-					ImGui::Text("UV properties");
-					ImGui::Image((ImTextureID)g_selected_mesh->material->texture->gpu_id, ImVec2(128, 128));
+					ImGui::Text("Material");
+					ImGui::Image((ImTextureID)g_selected_mesh->material->color_texture->gpu_id, ImVec2(128, 128));
 
 					char* texture_names_ptr = (char*)g_material_names.data;
 
@@ -1861,6 +1876,8 @@ int main(int argc, char* argv[])
 					}
 
 					ImGui::InputFloat("UV mult", &g_selected_mesh->uv_multiplier, 0, 0, "%.2f");
+					ImGui::InputFloat("Specular mult", &g_selected_mesh->material->specular_mult, 0, 0, "%.3f");
+					ImGui::InputFloat("Material shine", &g_selected_mesh->material->shininess, 0, 0, "%.3f");
 				}
 
 				ImGui::Text("Editor settings");
@@ -1873,12 +1890,6 @@ int main(int argc, char* argv[])
 				ImGui::InputFloat3("Light pos", &g_light.position[0], "%.3f");
 				ImGui::InputFloat("Light specular", &g_light.specular, 0, 0, "%.3f");
 				ImGui::InputFloat3("Light diffuse", &g_light.diffuse[0], "%.3f");
-
-				ImGui::Text("Material");
-				ImGui::InputFloat3("Material ambient", &g_material.ambient[0], "%.3f");
-				ImGui::InputFloat3("Material specular", &g_material.specular[0], "%.3f");
-				ImGui::InputFloat3("Material diffuse", &g_material.diffuse[0], "%.3f");
-				ImGui::InputFloat("Material shine", &g_material.shininess, 0, 0, "%.3f");
 
 				ImGui::Text("Game window");
 				ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);
