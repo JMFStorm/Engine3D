@@ -14,19 +14,28 @@ typedef long long			s64;
 typedef float				f32;
 typedef double				f64;
 
-enum Axis {
-	X,
-	Y,
-	Z
-};
+namespace E
+{
+	enum SelectedType {
+		None,
+		Mesh,
+		Light
+	};
+
+	enum PrimitiveType {
+		Plane,
+		Cube
+	};
+
+	enum Axis {
+		X,
+		Y,
+		Z
+	};
+}
 
 constexpr const int FILE_PATH_LEN = 128;
 constexpr const int FILENAME_LEN = FILE_PATH_LEN / 2;
-
-enum PrimitiveType {
-	Plane,
-	Cube
-};
 
 typedef struct Texture {
 	char file_name[FILENAME_LEN];
@@ -45,7 +54,7 @@ typedef struct Mesh {
 	glm::vec3 rotation;
 	glm::vec3 scale;
 	Material* material;
-	PrimitiveType mesh_type;
+	E::PrimitiveType mesh_type;
 	f32 uv_multiplier;
 } Mesh;
 
@@ -54,9 +63,14 @@ typedef struct MeshData {
 	glm::vec3 translation;
 	glm::vec3 rotation;
 	glm::vec3 scale;
-	PrimitiveType mesh_type;
+	E::PrimitiveType mesh_type;
 	f32 uv_multiplier;
 } MeshData;
+
+typedef struct SceneSelection {
+	s64 selection_index;
+	E::SelectedType type;
+} SceneSelection;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
 
@@ -136,29 +150,29 @@ inline glm::mat4 get_rotation_matrix(Mesh* mesh)
 	return rotation_matrix;
 }
 
-inline float get_vec3_val_by_axis(glm::vec3 vec, Axis axis)
+inline float get_vec3_val_by_axis(glm::vec3 vec, E::Axis axis)
 {
-	if (axis == Axis::X) return vec.x;
-	if (axis == Axis::Y) return vec.y;
-	if (axis == Axis::Z) return vec.z;
+	if (axis == E::Axis::X) return vec.x;
+	if (axis == E::Axis::Y) return vec.y;
+	if (axis == E::Axis::Z) return vec.z;
 	return 0.0f;
 }
 
-void get_axis_xor(Axis axis, Axis xor_axises[]);
+void get_axis_xor(E::Axis axis, E::Axis xor_axises[]);
 
 glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal);
 
-std::array<glm::vec3, 2> get_axis_xor_normals(Axis axis);
+std::array<glm::vec3, 2> get_axis_xor_normals(E::Axis axis);
 
-std::array<float, 2> get_plane_axis_xor_rotations(Axis axis, Mesh* mesh);
+std::array<float, 2> get_plane_axis_xor_rotations(E::Axis axis, Mesh* mesh);
 
-glm::vec3 get_normal_for_axis(Axis axis);
+glm::vec3 get_normal_for_axis(E::Axis axis);
 
 glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
 
 glm::vec3 get_vec_for_largest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
 
-void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis);
+void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, E::Axis axis);
 
 glm::vec3 get_plane_middle_point(Mesh mesh);
 

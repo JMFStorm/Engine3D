@@ -7,7 +7,7 @@ void memory_buffer_mallocate(MemoryBuffer* buffer, s64 size_in_bytes, char* name
 	memset(buffer->memory, 0x00, size_in_bytes);
 	buffer->size = size_in_bytes;
 	strcpy_s(buffer->name, name);
-	printf("memory_buffer_mallocate(): %.3f KB allocated for: '%s'.\n", (float)size_in_bytes / (float)1024, name);
+	printf("memory_buffer_mallocate(): %.3f KB allocated for buffer: %s.\n", (float)size_in_bytes / (float)1024, name);
 }
 
 void memory_buffer_wipe(MemoryBuffer* buffer)

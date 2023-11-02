@@ -246,14 +246,6 @@ typedef struct Light {
 	float quadratic;
 } Light;
 
-Light g_light = {
-	.position = glm::vec3(0.0f, 4.0f, 0.0f),
-	.diffuse = glm::vec3(1.0f),
-	.specular = 0.25f,
-	.linear = 0.35f,
-	.quadratic = 0.44f
-};
-
 Texture pointlight_texture;
 Texture spotlight_texture;
 
@@ -273,10 +265,18 @@ struct CharPtrEqual {
 std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map = {};
 
 Mesh* g_selected_mesh = nullptr;
-int g_selected_mesh_index = -1;
 
-MemoryBuffer g_scene_memory = { 0 };
+MemoryBuffer g_scene_meshes_memory = { 0 };
 JArray<Mesh> g_scene_meshes;
+
+constexpr const s64 SCENE_LIGHTS_MAX_COUNT = 20;
+MemoryBuffer g_scene_lights_memory = { 0 };
+JArray<Light> g_scene_lights;
+
+SceneSelection g_selected_object = {
+	.selection_index = -1,
+	.type = E::None
+};
 
 enum Transformation {
 	Translate,
@@ -285,7 +285,7 @@ enum Transformation {
 };
 
 typedef struct TransformationMode {
-	Axis axis;
+	E::Axis axis;
 	Transformation transformation;
 	bool is_active;
 } TransformationMode;
@@ -531,11 +531,13 @@ void draw_mesh(Mesh* mesh)
 	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
 	glUniform3f(camera_view_loc, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 
-	glUniform3f(light_pos_loc, g_light.position.x, g_light.position.y, g_light.position.z);
-	glUniform3f(light_diff_loc, g_light.diffuse.x, g_light.diffuse.y, g_light.diffuse.z);
-	glUniform1f(light_spec_loc, g_light.specular);
-	glUniform1f(light_linear_loc, g_light.linear);
-	glUniform1f(light_quadratic_loc, g_light.quadratic);
+	auto pointlight = *j_array_get(&g_scene_lights, 0);
+
+	glUniform3f(light_pos_loc, pointlight.position.x, pointlight.position.y, pointlight.position.z);
+	glUniform3f(light_diff_loc, pointlight.diffuse.x, pointlight.diffuse.y, pointlight.diffuse.z);
+	glUniform1f(light_spec_loc, pointlight.specular);
+	glUniform1f(light_linear_loc, pointlight.linear);
+	glUniform1f(light_quadratic_loc, pointlight.quadratic);
 
 	Material* material = mesh->material;
 	glUniform1f(material_shine_loc, material->shininess);
@@ -543,7 +545,7 @@ void draw_mesh(Mesh* mesh)
 
 	s64 draw_indicies = 0;
 
-	if (mesh->mesh_type == PrimitiveType::Plane)
+	if (mesh->mesh_type == E::PrimitiveType::Plane)
 	{
 		float vertices[] =
 		{
@@ -561,7 +563,7 @@ void draw_mesh(Mesh* mesh)
 		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
-	else if (mesh->mesh_type == PrimitiveType::Cube)
+	else if (mesh->mesh_type == E::PrimitiveType::Cube)
 	{
 		float vertices[] =
 		{
@@ -667,7 +669,7 @@ void draw_mesh_wireframe(Mesh *mesh, glm::vec3 color)
 
 	s64 draw_indicies = 0;
 
-	if (mesh->mesh_type == PrimitiveType::Plane)
+	if (mesh->mesh_type == E::PrimitiveType::Plane)
 	{
 		float vertices[] =
 		{
@@ -693,7 +695,7 @@ void draw_mesh_wireframe(Mesh *mesh, glm::vec3 color)
 		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
-	else if (mesh->mesh_type == PrimitiveType::Cube)
+	else if (mesh->mesh_type == E::PrimitiveType::Cube)
 	{
 		float vertices[] =
 		{
@@ -1208,8 +1210,19 @@ void delete_mesh(s64 plane_index)
 	Mesh* last_plane = j_array_get(&g_scene_meshes, g_scene_meshes.items_count - 1);
 	j_array_replace(&g_scene_meshes, *last_plane, plane_index);
 	j_array_pop_back(&g_scene_meshes);
-	g_selected_mesh = nullptr;
-	g_selected_mesh_index = -1;
+
+	g_selected_object.selection_index = -1;
+	g_selected_object.type = E::None;
+}
+
+void* get_selected_object_ptr()
+{
+	if (g_selected_object.type == E::Mesh)
+	{
+		return (void*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
+	}
+
+	return nullptr;
 }
 
 s64 add_new_mesh(Mesh new_mesh)
@@ -1225,22 +1238,25 @@ void duplicate_mesh(s64 plane_index)
 {
 	Mesh mesh_copy = *j_array_get(&g_scene_meshes, plane_index);
 	s64 index = add_new_mesh(mesh_copy);
-	g_selected_mesh = j_array_get(&g_scene_meshes, index);
-	g_selected_mesh_index = index;
+
+	g_selected_object.type = E::Mesh;
+	g_selected_object.selection_index = index;
+	g_selected_mesh = (Mesh*)get_selected_object_ptr();
 }
 
-void select_mesh_index(s64 index)
+void select_object_index(E::SelectedType type, s64 index)
 {
-	g_selected_mesh = j_array_get(&g_scene_meshes, index);
-	g_selected_mesh_index = index;
+	g_selected_object.type = type;
+	g_selected_object.selection_index = index;
+	g_selected_mesh = (Mesh*)get_selected_object_ptr();
 	auto selected_texture_name = g_materials_index_map[g_selected_mesh->material->color_texture->file_name];
 	g_selected_texture_item = selected_texture_name;
 }
 
 void deselect_current_mesh()
 {
-	g_selected_mesh = nullptr;
-	g_selected_mesh_index = -1;
+	g_selected_object.selection_index = -1;
+	g_selected_object.type = E::None;
 }
 
 bool calculate_plane_ray_intersection(
@@ -1282,13 +1298,13 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 		glm::vec3(0.0f,  0.0f, -1.0f)
 	};
 
-	Axis plane_axises[CUBE_PLANES_COUNT] = {
-		Axis::Y,
-		Axis::Y,
-		Axis::X,
-		Axis::X,
-		Axis::Z,
-		Axis::Z
+	E::Axis plane_axises[CUBE_PLANES_COUNT] = {
+		E::Axis::Y,
+		E::Axis::Y,
+		E::Axis::X,
+		E::Axis::X,
+		E::Axis::Z,
+		E::Axis::Z
 	};
 
 	glm::mat4 rotation_matrix = get_rotation_matrix(cube);
@@ -1316,7 +1332,7 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 		glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotation_matrix);
 		glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
 
-		Axis xor_axises[2] = {};
+		E::Axis xor_axises[2] = {};
 		get_axis_xor(current_axis, xor_axises);
 
 		float abs1 = std::abs(get_vec3_val_by_axis(local_intersection_point, xor_axises[0]));
@@ -1342,16 +1358,44 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 	return got_selected;
 }
 
-int get_mesh_selection_index(JArray<Mesh> meshes, glm::vec3 ray_origin, glm::vec3 ray_direction)
+s64 get_light_selection_index(JArray<Light> lights, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
 	s64 index = -1;
-	float closest_selection = std::numeric_limits<float>::max();
+	Mesh as_cube;
+	Light* as_light;
+	*select_dist = std::numeric_limits<float>::max();
+
+	for (int i = 0; i < lights.items_count; i++)
+	{
+		as_light = j_array_get(&g_scene_lights, i);
+		as_cube = {};
+		as_cube.mesh_type = E::Cube;
+		as_cube.translation = as_light->position;
+		as_cube.scale = vec3(0.35f);
+
+		f32 new_select_dist;
+		bool selected_light = get_cube_selection(&as_cube, &new_select_dist, ray_origin, ray_direction);
+
+		if (selected_light && new_select_dist < *select_dist)
+		{
+			index = i;
+			*select_dist = new_select_dist;
+		}
+	}
+
+	return index;
+}
+
+s64 get_mesh_selection_index(JArray<Mesh> meshes, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
+{
+	s64 index = -1;
+	*select_dist = std::numeric_limits<float>::max();
 
 	for (int i = 0; i < meshes.items_count; i++)
 	{
 		Mesh* mesh = j_array_get(&meshes, i);
 
-		if (mesh->mesh_type == PrimitiveType::Plane)
+		if (mesh->mesh_type == E::PrimitiveType::Plane)
 		{
 			auto plane_up = glm::vec3(0.0f, 1.0f, 0.0f);
 			glm::mat4 rotationMatrix = get_rotation_matrix(mesh);
@@ -1384,22 +1428,22 @@ int get_mesh_selection_index(JArray<Mesh> meshes, glm::vec3 ray_origin, glm::vec
 			{
 				float dist = glm::length(ray_origin - intersection_point);
 
-				if (dist < closest_selection)
+				if (dist < *select_dist)
 				{
-					closest_selection = dist;
+					*select_dist = dist;
 					index = i;
 				}
 			}
 		}
-		else if (mesh->mesh_type == PrimitiveType::Cube)
+		else if (mesh->mesh_type == E::PrimitiveType::Cube)
 		{
-			float select_dist;
-			bool selected_cube = get_cube_selection(mesh, &select_dist, ray_origin, ray_direction);
+			f32 new_select_dist;
+			bool selected_cube = get_cube_selection(mesh, &new_select_dist, ray_origin, ray_direction);
 
-			if (selected_cube && select_dist < closest_selection)
+			if (selected_cube && new_select_dist < *select_dist)
 			{
 				index = i;
-				closest_selection = select_dist;
+				*select_dist = new_select_dist;
 			}
 		}
 	}
@@ -1569,8 +1613,11 @@ int main(int argc, char* argv[])
 	{
 		memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
 
-		memory_buffer_mallocate(&g_scene_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
-		g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), (Mesh*)g_scene_memory.memory);
+		memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
+		g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), (Mesh*)g_scene_meshes_memory.memory);
+
+		memory_buffer_mallocate(&g_scene_lights_memory, sizeof(Light) * SCENE_LIGHTS_MAX_COUNT, const_cast<char*>("Scene lights"));
+		g_scene_lights = j_array_init(SCENE_LIGHTS_MAX_COUNT, sizeof(Light), (Light*)g_scene_lights_memory.memory);
 
 		memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
 		g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture),(Texture*)g_texture_memory.memory);
@@ -1828,6 +1875,16 @@ int main(int argc, char* argv[])
 	load_scene();
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 
+	Light pointlight_01 = {
+		.position = glm::vec3(0.0f, 4.0f, 0.0f),
+		.diffuse = glm::vec3(1.0f),
+		.specular = 0.25f,
+		.linear = 0.35f,
+		.quadratic = 0.44f
+	};
+
+	j_array_add(&g_scene_lights, pointlight_01);
+
 	while (!glfwWindowShouldClose(g_window))
 	{
 		glfwPollEvents();
@@ -1853,11 +1910,11 @@ int main(int argc, char* argv[])
 						.rotation = vec3(0),
 						.scale = vec3(1.0f),
 						.material = j_array_get(&g_materials, 1),
-						.mesh_type = PrimitiveType::Plane,
+						.mesh_type = E::PrimitiveType::Plane,
 						.uv_multiplier = 1.0f,
 					};
 					s64 new_mesh_index = add_new_mesh(new_plane);
-					select_mesh_index(new_mesh_index);
+					select_object_index(E::Mesh, new_mesh_index);
 				}
 
 				if (ImGui::Button("Add Cube"))
@@ -1867,15 +1924,15 @@ int main(int argc, char* argv[])
 						.rotation = vec3(0),
 						.scale = vec3(1.0f),
 						.material = j_array_get(&g_materials, 1),
-						.mesh_type = PrimitiveType::Cube,
+						.mesh_type = E::PrimitiveType::Cube,
 						.uv_multiplier = 1.0f,
 					};
 					s64 new_mesh_index = add_new_mesh(new_cube);
-					select_mesh_index(new_mesh_index);
+					select_object_index(E::Mesh, new_mesh_index);
 				}
 
 				char selected_mesh_str[24];
-				sprintf_s(selected_mesh_str, "Plane index: %d", g_selected_mesh_index);
+				sprintf_s(selected_mesh_str, "Plane index: %lld", g_selected_object.selection_index);
 				ImGui::Text(selected_mesh_str);
 
 				if (g_selected_mesh != nullptr)
@@ -1905,11 +1962,14 @@ int main(int argc, char* argv[])
 				ImGui::InputFloat("Rotation clip", &g_user_settings.transform_rotation_clip, 0, 0, "%.2f");
 
 				ImGui::Text("Scene settings");
+
+				Light* pointlight = j_array_get(&g_scene_lights, 0);
+
 				ImGui::Text("Light");
 				ImGui::InputFloat3("Global ambient", &g_user_settings.world_ambient[0], "%.3f");
-				ImGui::InputFloat3("Light pos", &g_light.position[0], "%.3f");
-				ImGui::InputFloat("Light specular", &g_light.specular, 0, 0, "%.3f");
-				ImGui::InputFloat3("Light diffuse", &g_light.diffuse[0], "%.3f");
+				ImGui::InputFloat3("Light pos", &pointlight->position[0], "%.3f");
+				ImGui::InputFloat("Light specular", &pointlight->specular, 0, 0, "%.3f");
+				ImGui::InputFloat3("Light diffuse", &pointlight->diffuse[0], "%.3f");
 
 				ImGui::Text("Game window");
 				ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);
@@ -2000,15 +2060,34 @@ int main(int argc, char* argv[])
 					g_debug_click_camera_pos = glm::vec3(0.0f);
 				}
 
-				int select_index = get_mesh_selection_index(g_scene_meshes, ray_origin, ray_direction);
+				f32 mesh_dist;
+				s64 mesh_index = get_mesh_selection_index(g_scene_meshes, &mesh_dist, ray_origin, ray_direction);
 
-				if (select_index != -1)
+				f32 light_dist;
+				s64 light_index = get_light_selection_index(g_scene_lights, &light_dist, ray_origin, ray_direction);
+
+				if (mesh_index == -1 && light_index == -1)
 				{
-					select_mesh_index(select_index);
+					deselect_current_mesh();
+				}
+				else if (0 <= mesh_index && light_index == -1)
+				{
+					select_object_index(E::Mesh, mesh_index);
+				}
+				else if (mesh_index == -1 && 0 <= light_index)
+				{
+					printf("Light selected!\n");
 				}
 				else
 				{
-					deselect_current_mesh();
+					if (mesh_dist < light_dist)
+					{
+						select_object_index(E::Mesh, mesh_index);
+					}
+					else
+					{
+						printf("Light selected!\n");
+					}
 				}
 			}
 		}
@@ -2080,11 +2159,11 @@ int main(int argc, char* argv[])
 		{
 			if (g_inputs.as_struct.del.pressed)
 			{
-				delete_mesh(g_selected_mesh_index);
+				delete_mesh(g_selected_object.selection_index);
 			}
 			else if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.d.pressed)
 			{
-				duplicate_mesh(g_selected_mesh_index);
+				duplicate_mesh(g_selected_object.selection_index);
 			}
 		}
 
@@ -2094,9 +2173,9 @@ int main(int argc, char* argv[])
 		{
 			g_transform_mode.is_active = true;
 
-			if		(g_inputs.as_struct.x.is_down) g_transform_mode.axis = Axis::X;
-			else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = Axis::Y;
-			else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = Axis::Z;
+			if		(g_inputs.as_struct.x.is_down) g_transform_mode.axis = E::Axis::X;
+			else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = E::Axis::Y;
+			else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = E::Axis::Z;
 
 			glm::vec3 intersection_point;
 			std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
@@ -2302,7 +2381,8 @@ int main(int argc, char* argv[])
 		}
 
 		// Draw lights
-		draw_billboard(g_light.position, pointlight_texture, 0.5f);
+		auto pointlight = *j_array_get(&g_scene_lights, 0);
+		draw_billboard(pointlight.position, pointlight_texture, 0.5f);
 
 		// Transformation mode debug lines
 		if (g_selected_mesh != nullptr && g_transform_mode.is_active)
@@ -2334,21 +2414,21 @@ int main(int argc, char* argv[])
 		}
 
 		// Draw selection
-		if (-1 < g_selected_mesh_index)
+		if (-1 < g_selected_object.selection_index)
 		{
-			Mesh selected_mesh = *j_array_get(&g_scene_meshes, g_selected_mesh_index);
-			auto model = get_model_matrix(&selected_mesh);
+			Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
+			auto model = get_model_matrix(selected_mesh);
 
-			if (selected_mesh.mesh_type == PrimitiveType::Plane)
+			if (selected_mesh->mesh_type == E::PrimitiveType::Plane)
 			{
-				draw_mesh_wireframe(&selected_mesh, glm::vec3(1.0f));
+				draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
 			}
-			else if (selected_mesh.mesh_type == PrimitiveType::Cube)
+			else if (selected_mesh->mesh_type == E::PrimitiveType::Cube)
 			{
-				draw_mesh_wireframe(&selected_mesh, glm::vec3(1.0f));
+				draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
 			}
 
-			draw_selection_arrows(selected_mesh.translation);
+			draw_selection_arrows(selected_mesh->translation);
 		}
 
 		// Click ray
