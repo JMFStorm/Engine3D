@@ -238,14 +238,6 @@ JArray<Texture> g_textures;
 MemoryBuffer g_materials_memory = { 0 };
 JArray<Material> g_materials;
 
-typedef struct Light {
-	glm::vec3 position;
-	glm::vec3 diffuse;
-	float specular;
-	float linear;
-	float quadratic;
-} Light;
-
 Texture pointlight_texture;
 Texture spotlight_texture;
 
@@ -1686,6 +1678,16 @@ void save_scene()
 		output_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
 	}
 
+	// Light count
+	output_file.write(reinterpret_cast<char*>(&g_scene_lights.items_count), sizeof(s64));
+
+	// Light data
+	for (int i = 0; i < g_scene_lights.items_count; i++)
+	{
+		Light light = *j_array_get(&g_scene_lights, i);
+		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
+	}
+
 	output_file.close();
 
 	printf("Scene saved.\n");
@@ -1708,7 +1710,6 @@ void load_scene()
 	// Header
 	char header[6] = { 0 };
 	input_file.read(header, 5);
-	int xx = strcmp(header, ".jmap");
 	ASSERT_TRUE(strcmp(header, ".jmap") == 0, ".jmap file has valid header");
 
 	// Scene camera
@@ -1727,6 +1728,18 @@ void load_scene()
 		input_file.read(reinterpret_cast<char*>(&m_data), sizeof(m_data));
 		Mesh mesh = mesh_deserailize(m_data);
 		j_array_add(&g_scene_meshes, mesh);
+	}
+
+	// Light count
+	s64 light_count = 0;
+	input_file.read(reinterpret_cast<char*>(&light_count), sizeof(s64));
+
+	// Light data
+	for (int i = 0; i < light_count; i++)
+	{
+		Light light;
+		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
+		j_array_add(&g_scene_lights, light);
 	}
 
 	input_file.close();
@@ -2132,7 +2145,7 @@ int main(int argc, char* argv[])
 
 					ImGui::Text("Light properties");
 					ImGui::InputFloat3("Light pos", &selected_light_ptr->position[0], "%.3f");
-					ImGui::InputFloat3("Light diffuse", &selected_light_ptr->diffuse[0], "%.3f");
+					ImGui::ColorEdit3("Color Picker", &selected_light_ptr->diffuse[0], 0);
 					ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
 					ImGui::InputFloat("Light quadratic", &selected_light_ptr->quadratic, 0, 0, "%.3f");
 					ImGui::InputFloat("Light linear", &selected_light_ptr->linear, 0, 0, "%.3f");

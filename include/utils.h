@@ -67,6 +67,14 @@ typedef struct MeshData {
 	f32 uv_multiplier;
 } MeshData;
 
+typedef struct Light {
+	glm::vec3 position;
+	glm::vec3 diffuse;
+	float specular;
+	float linear;
+	float quadratic;
+} Light;
+
 typedef struct SceneSelection {
 	s64 selection_index;
 	E::SelectedType type;
