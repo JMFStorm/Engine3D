@@ -29,6 +29,9 @@
 
 using namespace glm;
 
+bool g_use_linear_texture_filtering = false;
+bool g_generate_texture_mipmaps = false;
+
 GLFWwindow* g_window;
 glm::vec3 lastMousePos(0.0f);
 
@@ -45,7 +48,7 @@ UserSettings g_user_settings = {
 	.window_size_px = { 1900, 1200 },
 	.transform_clip = 0.25f,
 	.transform_rotation_clip = 15.0f,
-	.world_ambient = glm::vec3(0.2f),
+	.world_ambient = glm::vec3(0.1f),
 };
 
 int g_wireframe_shader;
@@ -215,7 +218,8 @@ bool g_camera_move_mode = false;
 float g_mouse_movement_x = 0;
 float g_mouse_movement_y = 0;
 
-const char* billboard_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\light_billboard_000.png";
+const char* pointlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\pointlight_billboard.png";
+const char* spotlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\spotlight_billboard.png";
 
 char material_paths[][FILE_PATH_LEN] = {
 	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
@@ -238,15 +242,20 @@ typedef struct Light {
 	glm::vec3 position;
 	glm::vec3 diffuse;
 	float specular;
+	float linear;
+	float quadratic;
 } Light;
 
 Light g_light = {
 	.position = glm::vec3(0.0f, 4.0f, 0.0f),
 	.diffuse = glm::vec3(1.0f),
-	.specular = 0.25f
+	.specular = 0.25f,
+	.linear = 0.35f,
+	.quadratic = 0.44f
 };
 
 Texture pointlight_texture;
+Texture spotlight_texture;
 
 // Custom hash function for char*
 struct CharPtrHash {
@@ -407,7 +416,7 @@ int compile_shader(const char* vertex_shader_path, const char* fragment_shader_p
 	return shader_id;
 }
 
-int load_image_into_texture_id(const char* image_path, bool use_nearest)
+int load_image_into_texture_id(const char* image_path)
 {
 	unsigned int texture;
 	int x, y, n;
@@ -415,24 +424,25 @@ int load_image_into_texture_id(const char* image_path, bool use_nearest)
 	stbi_set_flip_vertically_on_load(1);
 	byte* data = stbi_load(image_path, &x, &y, &n, 0);
 	ASSERT_TRUE(data != NULL, "Load texture");
+	ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
 
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 
-	GLint texture_mode = use_nearest ? GL_NEAREST : GL_LINEAR;
-
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texture_mode);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texture_mode);
 
-	ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
+	GLint filtering_mode = g_use_linear_texture_filtering ? GL_LINEAR : GL_NEAREST;
+	GLint mipmap_filtering_mode = g_use_linear_texture_filtering ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST;
 
-	GLint use_format = n == 3
-		? GL_RGB
-		: GL_RGBA;
+	if (g_generate_texture_mipmaps) glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mipmap_filtering_mode);
+	else glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filtering_mode);
 
+	GLint use_format = n == 3 ? GL_RGB : GL_RGBA;
 	glTexImage2D(GL_TEXTURE_2D, 0, use_format, x, y, 0, use_format, GL_UNSIGNED_BYTE, data);
+
+	if (g_generate_texture_mipmaps) glGenerateMipmap(GL_TEXTURE_2D);
+
 	stbi_image_free(data);
 	return texture;
 }
@@ -493,10 +503,13 @@ void draw_mesh(Mesh* mesh)
 	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader, "projection");
 	unsigned int camera_view_loc = glGetUniformLocation(g_mesh_shader, "viewPos");
 
-	unsigned int ambient_loc = glGetUniformLocation(g_mesh_shader, "ambientLight");
+	unsigned int ambient_loc = glGetUniformLocation(g_mesh_shader, "global_ambient_light");
 	unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, "light.position");
 	unsigned int light_diff_loc = glGetUniformLocation(g_mesh_shader, "light.diffuse");
 	unsigned int light_spec_loc = glGetUniformLocation(g_mesh_shader, "light.specular");
+
+	unsigned int light_linear_loc = glGetUniformLocation(g_mesh_shader, "light.linear");
+	unsigned int light_quadratic_loc = glGetUniformLocation(g_mesh_shader, "light.quadratic");
 
 	unsigned int use_texture_loc = glGetUniformLocation(g_mesh_shader, "use_texture");
 	unsigned int use_gloss_texture_loc = glGetUniformLocation(g_mesh_shader, "use_specular_texture");
@@ -521,6 +534,8 @@ void draw_mesh(Mesh* mesh)
 	glUniform3f(light_pos_loc, g_light.position.x, g_light.position.y, g_light.position.z);
 	glUniform3f(light_diff_loc, g_light.diffuse.x, g_light.diffuse.y, g_light.diffuse.z);
 	glUniform1f(light_spec_loc, g_light.specular);
+	glUniform1f(light_linear_loc, g_light.linear);
+	glUniform1f(light_quadratic_loc, g_light.quadratic);
 
 	Material* material = mesh->material;
 	glUniform1f(material_shine_loc, material->shininess);
@@ -1535,7 +1550,7 @@ void load_scene()
 
 Texture texture_load_from_filepath(char* path)
 {
-	int texture_id = load_image_into_texture_id(path, true);
+	int texture_id = load_image_into_texture_id(path);
 	char* file_name = strrchr(const_cast<char*>(path), '\\');
 	file_name++;
 	ASSERT_TRUE(file_name, "Filename from file path");
@@ -1755,7 +1770,10 @@ int main(int argc, char* argv[])
 
 	// Init textures/materials
 	{
-		pointlight_texture = texture_load_from_filepath(const_cast<char*>(billboard_image_path));
+		g_use_linear_texture_filtering = true;
+		g_generate_texture_mipmaps = true;
+		pointlight_texture = texture_load_from_filepath(const_cast<char*>(pointlight_image_path));
+		spotlight_texture = texture_load_from_filepath(const_cast<char*>(spotlight_image_path));
 
 		std::filesystem::path directory_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
 		ASSERT_TRUE(std::filesystem::is_directory(directory_path), "Valid materials directory");
@@ -1793,6 +1811,8 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	g_use_linear_texture_filtering = false;
+	g_generate_texture_mipmaps = false;
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 
@@ -2282,7 +2302,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Draw lights
-		draw_billboard(g_light.position, pointlight_texture, 0.35f);
+		draw_billboard(g_light.position, pointlight_texture, 0.5f);
 
 		// Transformation mode debug lines
 		if (g_selected_mesh != nullptr && g_transform_mode.is_active)

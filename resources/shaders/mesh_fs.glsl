@@ -4,6 +4,8 @@ struct Light {
     vec3 position;
     vec3 diffuse;
     float specular;
+    float linear;
+    float quadratic;
 };
 
 struct Material {
@@ -23,14 +25,14 @@ uniform vec3 viewPos; // Camera (view) position
 
 uniform Light light;
 uniform Material material;
-uniform vec3 ambientLight;
+uniform vec3 global_ambient_light;
 
 out vec4 FragColor;
 
 void main()
 {
     // ambient
-    vec3 ambient = ambientLight * texture(material.color_texture, TexCoord).rgb;
+    vec3 ambient = global_ambient_light * texture(material.color_texture, TexCoord).rgb;
 
     // diffuse
     vec3 norm = normalize(fragNormal);
@@ -38,8 +40,8 @@ void main()
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = light.diffuse * diff * texture(material.color_texture, TexCoord).rgb;
 
+    // Specular
     vec3 specular = vec3(0,0,0);
-
     if (use_specular_texture)
     {
         vec3 viewDir = normalize(viewPos - fragPos);
@@ -48,6 +50,12 @@ void main()
         specular = light.specular * spec * texture(material.specular_texture, TexCoord).rgb;
         specular = specular * material.specular_mult;
     }
+
+    // Point light
+    float distance = length(light.position - fragPos);
+    float attenuation = 1.0 / (1.0 + light.linear * distance + light.quadratic * (distance * distance));
+    diffuse  *= attenuation;
+    specular *= attenuation;
 
     // Result
     vec3 color_result = ambient + diffuse + specular;
