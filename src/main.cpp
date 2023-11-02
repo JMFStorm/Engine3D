@@ -1966,7 +1966,12 @@ int main(int argc, char* argv[])
 				}
 				else if (g_selected_object.type == E::Light)
 				{
+					Light* selected_light_ptr = (Light*)get_selected_object_ptr();
+
 					ImGui::Text("Light properties");
+					ImGui::InputFloat3("Light pos", &selected_light_ptr->position[0], "%.3f");
+					ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
+					ImGui::InputFloat3("Light diffuse", &selected_light_ptr->diffuse[0], "%.3f");
 				}
 
 				ImGui::Text("Editor settings");
@@ -1974,14 +1979,11 @@ int main(int argc, char* argv[])
 				ImGui::InputFloat("Rotation clip", &g_user_settings.transform_rotation_clip, 0, 0, "%.2f");
 
 				ImGui::Text("Scene settings");
+				ImGui::InputFloat3("Global ambient", &g_user_settings.world_ambient[0], "%.3f");
 
 				Light* pointlight = j_array_get(&g_scene_lights, 0);
 
-				ImGui::Text("Light");
-				ImGui::InputFloat3("Global ambient", &g_user_settings.world_ambient[0], "%.3f");
-				ImGui::InputFloat3("Light pos", &pointlight->position[0], "%.3f");
-				ImGui::InputFloat("Light specular", &pointlight->specular, 0, 0, "%.3f");
-				ImGui::InputFloat3("Light diffuse", &pointlight->diffuse[0], "%.3f");
+				
 
 				ImGui::Text("Game window");
 				ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);
@@ -2396,10 +2398,6 @@ int main(int argc, char* argv[])
 			draw_mesh(&plane);
 		}
 
-		// Draw lights
-		auto pointlight = *j_array_get(&g_scene_lights, 0);
-		draw_billboard(pointlight.position, pointlight_texture, 0.5f);
-
 		// Transformation mode debug lines
 		if (g_selected_object.type != E::None && g_transform_mode.is_active)
 		{
@@ -2442,9 +2440,18 @@ int main(int argc, char* argv[])
 			else if (g_selected_object.type == E::Light)
 			{
 				Light* selected_light = (Light*)get_selected_object_ptr();
+				Mesh as_cube = {};
+				as_cube.mesh_type = E::Cube;
+				as_cube.scale = vec3(0.35f);
+				as_cube.translation = selected_light->position;
+				draw_mesh_wireframe(&as_cube, glm::vec3(1.0f));
 				draw_selection_arrows(selected_light->position);
 			}
 		}
+
+		// Draw billboards
+		auto pointlight = *j_array_get(&g_scene_lights, 0);
+		draw_billboard(pointlight.position, pointlight_texture, 0.5f);
 
 		// Click ray
 		auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
