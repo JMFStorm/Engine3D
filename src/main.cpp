@@ -499,15 +499,10 @@ void draw_mesh(Mesh* mesh)
 	unsigned int model_loc = glGetUniformLocation(g_mesh_shader, "model");
 	unsigned int view_loc = glGetUniformLocation(g_mesh_shader, "view");
 	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader, "projection");
-	unsigned int camera_view_loc = glGetUniformLocation(g_mesh_shader, "viewPos");
+	unsigned int camera_view_loc = glGetUniformLocation(g_mesh_shader, "view_coords");
 
 	unsigned int ambient_loc = glGetUniformLocation(g_mesh_shader, "global_ambient_light");
-	unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, "light.position");
-	unsigned int light_diff_loc = glGetUniformLocation(g_mesh_shader, "light.diffuse");
-	unsigned int light_spec_loc = glGetUniformLocation(g_mesh_shader, "light.specular");
-
-	unsigned int light_linear_loc = glGetUniformLocation(g_mesh_shader, "light.linear");
-	unsigned int light_quadratic_loc = glGetUniformLocation(g_mesh_shader, "light.quadratic");
+	unsigned int pointlights_count_loc = glGetUniformLocation(g_mesh_shader, "pointlights_count");
 
 	unsigned int use_texture_loc = glGetUniformLocation(g_mesh_shader, "use_texture");
 	unsigned int use_gloss_texture_loc = glGetUniformLocation(g_mesh_shader, "use_specular_texture");
@@ -529,13 +524,40 @@ void draw_mesh(Mesh* mesh)
 	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
 	glUniform3f(camera_view_loc, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 
-	auto pointlight = *j_array_get(&g_scene_lights, 0);
+	// Point lights
+	{
+		glUniform1i(pointlights_count_loc, g_scene_lights.items_count);
+		char str_value[128] = {0};
 
-	glUniform3f(light_pos_loc, pointlight.position.x, pointlight.position.y, pointlight.position.z);
-	glUniform3f(light_diff_loc, pointlight.diffuse.x, pointlight.diffuse.y, pointlight.diffuse.z);
-	glUniform1f(light_spec_loc, pointlight.specular);
-	glUniform1f(light_linear_loc, pointlight.linear);
-	glUniform1f(light_quadratic_loc, pointlight.quadratic);
+		for (int i = 0; i < g_scene_lights.items_count; i++)
+		{
+			auto pointlight = *j_array_get(&g_scene_lights, i);
+			sprintf_s(str_value, "pointlights[%d].position", i);
+			unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, str_value);
+
+			memset(str_value, 0, sizeof(str_value));
+			sprintf_s(str_value, "pointlights[%d].diffuse", i);
+			unsigned int light_diff_loc = glGetUniformLocation(g_mesh_shader, str_value);
+
+			memset(str_value, 0, sizeof(str_value));
+			sprintf_s(str_value, "pointlights[%d].specular", i);
+			unsigned int light_spec_loc = glGetUniformLocation(g_mesh_shader, str_value);
+
+			memset(str_value, 0, sizeof(str_value));
+			sprintf_s(str_value, "pointlights[%d].linear", i);
+			unsigned int light_linear_loc = glGetUniformLocation(g_mesh_shader, str_value);
+
+			memset(str_value, 0, sizeof(str_value));
+			sprintf_s(str_value, "pointlights[%d].quadratic", i);
+			unsigned int light_quadratic_loc = glGetUniformLocation(g_mesh_shader, str_value);
+
+			glUniform3f(light_pos_loc, pointlight.position.x, pointlight.position.y, pointlight.position.z);
+			glUniform3f(light_diff_loc, pointlight.diffuse.x, pointlight.diffuse.y, pointlight.diffuse.z);
+			glUniform1f(light_spec_loc, pointlight.specular);
+			glUniform1f(light_linear_loc, pointlight.linear);
+			glUniform1f(light_quadratic_loc, pointlight.quadratic);
+		}
+	}
 
 	Material* material = mesh->material;
 	glUniform1f(material_shine_loc, material->shininess);
@@ -1259,12 +1281,22 @@ s64 add_new_light(Light new_light)
 	return new_index;
 }
 
-void duplicate_mesh(s64 plane_index)
+void duplicate_selected_object()
 {
-	Mesh mesh_copy = *j_array_get(&g_scene_meshes, plane_index);
-	s64 index = add_new_mesh(mesh_copy);
-	g_selected_object.type = E::Mesh;
-	g_selected_object.selection_index = index;
+	if (g_selected_object.type == E::Mesh)
+	{
+		Mesh mesh_copy = *j_array_get(&g_scene_meshes, g_selected_object.selection_index);
+		s64 index = add_new_mesh(mesh_copy);
+		g_selected_object.type = E::Mesh;
+		g_selected_object.selection_index = index;
+	}
+	else if (g_selected_object.type == E::Light)
+	{
+		Light light_copy = *j_array_get(&g_scene_lights, g_selected_object.selection_index);
+		s64 index = add_new_light(light_copy);
+		g_selected_object.type = E::Light;
+		g_selected_object.selection_index = index;
+	}
 }
 
 void select_object_index(E::SelectedType type, s64 index)
@@ -2062,14 +2094,15 @@ int main(int argc, char* argv[])
 					s64 new_light_index = add_new_light(new_pointlight);
 					select_object_index(E::Light, new_light_index);
 				}
-
-				char selected_mesh_str[24];
-				sprintf_s(selected_mesh_str, "Plane index: %lld", g_selected_object.selection_index);
-				ImGui::Text(selected_mesh_str);
 				
 				if (g_selected_object.type == E::Mesh)
 				{
+					char selected_mesh_str[24];
+					sprintf_s(selected_mesh_str, "Mesh index: %lld", g_selected_object.selection_index);
+					ImGui::Text(selected_mesh_str);
+
 					Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
+
 					ImGui::Text("Mesh properties");
 					ImGui::InputFloat3("Translation", &selected_mesh_ptr->translation[0], "%.2f");
 					ImGui::InputFloat3("Rotation", &selected_mesh_ptr->rotation[0], "%.2f");
@@ -2091,12 +2124,18 @@ int main(int argc, char* argv[])
 				}
 				else if (g_selected_object.type == E::Light)
 				{
+					char selected_light_str[24];
+					sprintf_s(selected_light_str, "Light index: %lld", g_selected_object.selection_index);
+					ImGui::Text(selected_light_str);
+
 					Light* selected_light_ptr = (Light*)get_selected_object_ptr();
 
 					ImGui::Text("Light properties");
 					ImGui::InputFloat3("Light pos", &selected_light_ptr->position[0], "%.3f");
-					ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
 					ImGui::InputFloat3("Light diffuse", &selected_light_ptr->diffuse[0], "%.3f");
+					ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
+					ImGui::InputFloat("Light quadratic", &selected_light_ptr->quadratic, 0, 0, "%.3f");
+					ImGui::InputFloat("Light linear", &selected_light_ptr->linear, 0, 0, "%.3f");
 				}
 
 				ImGui::Text("Editor settings");
@@ -2160,9 +2199,9 @@ int main(int argc, char* argv[])
 		g_frame_data.mouse_x = xpos;
 		g_frame_data.mouse_y = ypos;
 
-		int current_game_second = (int)g_game_metrics.game_time;
+		s64 current_game_second = (s64)g_game_metrics.game_time;
 
-		if (current_game_second - g_game_metrics.fps_prev_second > 0)
+		if (0 < current_game_second - g_game_metrics.fps_prev_second)
 		{
 			g_game_metrics.fps = g_game_metrics.fps_frames;
 			g_game_metrics.fps_frames = 0;
@@ -2282,7 +2321,7 @@ int main(int argc, char* argv[])
 		if (has_object_selection())
 		{
 			if		(g_inputs.as_struct.del.pressed) delete_selected_object();
-			else if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.d.pressed) duplicate_mesh(g_selected_object.selection_index);
+			else if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.d.pressed) duplicate_selected_object();
 		}
 
 		// Transformation mode start
@@ -2343,6 +2382,10 @@ int main(int argc, char* argv[])
 
 				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
 				else selected_mesh_ptr->scale = g_new_scale;
+
+				if (selected_mesh_ptr->scale.x < 0.01f) selected_mesh_ptr->scale.x = 0.01f;
+				if (selected_mesh_ptr->scale.y < 0.01f) selected_mesh_ptr->scale.y = 0.01f;
+				if (selected_mesh_ptr->scale.z < 0.01f) selected_mesh_ptr->scale.z = 0.01f;
 			}
 			else if (intersection && g_transform_mode.transformation == Transformation::Rotate)
 			{
