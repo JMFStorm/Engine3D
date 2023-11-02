@@ -1224,9 +1224,23 @@ void delete_mesh(s64 mesh_index)
 	Mesh* last_mesh = j_array_get(&g_scene_meshes, g_scene_meshes.items_count - 1);
 	j_array_replace(&g_scene_meshes, *last_mesh, mesh_index);
 	j_array_pop_back(&g_scene_meshes);
-
 	g_selected_object.selection_index = -1;
 	g_selected_object.type = E::None;
+}
+
+void delete_light(s64 light_index)
+{
+	Light* last_light = j_array_get(&g_scene_lights, g_scene_lights.items_count - 1);
+	j_array_replace(&g_scene_lights, *last_light, light_index);
+	j_array_pop_back(&g_scene_lights);
+	g_selected_object.selection_index = -1;
+	g_selected_object.type = E::None;
+}
+
+void delete_selected_object()
+{
+	if		(g_selected_object.type == E::Mesh) delete_mesh(g_selected_object.selection_index);
+	else if (g_selected_object.type == E::Light) delete_light(g_selected_object.selection_index);
 }
 
 s64 add_new_mesh(Mesh new_mesh)
@@ -1238,11 +1252,17 @@ s64 add_new_mesh(Mesh new_mesh)
 	return new_index;
 }
 
+s64 add_new_light(Light new_light)
+{
+	j_array_add(&g_scene_lights, new_light);
+	s64 new_index = g_scene_lights.items_count - 1;
+	return new_index;
+}
+
 void duplicate_mesh(s64 plane_index)
 {
 	Mesh mesh_copy = *j_array_get(&g_scene_meshes, plane_index);
 	s64 index = add_new_mesh(mesh_copy);
-
 	g_selected_object.type = E::Mesh;
 	g_selected_object.selection_index = index;
 }
@@ -1258,6 +1278,7 @@ void select_object_index(E::SelectedType type, s64 index)
 		auto selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
 		g_selected_texture_item = selected_texture_name;
 	}
+	else if (type == E::Light) g_transform_mode.transformation = Transformation::Translate;
 }
 
 void deselect_current_mesh()
@@ -1487,12 +1508,94 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
+bool try_init_transform_mode()
+{
+	bool has_valid_mode = g_transform_mode.transformation == Transformation::Translate
+		|| (g_transform_mode.transformation == Transformation::Rotate && g_selected_object.type == E::Mesh)
+		|| (g_transform_mode.transformation == Transformation::Scale && g_selected_object.type == E::Mesh);
+
+	if (!has_valid_mode) return false;
+
+	if		(g_inputs.as_struct.x.is_down) g_transform_mode.axis = E::Axis::X;
+	else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = E::Axis::Y;
+	else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = E::Axis::Z;
+
+	double xpos, ypos;
+	glfwGetCursorPos(g_window, &xpos, &ypos);
+
+	glm::vec3 intersection_point;
+	std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
+	g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
+
+	Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
+
+	if (g_transform_mode.transformation == Transformation::Translate)
+	{
+		g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
+
+		bool intersection = calculate_plane_ray_intersection(
+			g_normal_for_ray_intersect,
+			selected_mesh_ptr->translation,
+			g_scene_camera.position,
+			g_used_transform_ray,
+			intersection_point);
+
+		if (!intersection) return false;
+
+		g_prev_intersection = intersection_point;
+		g_new_translation = selected_mesh_ptr->translation;
+	}
+	else if (g_transform_mode.transformation == Transformation::Scale)
+	{
+		glm::mat4 model = get_rotation_matrix(selected_mesh_ptr);
+
+		use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
+		use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
+
+		g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
+
+		bool intersection = calculate_plane_ray_intersection(
+			g_normal_for_ray_intersect,
+			selected_mesh_ptr->translation,
+			g_scene_camera.position,
+			g_used_transform_ray,
+			intersection_point);
+
+		if (!intersection) return false;
+
+		glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
+		used_normal = model * glm::vec4(used_normal, 1.0f);
+
+		glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, selected_mesh_ptr->translation, used_normal);
+		g_prev_point_on_scale_plane = point_on_scale_plane;
+		g_new_scale = selected_mesh_ptr->scale;
+	}
+	else if (g_transform_mode.transformation == Transformation::Rotate)
+	{
+		g_normal_for_ray_intersect = get_normal_for_axis(g_transform_mode.axis);
+
+		bool intersection = calculate_plane_ray_intersection(
+			g_normal_for_ray_intersect,
+			selected_mesh_ptr->translation,
+			g_scene_camera.position,
+			g_used_transform_ray,
+			intersection_point);
+
+		if (!intersection) return false;
+
+		g_prev_intersection = intersection_point;
+		g_new_rotation = selected_mesh_ptr->rotation;
+	}
+
+	return true;
+}
+
 Material material_init(Texture* color_ptr, Texture* specular_ptr)
 {
 	Material material = {
 		.color_texture = color_ptr,
 		.specular_texture = specular_ptr,
-		.specular_mult = 1.0f,
+		.specular_mult = 0.5f,
 		.shininess = 32.0f,
 	};
 	return material;
@@ -1599,6 +1702,11 @@ void load_scene()
 	printf("Scene loaded.\n");
 }
 
+inline bool has_object_selection()
+{
+	return g_selected_object.type != E::None;
+}
+
 Texture texture_load_from_filepath(char* path)
 {
 	int texture_id = load_image_into_texture_id(path);
@@ -1612,6 +1720,26 @@ Texture texture_load_from_filepath(char* path)
 	};
 	memcpy(texture.file_name, file_name, name_len);
 	return texture;
+}
+
+Light pointlight_init()
+{
+	Light p_light = {
+		.position = glm::vec3(0.0f, 0.0f, 0.0f),
+		.diffuse = glm::vec3(1.0f),
+		.specular = 0.25f,
+		.linear = 0.35f,
+		.quadratic = 0.44f
+	};
+	return p_light;
+}
+
+Transformation get_curr_transformation_mode()
+{
+	if (g_inputs.as_struct.q.pressed) return Transformation::Translate;
+	if (g_inputs.as_struct.w.pressed && g_selected_object.type == E::Mesh) return Transformation::Rotate;
+	if (g_inputs.as_struct.e.pressed && g_selected_object.type == E::Mesh) return Transformation::Scale;
+	return g_transform_mode.transformation;
 }
 
 int main(int argc, char* argv[])
@@ -1882,16 +2010,6 @@ int main(int argc, char* argv[])
 	load_scene();
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 
-	Light pointlight_01 = {
-		.position = glm::vec3(0.0f, 4.0f, 0.0f),
-		.diffuse = glm::vec3(1.0f),
-		.specular = 0.25f,
-		.linear = 0.35f,
-		.quadratic = 0.44f
-	};
-
-	j_array_add(&g_scene_lights, pointlight_01);
-
 	while (!glfwWindowShouldClose(g_window))
 	{
 		glfwPollEvents();
@@ -1938,6 +2056,13 @@ int main(int argc, char* argv[])
 					select_object_index(E::Mesh, new_mesh_index);
 				}
 
+				if (ImGui::Button("Add pointlight"))
+				{
+					Light new_pointlight = pointlight_init();
+					s64 new_light_index = add_new_light(new_pointlight);
+					select_object_index(E::Light, new_light_index);
+				}
+
 				char selected_mesh_str[24];
 				sprintf_s(selected_mesh_str, "Plane index: %lld", g_selected_object.selection_index);
 				ImGui::Text(selected_mesh_str);
@@ -1980,10 +2105,6 @@ int main(int argc, char* argv[])
 
 				ImGui::Text("Scene settings");
 				ImGui::InputFloat3("Global ambient", &g_user_settings.world_ambient[0], "%.3f");
-
-				Light* pointlight = j_array_get(&g_scene_lights, 0);
-
-				
 
 				ImGui::Text("Game window");
 				ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);
@@ -2048,10 +2169,9 @@ int main(int argc, char* argv[])
 			g_game_metrics.fps_prev_second = current_game_second;
 		}
 
-		if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.s.pressed)
-		{
-			save_scene();
-		}
+		if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.s.pressed) save_scene();
+
+		g_transform_mode.transformation = get_curr_transformation_mode();
 
 		if (g_inputs.as_struct.mouse1.pressed)
 		{
@@ -2106,18 +2226,11 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		if (g_inputs.as_struct.mouse2.pressed && clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y))
-		{
-			g_camera_move_mode = true;
-		}
-		else if (!g_inputs.as_struct.mouse2.is_down)
-		{
-			g_camera_move_mode = false;
+		bool camera_mode_start = g_inputs.as_struct.mouse2.pressed
+			&& clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y);
 
-			if		(g_inputs.as_struct.q.pressed) g_transform_mode.transformation = Transformation::Translate;
-			else if (g_inputs.as_struct.w.pressed) g_transform_mode.transformation = Transformation::Rotate;
-			else if (g_inputs.as_struct.e.pressed) g_transform_mode.transformation = Transformation::Scale;
-		}
+		if (camera_mode_start) g_camera_move_mode = true;
+		else if (!g_inputs.as_struct.mouse2.is_down) g_camera_move_mode = false;
 
 		if (g_camera_move_mode)
 		{
@@ -2164,111 +2277,19 @@ int main(int argc, char* argv[])
 				g_scene_camera.position += glm::normalize(glm::cross(g_scene_camera.front_vec, g_scene_camera.up_vec)) * speed_mult;
 			}
 		}
-		else
-		{
-			glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-		}
+		else glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
-		if (g_selected_object.type != E::None)
+		if (has_object_selection())
 		{
-			if (g_inputs.as_struct.del.pressed)
-			{
-				delete_mesh(g_selected_object.selection_index);
-			}
-			else if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.d.pressed)
-			{
-				duplicate_mesh(g_selected_object.selection_index);
-			}
+			if		(g_inputs.as_struct.del.pressed) delete_selected_object();
+			else if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.d.pressed) duplicate_mesh(g_selected_object.selection_index);
 		}
 
 		// Transformation mode start
-		if (g_selected_object.type != E::None
-			&& (g_inputs.as_struct.z.pressed || g_inputs.as_struct.x.pressed || g_inputs.as_struct.c.pressed))
+		if (has_object_selection()
+			&& (g_inputs.as_struct.x.pressed || g_inputs.as_struct.z.pressed || g_inputs.as_struct.c.pressed))
 		{
-			g_transform_mode.is_active = true;
-
-			if		(g_inputs.as_struct.x.is_down) g_transform_mode.axis = E::Axis::X;
-			else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = E::Axis::Y;
-			else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = E::Axis::Z;
-
-			glm::vec3 intersection_point;
-			std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
-			g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
-
-			Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
-
-			if (g_transform_mode.transformation == Transformation::Translate)
-			{
-				g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
-
-				bool intersection = calculate_plane_ray_intersection(
-					g_normal_for_ray_intersect,
-					selected_mesh_ptr->translation,
-					g_scene_camera.position,
-					g_used_transform_ray,
-					intersection_point);
-
-				if (intersection)
-				{
-					g_prev_intersection = intersection_point;
-					g_new_translation = selected_mesh_ptr->translation;
-				}
-				else
-				{
-					g_transform_mode.is_active = false;
-				}
-			}
-			else if (g_transform_mode.transformation == Transformation::Scale)
-			{
-				glm::mat4 model = get_rotation_matrix(selected_mesh_ptr);
-
-				use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
-				use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
-
-				g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
-
-				bool intersection = calculate_plane_ray_intersection(
-					g_normal_for_ray_intersect,
-					selected_mesh_ptr->translation,
-					g_scene_camera.position,
-					g_used_transform_ray,
-					intersection_point);
-
-				if (intersection)
-				{
-					glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
-					used_normal = model * glm::vec4(used_normal, 1.0f);
-
-					glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, selected_mesh_ptr->translation, used_normal);
-					g_prev_point_on_scale_plane = point_on_scale_plane;
-					g_new_scale = selected_mesh_ptr->scale;
-				}
-				else
-				{
-					g_transform_mode.is_active = false;
-				}
-			}
-			else if (g_transform_mode.transformation == Transformation::Rotate)
-			{
-				g_normal_for_ray_intersect = get_normal_for_axis(g_transform_mode.axis);
-
-				bool intersection = calculate_plane_ray_intersection(
-					g_normal_for_ray_intersect,
-					selected_mesh_ptr->translation,
-					g_scene_camera.position,
-					g_used_transform_ray,
-					intersection_point);
-
-				if (intersection)
-				{
-					g_prev_intersection = intersection_point;
-					g_new_rotation = selected_mesh_ptr->rotation;
-				}
-				else
-				{
-					g_transform_mode.is_active = false;
-				}
-			}
+			g_transform_mode.is_active = try_init_transform_mode();
 		}
 		// Check transformation mode end
 		else if (g_transform_mode.is_active
@@ -2299,14 +2320,8 @@ int main(int argc, char* argv[])
 				vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
 				g_prev_intersection = intersection_point;
 
-				if (0.0f < g_user_settings.transform_clip)
-				{
-					selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
-				}
-				else
-				{
-					selected_mesh_ptr->translation = g_new_translation;
-				}
+				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
+				else selected_mesh_ptr->translation = g_new_translation;
 			}
 			else if (intersection && g_transform_mode.transformation == Transformation::Scale)
 			{
@@ -2326,14 +2341,8 @@ int main(int argc, char* argv[])
 
 				vec3_add_for_axis(g_new_scale, travel_dist, g_transform_mode.axis);
 
-				if (0.0f < g_user_settings.transform_clip)
-				{
-					selected_mesh_ptr->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
-				}
-				else
-				{
-					selected_mesh_ptr->scale = g_new_scale;
-				}
+				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
+				else selected_mesh_ptr->scale = g_new_scale;
 			}
 			else if (intersection && g_transform_mode.transformation == Transformation::Rotate)
 			{
@@ -2399,7 +2408,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Transformation mode debug lines
-		if (g_selected_object.type != E::None && g_transform_mode.is_active)
+		if (has_object_selection() && g_transform_mode.is_active)
 		{
 			// Scale mode
 			if (g_transform_mode.transformation == Transformation::Scale)
@@ -2429,7 +2438,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Draw selection
-		if (-1 < g_selected_object.selection_index)
+		if (has_object_selection())
 		{
 			if (g_selected_object.type == E::Mesh)
 			{
@@ -2450,8 +2459,11 @@ int main(int argc, char* argv[])
 		}
 
 		// Draw billboards
-		auto pointlight = *j_array_get(&g_scene_lights, 0);
-		draw_billboard(pointlight.position, pointlight_texture, 0.5f);
+		for (int i = 0; i < g_scene_lights.items_count; i++)
+		{
+			auto light = *j_array_get(&g_scene_lights, i);
+			draw_billboard(light.position, pointlight_texture, 0.5f);
+		}
 
 		// Click ray
 		auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
