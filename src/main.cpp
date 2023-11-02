@@ -264,8 +264,6 @@ struct CharPtrEqual {
 };
 std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map = {};
 
-Mesh* g_selected_mesh = nullptr;
-
 MemoryBuffer g_scene_meshes_memory = { 0 };
 JArray<Mesh> g_scene_meshes;
 
@@ -857,6 +855,21 @@ void draw_line_ontop(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thic
 	glBindVertexArray(0);
 }
 
+void* get_selected_object_ptr()
+{
+	if (g_selected_object.type == E::Mesh)
+	{
+		return (void*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
+	}
+
+	if (g_selected_object.type == E::Light)
+	{
+		return (void*)j_array_get(&g_scene_lights, g_selected_object.selection_index);
+	}
+
+	return nullptr;
+}
+
 void draw_selection_arrows(glm::vec3 position)
 {
 	auto vec_x = glm::vec3(1.0f, 0, 0);
@@ -883,7 +896,8 @@ void draw_selection_arrows(glm::vec3 position)
 	{
 		if (g_transform_mode.transformation == Transformation::Scale)
 		{
-			glm::mat4 rotation_mat = get_rotation_matrix(g_selected_mesh);
+			Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
+			glm::mat4 rotation_mat = get_rotation_matrix(mesh_ptr);
 			vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
 			vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
 			vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
@@ -1205,24 +1219,14 @@ bool clicked_scene_space(int x, int y)
 	return x < g_game_metrics.scene_width_px && y < g_game_metrics.scene_height_px;
 }
 
-void delete_mesh(s64 plane_index)
+void delete_mesh(s64 mesh_index)
 {
-	Mesh* last_plane = j_array_get(&g_scene_meshes, g_scene_meshes.items_count - 1);
-	j_array_replace(&g_scene_meshes, *last_plane, plane_index);
+	Mesh* last_mesh = j_array_get(&g_scene_meshes, g_scene_meshes.items_count - 1);
+	j_array_replace(&g_scene_meshes, *last_mesh, mesh_index);
 	j_array_pop_back(&g_scene_meshes);
 
 	g_selected_object.selection_index = -1;
 	g_selected_object.type = E::None;
-}
-
-void* get_selected_object_ptr()
-{
-	if (g_selected_object.type == E::Mesh)
-	{
-		return (void*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
-	}
-
-	return nullptr;
 }
 
 s64 add_new_mesh(Mesh new_mesh)
@@ -1241,16 +1245,19 @@ void duplicate_mesh(s64 plane_index)
 
 	g_selected_object.type = E::Mesh;
 	g_selected_object.selection_index = index;
-	g_selected_mesh = (Mesh*)get_selected_object_ptr();
 }
 
 void select_object_index(E::SelectedType type, s64 index)
 {
 	g_selected_object.type = type;
 	g_selected_object.selection_index = index;
-	g_selected_mesh = (Mesh*)get_selected_object_ptr();
-	auto selected_texture_name = g_materials_index_map[g_selected_mesh->material->color_texture->file_name];
-	g_selected_texture_item = selected_texture_name;
+
+	if (type == E::Mesh)
+	{
+		Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
+		auto selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
+		g_selected_texture_item = selected_texture_name;
+	}
 }
 
 void deselect_current_mesh()
@@ -1934,27 +1941,32 @@ int main(int argc, char* argv[])
 				char selected_mesh_str[24];
 				sprintf_s(selected_mesh_str, "Plane index: %lld", g_selected_object.selection_index);
 				ImGui::Text(selected_mesh_str);
-
-				if (g_selected_mesh != nullptr)
+				
+				if (g_selected_object.type == E::Mesh)
 				{
+					Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
 					ImGui::Text("Mesh properties");
-					ImGui::InputFloat3("Translation", &g_selected_mesh->translation[0], "%.2f");
-					ImGui::InputFloat3("Rotation", &g_selected_mesh->rotation[0], "%.2f");
-					ImGui::InputFloat3("Scale", &g_selected_mesh->scale[0], "%.2f");
+					ImGui::InputFloat3("Translation", &selected_mesh_ptr->translation[0], "%.2f");
+					ImGui::InputFloat3("Rotation", &selected_mesh_ptr->rotation[0], "%.2f");
+					ImGui::InputFloat3("Scale", &selected_mesh_ptr->scale[0], "%.2f");
 
 					ImGui::Text("Material");
-					ImGui::Image((ImTextureID)g_selected_mesh->material->color_texture->gpu_id, ImVec2(128, 128));
+					ImGui::Image((ImTextureID)selected_mesh_ptr->material->color_texture->gpu_id, ImVec2(128, 128));
 
 					char* texture_names_ptr = (char*)g_material_names.data;
 
 					if (ImGui::Combo("Material", &g_selected_texture_item, texture_names_ptr, g_material_names.strings_count))
 					{
-						g_selected_mesh->material = j_array_get(&g_materials, g_selected_texture_item);
+						selected_mesh_ptr->material = j_array_get(&g_materials, g_selected_texture_item);
 					}
 
-					ImGui::InputFloat("UV mult", &g_selected_mesh->uv_multiplier, 0, 0, "%.2f");
-					ImGui::InputFloat("Specular mult", &g_selected_mesh->material->specular_mult, 0, 0, "%.3f");
-					ImGui::InputFloat("Material shine", &g_selected_mesh->material->shininess, 0, 0, "%.3f");
+					ImGui::InputFloat("UV mult", &selected_mesh_ptr->uv_multiplier, 0, 0, "%.2f");
+					ImGui::InputFloat("Specular mult", &selected_mesh_ptr->material->specular_mult, 0, 0, "%.3f");
+					ImGui::InputFloat("Material shine", &selected_mesh_ptr->material->shininess, 0, 0, "%.3f");
+				}
+				else if (g_selected_object.type == E::Light)
+				{
+					ImGui::Text("Light properties");
 				}
 
 				ImGui::Text("Editor settings");
@@ -2076,7 +2088,7 @@ int main(int argc, char* argv[])
 				}
 				else if (mesh_index == -1 && 0 <= light_index)
 				{
-					printf("Light selected!\n");
+					select_object_index(E::Light, light_index);
 				}
 				else
 				{
@@ -2086,7 +2098,7 @@ int main(int argc, char* argv[])
 					}
 					else
 					{
-						printf("Light selected!\n");
+						select_object_index(E::Light, light_index);
 					}
 				}
 			}
@@ -2155,7 +2167,7 @@ int main(int argc, char* argv[])
 			glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 
-		if (g_selected_mesh != nullptr)
+		if (g_selected_object.type != E::None)
 		{
 			if (g_inputs.as_struct.del.pressed)
 			{
@@ -2168,7 +2180,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Transformation mode start
-		if (g_selected_mesh != nullptr
+		if (g_selected_object.type != E::None
 			&& (g_inputs.as_struct.z.pressed || g_inputs.as_struct.x.pressed || g_inputs.as_struct.c.pressed))
 		{
 			g_transform_mode.is_active = true;
@@ -2181,13 +2193,15 @@ int main(int argc, char* argv[])
 			std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
 			g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
+			Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
+
 			if (g_transform_mode.transformation == Transformation::Translate)
 			{
 				g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
 				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,
-					g_selected_mesh->translation,
+					selected_mesh_ptr->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
@@ -2195,7 +2209,7 @@ int main(int argc, char* argv[])
 				if (intersection)
 				{
 					g_prev_intersection = intersection_point;
-					g_new_translation = g_selected_mesh->translation;
+					g_new_translation = selected_mesh_ptr->translation;
 				}
 				else
 				{
@@ -2204,7 +2218,7 @@ int main(int argc, char* argv[])
 			}
 			else if (g_transform_mode.transformation == Transformation::Scale)
 			{
-				glm::mat4 model = get_rotation_matrix(g_selected_mesh);
+				glm::mat4 model = get_rotation_matrix(selected_mesh_ptr);
 
 				use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
 				use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
@@ -2213,7 +2227,7 @@ int main(int argc, char* argv[])
 
 				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,
-					g_selected_mesh->translation,
+					selected_mesh_ptr->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
@@ -2223,9 +2237,9 @@ int main(int argc, char* argv[])
 					glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
 					used_normal = model * glm::vec4(used_normal, 1.0f);
 
-					glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, g_selected_mesh->translation, used_normal);
+					glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, selected_mesh_ptr->translation, used_normal);
 					g_prev_point_on_scale_plane = point_on_scale_plane;
-					g_new_scale = g_selected_mesh->scale;
+					g_new_scale = selected_mesh_ptr->scale;
 				}
 				else
 				{
@@ -2238,7 +2252,7 @@ int main(int argc, char* argv[])
 
 				bool intersection = calculate_plane_ray_intersection(
 					g_normal_for_ray_intersect,
-					g_selected_mesh->translation,
+					selected_mesh_ptr->translation,
 					g_scene_camera.position,
 					g_used_transform_ray,
 					intersection_point);
@@ -2246,7 +2260,7 @@ int main(int argc, char* argv[])
 				if (intersection)
 				{
 					g_prev_intersection = intersection_point;
-					g_new_rotation = g_selected_mesh->rotation;
+					g_new_rotation = selected_mesh_ptr->rotation;
 				}
 				else
 				{
@@ -2266,9 +2280,11 @@ int main(int argc, char* argv[])
 			glm::vec3 intersection_point;
 			g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
+			Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
+
 			bool intersection = calculate_plane_ray_intersection(
 				g_normal_for_ray_intersect,
-				g_selected_mesh->translation,
+				selected_mesh_ptr->translation,
 				g_scene_camera.position,
 				g_used_transform_ray,
 				intersection_point);
@@ -2283,24 +2299,24 @@ int main(int argc, char* argv[])
 
 				if (0.0f < g_user_settings.transform_clip)
 				{
-					g_selected_mesh->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
+					selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
 				}
 				else
 				{
-					g_selected_mesh->translation = g_new_translation;
+					selected_mesh_ptr->translation = g_new_translation;
 				}
 			}
 			else if (intersection && g_transform_mode.transformation == Transformation::Scale)
 			{
-				glm::mat4 rotation_mat4 = get_rotation_matrix(g_selected_mesh);
+				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr);
 				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
 
 				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
-				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, g_selected_mesh->translation, used_normal);
+				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, selected_mesh_ptr->translation, used_normal);
 				g_point_on_scale_plane = point_on_scale_plane;
 
 				// Reverse the rotation by applying the inverse rotation matrix to the vector
-				glm::vec3 reversedVector =  glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
+				glm::vec3 reversedVector = glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
 				glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_prev_point_on_scale_plane, 1.0f);
 
 				glm::vec3 travel_dist = reversedVector - reversedVector2;
@@ -2310,20 +2326,20 @@ int main(int argc, char* argv[])
 
 				if (0.0f < g_user_settings.transform_clip)
 				{
-					g_selected_mesh->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
+					selected_mesh_ptr->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
 				}
 				else
 				{
-					g_selected_mesh->scale = g_new_scale;
+					selected_mesh_ptr->scale = g_new_scale;
 				}
 			}
 			else if (intersection && g_transform_mode.transformation == Transformation::Rotate)
 			{
-				auto new_line = g_debug_plane_intersection - g_selected_mesh->translation;
+				auto new_line = g_debug_plane_intersection - selected_mesh_ptr->translation;
 
 				if (0.15f < glm::length(new_line))
 				{
-					glm::vec3 prev_vec = glm::normalize(g_prev_intersection - g_selected_mesh->translation);
+					glm::vec3 prev_vec = glm::normalize(g_prev_intersection - selected_mesh_ptr->translation);
 					glm::vec3 current_vec = glm::normalize(new_line);
 
 					g_prev_intersection = g_debug_plane_intersection;
@@ -2353,16 +2369,16 @@ int main(int argc, char* argv[])
 
 							if (0.0f < g_user_settings.transform_rotation_clip)
 							{
-								g_selected_mesh->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
+								selected_mesh_ptr->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
 							}
 							else
 							{
-								g_selected_mesh->rotation = g_new_rotation;
+								selected_mesh_ptr->rotation = g_new_rotation;
 							}
 
-							g_selected_mesh->rotation.x = float_modulus_operation(g_selected_mesh->rotation.x, 360.0f);
-							g_selected_mesh->rotation.y = float_modulus_operation(g_selected_mesh->rotation.y, 360.0f);
-							g_selected_mesh->rotation.z = float_modulus_operation(g_selected_mesh->rotation.z, 360.0f);
+							selected_mesh_ptr->rotation.x = float_modulus_operation(selected_mesh_ptr->rotation.x, 360.0f);
+							selected_mesh_ptr->rotation.y = float_modulus_operation(selected_mesh_ptr->rotation.y, 360.0f);
+							selected_mesh_ptr->rotation.z = float_modulus_operation(selected_mesh_ptr->rotation.z, 360.0f);
 						}
 					}
 				}
@@ -2385,7 +2401,7 @@ int main(int argc, char* argv[])
 		draw_billboard(pointlight.position, pointlight_texture, 0.5f);
 
 		// Transformation mode debug lines
-		if (g_selected_mesh != nullptr && g_transform_mode.is_active)
+		if (g_selected_object.type != E::None && g_transform_mode.is_active)
 		{
 			// Scale mode
 			if (g_transform_mode.transformation == Transformation::Scale)
@@ -2402,7 +2418,8 @@ int main(int argc, char* argv[])
 			// Rotate mode
 			if (g_transform_mode.transformation == Transformation::Rotate)
 			{
-				draw_line(g_debug_plane_intersection, g_selected_mesh->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
+				Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
+				draw_line(g_debug_plane_intersection, selected_mesh_ptr->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
 			}
 		}
 
@@ -2416,19 +2433,17 @@ int main(int argc, char* argv[])
 		// Draw selection
 		if (-1 < g_selected_object.selection_index)
 		{
-			Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
-			auto model = get_model_matrix(selected_mesh);
-
-			if (selected_mesh->mesh_type == E::PrimitiveType::Plane)
+			if (g_selected_object.type == E::Mesh)
 			{
+				Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
 				draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
+				draw_selection_arrows(selected_mesh->translation);
 			}
-			else if (selected_mesh->mesh_type == E::PrimitiveType::Cube)
+			else if (g_selected_object.type == E::Light)
 			{
-				draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
+				Light* selected_light = (Light*)get_selected_object_ptr();
+				draw_selection_arrows(selected_light->position);
 			}
-
-			draw_selection_arrows(selected_mesh->translation);
 		}
 
 		// Click ray
