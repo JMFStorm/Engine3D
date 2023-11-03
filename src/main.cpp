@@ -249,14 +249,16 @@ struct CharPtrHash {
 		return std::hash<std::string_view>{}(str);
 	}
 };
-
 // Custom equality operator for char*
 struct CharPtrEqual {
 	bool operator()(const char* a, const char* b) const {
 		return std::strcmp(a, b) == 0;
 	}
 };
-std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map = {};
+
+static std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map = {};
+static std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_mat_data_map;
+static std::unordered_map<s64, char*> g_mat_data_map_inverse;
 
 MemoryBuffer g_scene_meshes_memory = { 0 };
 JArray<Mesh> g_scene_meshes;
@@ -1629,22 +1631,25 @@ Material material_init(Texture* color_ptr, Texture* specular_ptr)
 
 inline MeshData mesh_serialize(Mesh* mesh)
 {
+	s64 material_id = g_mat_data_map[mesh->material->color_texture->file_name];
+
 	MeshData data = {
-		.material_name = "",
 		.translation = mesh->translation,
 		.rotation = mesh->rotation,
 		.scale = mesh->scale,
 		.mesh_type = mesh->mesh_type,
+		.material_id = material_id,
 		.uv_multiplier = mesh->uv_multiplier,
 	};
-	strcpy_s(data.material_name, mesh->material->color_texture->file_name);
 	return data;
 }
 
-inline Mesh mesh_deserailize(MeshData data)
+inline Mesh mesh_deserialize(MeshData data)
 {
-	s64 material_index = g_materials_index_map[data.material_name];
+	char* material_name = g_mat_data_map_inverse[data.material_id];
+	s64 material_index = g_materials_index_map[material_name];
 	Material* material_ptr = j_array_get(&g_materials, material_index);
+
 	Mesh mesh = {
 		.translation = data.translation,
 		.rotation = data.rotation,
@@ -1728,7 +1733,7 @@ void load_scene()
 	{
 		MeshData m_data;
 		input_file.read(reinterpret_cast<char*>(&m_data), sizeof(m_data));
-		Mesh mesh = mesh_deserailize(m_data);
+		Mesh mesh = mesh_deserialize(m_data);
 		j_array_add(&g_scene_meshes, mesh);
 	}
 
@@ -1757,8 +1762,9 @@ inline bool has_object_selection()
 Texture texture_load_from_filepath(char* path)
 {
 	int texture_id = load_image_into_texture_id(path);
-	char* file_name = strrchr(const_cast<char*>(path), '\\');
+	char* file_name = strrchr(path, '\\');
 	file_name++;
+	str_trim_file_ext(file_name);
 	ASSERT_TRUE(file_name, "Filename from file path");
 	s64 name_len = strlen(file_name);
 	Texture texture = {
@@ -1791,12 +1797,13 @@ Transformation get_curr_transformation_mode()
 
 MaterialData material_serialize(Material material)
 {
+	s64 material_id = g_mat_data_map[material.color_texture->file_name];
+
 	MaterialData m_data = {
-		.material_name = "",
+		.material_id = material_id,
 		.specular_mult = material.specular_mult,
 		.shininess = material.shininess
 	};
-	strcpy_s(m_data.material_name, material.color_texture->file_name);
 	return m_data;
 }
 
@@ -1822,7 +1829,7 @@ void save_material(Material material)
 	char filepath[FILE_PATH_LEN] = { 0 };
 	sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename);
 
-	std::ofstream output_mat_file(filepath, std::ios::binary);
+	std::ofstream output_mat_file(filepath, std::ios::binary | std::ios::trunc);
 	ASSERT_TRUE(output_mat_file.is_open(), ".jmat file opened");
 
 	output_mat_file.write(".jmat", 5);
@@ -1838,9 +1845,13 @@ void save_all()
 		save_material(to_save);
 		printf("Mat saved.\n");
 	}
-
 	save_scene();
 }
+
+typedef struct MaterialIdData {
+	char material_name[FILENAME_LEN];
+	s64 material_id;
+} MaterialIdData;
 
 int main(int argc, char* argv[])
 {
@@ -2054,13 +2065,48 @@ int main(int argc, char* argv[])
 	{
 		g_use_linear_texture_filtering = true;
 		g_generate_texture_mipmaps = true;
-		pointlight_texture = texture_load_from_filepath(const_cast<char*>(pointlight_image_path));
-		spotlight_texture = texture_load_from_filepath(const_cast<char*>(spotlight_image_path));
 
+		char path_str[FILE_PATH_LEN] = { 0 };
+		strcpy_s(path_str, pointlight_image_path);
+		pointlight_texture = texture_load_from_filepath(path_str);
+
+		strcpy_s(path_str, spotlight_image_path);
+		spotlight_texture = texture_load_from_filepath(path_str);
+
+		char header[6] = { 0 };
+		char filepath[FILE_PATH_LEN] = { 0 };
+		const char* mat_data_filename = "materials.data";
+
+		s64 materials_count = 0;
+
+		// Read materials data file
+		{
+			sprintf_s(filepath, "%s\\%s", g_materials_dir_path, mat_data_filename);
+
+			std::ifstream mat_data_file(filepath, std::ios::in | std::ios::out | std::ios::app);
+			mat_data_file.read(header, 5);
+			ASSERT_TRUE(strcmp(header, ".data") == 0, "valid .data header");
+
+			s64 materials_data_count = 0;
+			mat_data_file.read(reinterpret_cast<char*>(&materials_data_count), sizeof(materials_data_count));
+
+			// Add existing materials from data file
+			for (int i = 0; i < materials_data_count; i++)
+			{
+				MaterialIdData existing_data = {};
+				mat_data_file.read(reinterpret_cast<char*>(&existing_data), sizeof(existing_data));
+
+				char* new_name_ptr = j_strings_add(&g_material_names, existing_data.material_name);
+				g_mat_data_map.insert(std::make_pair(new_name_ptr, existing_data.material_id));
+				g_mat_data_map_inverse.insert(std::make_pair(existing_data.material_id, new_name_ptr));
+				g_materials_index_map[new_name_ptr] = materials_count;
+				materials_count++;
+			}
+		}
+
+		// Read .jmat files
 		ASSERT_TRUE(std::filesystem::is_directory(g_materials_dir_path), "Valid materials directory");
 		const char* material_ext = ".jmat";
-
-		s64 material_index = 0;
 
 		for (const auto& entry : std::filesystem::directory_iterator(g_materials_dir_path))
 		{
@@ -2070,13 +2116,11 @@ int main(int argc, char* argv[])
 			// Material file
 			Material new_material;
 			auto filename = entry.path().stem().filename().string();
-			char filepath[FILE_PATH_LEN] = {0};
 			sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename.c_str());
 
 			std::ifstream input_mat_file(filepath, std::ios::binary);
 			ASSERT_TRUE(input_mat_file.is_open(), ".jmat file opened");
 
-			char header[6] = { 0 };
 			input_mat_file.read(header, 5);
 			bool valid_header = strcmp(header, ".jmat") == 0;
 			
@@ -2085,7 +2129,6 @@ int main(int argc, char* argv[])
 				MaterialData mat_data = {};
 				input_mat_file.read(reinterpret_cast<char*>(&mat_data), sizeof(mat_data));
 				new_material = material_deserialize(mat_data);
-				printf("Mat load\n");
 			}
 
 			// Texture images
@@ -2110,9 +2153,33 @@ int main(int argc, char* argv[])
 			if (!valid_header) new_material = material_init(color_texture_prt, specular_texture_ptr);
 			Material* new_material_prt = j_array_add(&g_materials, new_material);
 
-			char* new_str = j_strings_add(&g_material_names, color_texture.file_name);
-			g_materials_index_map[new_str] = material_index++;
-			printf("Material added: %s.\n", filename.c_str());
+			// Add new material as data
+			bool not_found = g_mat_data_map.find(color_texture.file_name) == g_mat_data_map.end();
+
+			if (not_found)
+			{
+				char* new_str = j_strings_add(&g_material_names, color_texture.file_name);
+				g_mat_data_map.insert(std::make_pair(new_str, materials_count));
+				g_mat_data_map_inverse.insert(std::make_pair(materials_count, new_str));
+				g_materials_index_map[new_str] = materials_count;
+				++materials_count;
+			}
+		}
+
+		// Add material ids to .data
+		sprintf_s(filepath, "%s\\%s", g_materials_dir_path, mat_data_filename);
+		std::ofstream mat_data_file(filepath, std::ios::binary | std::ios::trunc);
+		mat_data_file.write(".data", 5);
+		mat_data_file.write(reinterpret_cast<char*>(&materials_count), sizeof(materials_count));
+
+		for (const auto& mat_data : g_mat_data_map)
+		{
+			MaterialIdData new_data = {
+				.material_name = "",
+				.material_id = mat_data.second,
+			};
+			strcpy_s(new_data.material_name, mat_data.first);
+			mat_data_file.write(reinterpret_cast<char*>(&new_data), sizeof(new_data));
 		}
 	}
 

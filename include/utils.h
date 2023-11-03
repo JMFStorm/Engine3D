@@ -50,7 +50,7 @@ typedef struct Material {
 } Material;
 
 typedef struct MaterialData {
-	char material_name[FILENAME_LEN];
+	s64 material_id;
 	f32 specular_mult;
 	f32 shininess;
 } MaterialData;
@@ -65,11 +65,11 @@ typedef struct Mesh {
 } Mesh;
 
 typedef struct MeshData {
-	char material_name[FILENAME_LEN];
 	glm::vec3 translation;
 	glm::vec3 rotation;
 	glm::vec3 scale;
 	E::PrimitiveType mesh_type;
+	s64 material_id;
 	f32 uv_multiplier;
 } MeshData;
 
