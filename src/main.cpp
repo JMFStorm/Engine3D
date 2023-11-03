@@ -2093,7 +2093,7 @@ int main(int argc, char* argv[])
 			new_material.color_texture = color_texture_prt;
 
 			Texture* specular_texture_ptr = nullptr;
-			sprintf_s(filepath, "%s\\%s._specular.png", g_materials_dir_path, filename.c_str());
+			sprintf_s(filepath, "%s\\%s_specular.png", g_materials_dir_path, filename.c_str());
 			std::ifstream spec_file(filepath);
 
 			if (spec_file.good())
