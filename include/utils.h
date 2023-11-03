@@ -14,25 +14,21 @@ typedef long long			s64;
 typedef float				f32;
 typedef double				f64;
 
-namespace E
-{
-	enum SelectedType {
-		None,
-		Mesh,
-		Light
-	};
+constexpr const s64 E_Transform_Translate = 0;
+constexpr const s64 E_Transform_Rotate    = 1;
+constexpr const s64 E_Transform_Scale     = 2;
 
-	enum PrimitiveType {
-		Plane,
-		Cube
-	};
+constexpr const s64 E_Axis_X = 0;
+constexpr const s64 E_Axis_Y = 1;
+constexpr const s64 E_Axis_Z = 2;
 
-	enum Axis {
-		X,
-		Y,
-		Z
-	};
-}
+constexpr const s64 E_Type_None  = 0;
+constexpr const s64 E_Type_Mesh  = 1;
+constexpr const s64 E_Type_Light = 2;
+
+constexpr const s64 E_Primitive_Plane  = 0;
+constexpr const s64 E_Primitive_Cube   = 1;
+constexpr const s64 E_Primitive_Sphere = 2;
 
 constexpr const int FILE_PATH_LEN = 256;
 constexpr const int FILENAME_LEN = FILE_PATH_LEN / 4;
@@ -60,7 +56,7 @@ typedef struct Mesh {
 	glm::vec3 rotation;
 	glm::vec3 scale;
 	Material* material;
-	E::PrimitiveType mesh_type;
+	s64 mesh_type;
 	f32 uv_multiplier;
 } Mesh;
 
@@ -68,7 +64,7 @@ typedef struct MeshData {
 	glm::vec3 translation;
 	glm::vec3 rotation;
 	glm::vec3 scale;
-	E::PrimitiveType mesh_type;
+	s64 mesh_type;
 	s64 material_id;
 	f32 uv_multiplier;
 } MeshData;
@@ -83,7 +79,7 @@ typedef struct Light {
 
 typedef struct SceneSelection {
 	s64 selection_index;
-	E::SelectedType type;
+	s64 type;
 } SceneSelection;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
@@ -166,29 +162,29 @@ inline glm::mat4 get_rotation_matrix(Mesh* mesh)
 	return rotation_matrix;
 }
 
-inline float get_vec3_val_by_axis(glm::vec3 vec, E::Axis axis)
+inline float get_vec3_val_by_axis(glm::vec3 vec, s64 axis)
 {
-	if (axis == E::Axis::X) return vec.x;
-	if (axis == E::Axis::Y) return vec.y;
-	if (axis == E::Axis::Z) return vec.z;
+	if (axis == E_Axis_X) return vec.x;
+	if (axis == E_Axis_Y) return vec.y;
+	if (axis == E_Axis_Z) return vec.z;
 	return 0.0f;
 }
 
-void get_axis_xor(E::Axis axis, E::Axis xor_axises[]);
+void get_axis_xor(s64 axis, s64 xor_axises[]);
 
 glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal);
 
-std::array<glm::vec3, 2> get_axis_xor_normals(E::Axis axis);
+std::array<glm::vec3, 2> get_axis_xor_normals(s64 axis);
 
-std::array<float, 2> get_plane_axis_xor_rotations(E::Axis axis, Mesh* mesh);
+std::array<float, 2> get_plane_axis_xor_rotations(s64 axis, Mesh* mesh);
 
-glm::vec3 get_normal_for_axis(E::Axis axis);
+glm::vec3 get_normal_for_axis(s64 axis);
 
 glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
 
 glm::vec3 get_vec_for_largest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
 
-void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, E::Axis axis);
+void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, s64 axis);
 
 glm::vec3 get_plane_middle_point(Mesh mesh);
 

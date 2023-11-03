@@ -269,18 +269,12 @@ JArray<Light> g_scene_lights;
 
 SceneSelection g_selected_object = {
 	.selection_index = -1,
-	.type = E::None
-};
-
-enum Transformation {
-	Translate,
-	Rotate,
-	Scale
+	.type = E_Type_None,
 };
 
 typedef struct TransformationMode {
-	E::Axis axis;
-	Transformation transformation;
+	s64 axis;
+	s64 mode;
 	bool is_active;
 } TransformationMode;
 
@@ -561,7 +555,7 @@ void draw_mesh(Mesh* mesh)
 
 	s64 draw_indicies = 0;
 
-	if (mesh->mesh_type == E::PrimitiveType::Plane)
+	if (mesh->mesh_type == E_Primitive_Plane)
 	{
 		float vertices[] =
 		{
@@ -579,64 +573,64 @@ void draw_mesh(Mesh* mesh)
 		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
-	else if (mesh->mesh_type == E::PrimitiveType::Cube)
+	else if (mesh->mesh_type == E_Primitive_Cube)
 	{
 		float vertices[] =
 		{
-			 // Coords				 // UV			 // Plane normal
-			 // Ceiling
-			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  1.0f, 0.0f, // top right
-			-0.5f,  0.5f, -0.5f,	 0.0f, 1.0f,	 0.0f,  1.0f, 0.0f, // top left
-			-0.5f,  0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  1.0f, 0.0f, // bot left
-								 				    
-			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  1.0f, 0.0f, // top right
-			-0.5f,  0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  1.0f, 0.0f, // bot left 
-			 0.5f,  0.5f,  0.5f,	 1.0f, 0.0f,	 0.0f,  1.0f, 0.0f, // bot right
-								 
-			 // Floor
-			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, // bot left 
-			 0.5f, -0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, // top right
-			 0.5f, -0.5f,  0.5f,	 1.0f, 0.0f,	 0.0f, -1.0f, 0.0f, // bot right
+			// Coords				 // UV			 // Plane normal
+			// Ceiling
+			0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  1.0f, 0.0f, // top right
+		   -0.5f,  0.5f, -0.5f,	 0.0f, 1.0f,	 0.0f,  1.0f, 0.0f, // top left
+		   -0.5f,  0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  1.0f, 0.0f, // bot left
 
-			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, // bot left
-			-0.5f, -0.5f, -0.5f,	 0.0f, 1.0f,	 0.0f, -1.0f, 0.0f, // top left
-			 0.5f, -0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, // top right
+			0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  1.0f, 0.0f, // top right
+		   -0.5f,  0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  1.0f, 0.0f, // bot left 
+			0.5f,  0.5f,  0.5f,	 1.0f, 0.0f,	 0.0f,  1.0f, 0.0f, // bot right
 
-			 // North
-			-0.5f, -0.5f, -0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f, -1.0f, // bot left 
-			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f, -1.0f, // top right
-			 0.5f, -0.5f, -0.5f,	 1.0f, 0.0f,	 0.0f,  0.0f, -1.0f, // bot right
+			// Floor
+		   -0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, // bot left 
+			0.5f, -0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, // top right
+			0.5f, -0.5f,  0.5f,	 1.0f, 0.0f,	 0.0f, -1.0f, 0.0f, // bot right
 
-			-0.5f, -0.5f, -0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f, -1.0f, // bot left
-			-0.5f,  0.5f, -0.5f,	 0.0f, 1.0f,	 0.0f,  0.0f, -1.0f, // top left
-			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f, -1.0f, // top right
+		   -0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, // bot left
+		   -0.5f, -0.5f, -0.5f,	 0.0f, 1.0f,	 0.0f, -1.0f, 0.0f, // top left
+			0.5f, -0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, // top right
 
-			 // South
-			 0.5f,  0.5f,  0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f,  1.0f, // top right
-			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f,  1.0f, // bot left 
-			 0.5f, -0.5f,  0.5f,	 1.0f, 0.0f,	 0.0f,  0.0f,  1.0f, // bot right
-			
-			-0.5f,  0.5f,  0.5f,	 0.0f, 1.0f,	 0.0f,  0.0f,  1.0f, // top left
-			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f,  1.0f, // bot left
-			 0.5f,  0.5f,  0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f,  1.0f, // top right
+			// North
+		   -0.5f, -0.5f, -0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f, -1.0f, // bot left 
+			0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f, -1.0f, // top right
+			0.5f, -0.5f, -0.5f,	 1.0f, 0.0f,	 0.0f,  0.0f, -1.0f, // bot right
 
-			 // West
-			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	-1.0f,  0.0f,  0.0f, // bot left 
-			-0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	-1.0f,  0.0f,  0.0f, // top right
-			-0.5f, -0.5f, -0.5f,	 1.0f, 0.0f,	-1.0f,  0.0f,  0.0f, // bot right
-			
-			-0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	-1.0f,  0.0f,  0.0f, // bot left
-			-0.5f,  0.5f,  0.5f,	 0.0f, 1.0f,	-1.0f,  0.0f,  0.0f, // top left
-			-0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	-1.0f,  0.0f,  0.0f, // top right
+		   -0.5f, -0.5f, -0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f, -1.0f, // bot left
+		   -0.5f,  0.5f, -0.5f,	 0.0f, 1.0f,	 0.0f,  0.0f, -1.0f, // top left
+			0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f, -1.0f, // top right
 
-			 // East
-			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top right
-			 0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 1.0f,  0.0f,  0.0f, // bot left 
-			 0.5f, -0.5f, -0.5f,	 1.0f, 0.0f,	 1.0f,  0.0f,  0.0f, // bot right
-			
-			 0.5f,  0.5f,  0.5f,	 0.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top left
-			 0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 1.0f,  0.0f,  0.0f, // bot left
-			 0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top right
+			// South
+			0.5f,  0.5f,  0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f,  1.0f, // top right
+		   -0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f,  1.0f, // bot left 
+			0.5f, -0.5f,  0.5f,	 1.0f, 0.0f,	 0.0f,  0.0f,  1.0f, // bot right
+
+		   -0.5f,  0.5f,  0.5f,	 0.0f, 1.0f,	 0.0f,  0.0f,  1.0f, // top left
+		   -0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 0.0f,  0.0f,  1.0f, // bot left
+			0.5f,  0.5f,  0.5f,	 1.0f, 1.0f,	 0.0f,  0.0f,  1.0f, // top right
+
+			// West
+		   -0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	-1.0f,  0.0f,  0.0f, // bot left 
+		   -0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	-1.0f,  0.0f,  0.0f, // top right
+		   -0.5f, -0.5f, -0.5f,	 1.0f, 0.0f,	-1.0f,  0.0f,  0.0f, // bot right
+
+		   -0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	-1.0f,  0.0f,  0.0f, // bot left
+		   -0.5f,  0.5f,  0.5f,	 0.0f, 1.0f,	-1.0f,  0.0f,  0.0f, // top left
+		   -0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	-1.0f,  0.0f,  0.0f, // top right
+
+		   // East
+		   0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top right
+		   0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 1.0f,  0.0f,  0.0f, // bot left 
+		   0.5f, -0.5f, -0.5f,	 1.0f, 0.0f,	 1.0f,  0.0f,  0.0f, // bot right
+
+		   0.5f,  0.5f,  0.5f,	 0.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top left
+		   0.5f, -0.5f,  0.5f,	 0.0f, 0.0f,	 1.0f,  0.0f,  0.0f, // bot left
+		   0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top right
 		};
 
 		draw_indicies = 40;
@@ -664,7 +658,7 @@ void draw_mesh(Mesh* mesh)
 	glBindVertexArray(0);
 }
 
-void draw_mesh_wireframe(Mesh *mesh, glm::vec3 color)
+void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 {
 	glUseProgram(g_wireframe_shader);
 	glBindVertexArray(g_wireframe_vao);
@@ -685,7 +679,7 @@ void draw_mesh_wireframe(Mesh *mesh, glm::vec3 color)
 
 	s64 draw_indicies = 0;
 
-	if (mesh->mesh_type == E::PrimitiveType::Plane)
+	if (mesh->mesh_type == E_Primitive_Plane)
 	{
 		float vertices[] =
 		{
@@ -693,7 +687,7 @@ void draw_mesh_wireframe(Mesh *mesh, glm::vec3 color)
 			1.0f, 0.0f, 0.0f, // top right
 			0.0f, 0.0f, 0.0f, // top left
 			0.0f, 0.0f, 1.0f, // bot left
-							
+
 			1.0f, 0.0f, 0.0f, // top right
 			0.0f, 0.0f, 1.0f, // bot left 
 			1.0f, 0.0f, 1.0f, // bot right
@@ -711,7 +705,7 @@ void draw_mesh_wireframe(Mesh *mesh, glm::vec3 color)
 		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
-	else if (mesh->mesh_type == E::PrimitiveType::Cube)
+	else if (mesh->mesh_type == E_Primitive_Cube)
 	{
 		float vertices[] =
 		{
@@ -720,16 +714,16 @@ void draw_mesh_wireframe(Mesh *mesh, glm::vec3 color)
 			0.5f,  0.5f, -0.5f, // top right
 		   -0.5f,  0.5f, -0.5f, // top left
 		   -0.5f,  0.5f,  0.5f, // bot left
-							    
+
 			0.5f,  0.5f, -0.5f, // top right
 		   -0.5f,  0.5f,  0.5f, // bot left 
 			0.5f,  0.5f,  0.5f, // bot right
-							    
+
 			// Floor		    
 		   -0.5f, -0.5f,  0.5f, // bot left 
 			0.5f, -0.5f, -0.5f, // top right
 			0.5f, -0.5f,  0.5f, // bot right
-							    
+
 		   -0.5f, -0.5f,  0.5f, // bot left
 		   -0.5f, -0.5f, -0.5f, // top left
 			0.5f, -0.5f, -0.5f, // top right
@@ -875,12 +869,12 @@ void draw_line_ontop(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thic
 
 void* get_selected_object_ptr()
 {
-	if (g_selected_object.type == E::Mesh)
+	if (g_selected_object.type == E_Type_Mesh)
 	{
 		return (void*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
 	}
 
-	if (g_selected_object.type == E::Light)
+	if (g_selected_object.type == E_Type_Light)
 	{
 		return (void*)j_array_get(&g_scene_lights, g_selected_object.selection_index);
 	}
@@ -896,7 +890,7 @@ void draw_selection_arrows(glm::vec3 position)
 
 	constexpr float line_width = 14.0f;
 
-	if (g_transform_mode.transformation == Transformation::Rotate)
+	if (g_transform_mode.mode == E_Transform_Rotate)
 	{
 		auto start_x = position - vec_x * 0.5f;
 		auto start_y = position - vec_y * 0.5f;
@@ -912,7 +906,7 @@ void draw_selection_arrows(glm::vec3 position)
 	}
 	else
 	{
-		if (g_transform_mode.transformation == Transformation::Scale)
+		if (g_transform_mode.mode == E_Transform_Scale)
 		{
 			Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
 			glm::mat4 rotation_mat = get_rotation_matrix(mesh_ptr);
@@ -1243,7 +1237,7 @@ void delete_mesh(s64 mesh_index)
 	j_array_replace(&g_scene_meshes, *last_mesh, mesh_index);
 	j_array_pop_back(&g_scene_meshes);
 	g_selected_object.selection_index = -1;
-	g_selected_object.type = E::None;
+	g_selected_object.type = E_Type_None;
 }
 
 void delete_light(s64 light_index)
@@ -1252,13 +1246,13 @@ void delete_light(s64 light_index)
 	j_array_replace(&g_scene_lights, *last_light, light_index);
 	j_array_pop_back(&g_scene_lights);
 	g_selected_object.selection_index = -1;
-	g_selected_object.type = E::None;
+	g_selected_object.type = E_Type_None;
 }
 
 void delete_selected_object()
 {
-	if		(g_selected_object.type == E::Mesh) delete_mesh(g_selected_object.selection_index);
-	else if (g_selected_object.type == E::Light) delete_light(g_selected_object.selection_index);
+	if (g_selected_object.type == E_Type_Mesh) delete_mesh(g_selected_object.selection_index);
+	else if (g_selected_object.type == E_Type_Light) delete_light(g_selected_object.selection_index);
 }
 
 s64 add_new_mesh(Mesh new_mesh)
@@ -1279,40 +1273,40 @@ s64 add_new_light(Light new_light)
 
 void duplicate_selected_object()
 {
-	if (g_selected_object.type == E::Mesh)
+	if (g_selected_object.type == E_Type_Mesh)
 	{
 		Mesh mesh_copy = *j_array_get(&g_scene_meshes, g_selected_object.selection_index);
 		s64 index = add_new_mesh(mesh_copy);
-		g_selected_object.type = E::Mesh;
+		g_selected_object.type = E_Type_Mesh;
 		g_selected_object.selection_index = index;
 	}
-	else if (g_selected_object.type == E::Light)
+	else if (g_selected_object.type == E_Type_Light)
 	{
 		Light light_copy = *j_array_get(&g_scene_lights, g_selected_object.selection_index);
 		s64 index = add_new_light(light_copy);
-		g_selected_object.type = E::Light;
+		g_selected_object.type = E_Type_Light;
 		g_selected_object.selection_index = index;
 	}
 }
 
-void select_object_index(E::SelectedType type, s64 index)
+void select_object_index(s64 type, s64 index)
 {
 	g_selected_object.type = type;
 	g_selected_object.selection_index = index;
 
-	if (type == E::Mesh)
+	if (type == E_Type_Mesh)
 	{
 		Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
 		auto selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
 		g_selected_texture_item = selected_texture_name;
 	}
-	else if (type == E::Light) g_transform_mode.transformation = Transformation::Translate;
+	else if (type == E_Type_Light) g_transform_mode.mode = E_Transform_Translate;
 }
 
 void deselect_current_mesh()
 {
 	g_selected_object.selection_index = -1;
-	g_selected_object.type = E::None;
+	g_selected_object.type = E_Type_None;
 }
 
 bool calculate_plane_ray_intersection(
@@ -1354,13 +1348,13 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 		glm::vec3(0.0f,  0.0f, -1.0f)
 	};
 
-	E::Axis plane_axises[CUBE_PLANES_COUNT] = {
-		E::Axis::Y,
-		E::Axis::Y,
-		E::Axis::X,
-		E::Axis::X,
-		E::Axis::Z,
-		E::Axis::Z
+	s64 plane_axises[CUBE_PLANES_COUNT] = {
+		E_Axis_Y,
+		E_Axis_Y,
+		E_Axis_X,
+		E_Axis_X,
+		E_Axis_Z,
+		E_Axis_Z
 	};
 
 	glm::mat4 rotation_matrix = get_rotation_matrix(cube);
@@ -1388,7 +1382,7 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 		glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotation_matrix);
 		glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
 
-		E::Axis xor_axises[2] = {};
+		s64 xor_axises[2] = {};
 		get_axis_xor(current_axis, xor_axises);
 
 		float abs1 = std::abs(get_vec3_val_by_axis(local_intersection_point, xor_axises[0]));
@@ -1425,7 +1419,7 @@ s64 get_light_selection_index(JArray<Light> lights, f32* select_dist, glm::vec3 
 	{
 		as_light = j_array_get(&g_scene_lights, i);
 		as_cube = {};
-		as_cube.mesh_type = E::Cube;
+		as_cube.mesh_type = E_Primitive_Cube;
 		as_cube.translation = as_light->position;
 		as_cube.scale = vec3(0.35f);
 
@@ -1451,7 +1445,7 @@ s64 get_mesh_selection_index(JArray<Mesh> meshes, f32* select_dist, glm::vec3 ra
 	{
 		Mesh* mesh = j_array_get(&meshes, i);
 
-		if (mesh->mesh_type == E::PrimitiveType::Plane)
+		if (mesh->mesh_type == E_Primitive_Plane)
 		{
 			auto plane_up = glm::vec3(0.0f, 1.0f, 0.0f);
 			glm::mat4 rotationMatrix = get_rotation_matrix(mesh);
@@ -1491,7 +1485,7 @@ s64 get_mesh_selection_index(JArray<Mesh> meshes, f32* select_dist, glm::vec3 ra
 				}
 			}
 		}
-		else if (mesh->mesh_type == E::PrimitiveType::Cube)
+		else if (mesh->mesh_type == E_Primitive_Cube)
 		{
 			f32 new_select_dist;
 			bool selected_cube = get_cube_selection(mesh, &new_select_dist, ray_origin, ray_direction);
@@ -1538,15 +1532,15 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 
 bool try_init_transform_mode()
 {
-	bool has_valid_mode = g_transform_mode.transformation == Transformation::Translate
-		|| (g_transform_mode.transformation == Transformation::Rotate && g_selected_object.type == E::Mesh)
-		|| (g_transform_mode.transformation == Transformation::Scale && g_selected_object.type == E::Mesh);
+	bool has_valid_mode = g_transform_mode.mode == E_Transform_Translate
+		|| (g_transform_mode.mode == E_Transform_Rotate && g_selected_object.type == E_Type_Mesh)
+		|| (g_transform_mode.mode == E_Transform_Scale && g_selected_object.type == E_Type_Mesh);
 
 	if (!has_valid_mode) return false;
 
-	if		(g_inputs.as_struct.x.is_down) g_transform_mode.axis = E::Axis::X;
-	else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = E::Axis::Y;
-	else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = E::Axis::Z;
+	if (g_inputs.as_struct.x.is_down) g_transform_mode.axis = E_Axis_X;
+	else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = E_Axis_Y;
+	else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = E_Axis_Z;
 
 	double xpos, ypos;
 	glfwGetCursorPos(g_window, &xpos, &ypos);
@@ -1557,7 +1551,7 @@ bool try_init_transform_mode()
 
 	Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
 
-	if (g_transform_mode.transformation == Transformation::Translate)
+	if (g_transform_mode.mode == E_Transform_Translate)
 	{
 		g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
@@ -1573,7 +1567,7 @@ bool try_init_transform_mode()
 		g_prev_intersection = intersection_point;
 		g_new_translation = selected_mesh_ptr->translation;
 	}
-	else if (g_transform_mode.transformation == Transformation::Scale)
+	else if (g_transform_mode.mode == E_Transform_Scale)
 	{
 		glm::mat4 model = get_rotation_matrix(selected_mesh_ptr);
 
@@ -1598,7 +1592,7 @@ bool try_init_transform_mode()
 		g_prev_point_on_scale_plane = point_on_scale_plane;
 		g_new_scale = selected_mesh_ptr->scale;
 	}
-	else if (g_transform_mode.transformation == Transformation::Rotate)
+	else if (g_transform_mode.mode == E_Transform_Rotate)
 	{
 		g_normal_for_ray_intersect = get_normal_for_axis(g_transform_mode.axis);
 
@@ -1756,7 +1750,7 @@ inline void load_scene()
 
 inline bool has_object_selection()
 {
-	return g_selected_object.type != E::None;
+	return g_selected_object.type != E_Type_None;
 }
 
 Texture texture_load_from_filepath(char* path)
@@ -1787,12 +1781,12 @@ Light pointlight_init()
 	return p_light;
 }
 
-Transformation get_curr_transformation_mode()
+s64 get_curr_transformation_mode()
 {
-	if (g_inputs.as_struct.q.pressed) return Transformation::Translate;
-	if (g_inputs.as_struct.w.pressed && g_selected_object.type == E::Mesh) return Transformation::Rotate;
-	if (g_inputs.as_struct.e.pressed && g_selected_object.type == E::Mesh) return Transformation::Scale;
-	return g_transform_mode.transformation;
+	if (g_inputs.as_struct.q.pressed) return E_Transform_Translate;
+	if (g_inputs.as_struct.w.pressed && g_selected_object.type == E_Type_Mesh) return E_Transform_Rotate;
+	if (g_inputs.as_struct.e.pressed && g_selected_object.type == E_Type_Mesh) return E_Transform_Scale;
+	return g_transform_mode.mode;
 }
 
 inline MaterialData material_serialize(Material material)
@@ -1866,7 +1860,7 @@ int main(int argc, char* argv[])
 		g_scene_lights = j_array_init(SCENE_LIGHTS_MAX_COUNT, sizeof(Light), (Light*)g_scene_lights_memory.memory);
 
 		memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
-		g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture),(Texture*)g_texture_memory.memory);
+		g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), (Texture*)g_texture_memory.memory);
 
 		memory_buffer_mallocate(&g_materials_memory, sizeof(Material) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Materials"));
 		g_materials = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Material), (Material*)g_materials_memory.memory);
@@ -1950,7 +1944,7 @@ int main(int argc, char* argv[])
 				-0.5f, -0.5f, 0.0f,	 0.0f, 0.0f, // bottom left
 				 0.5f, -0.5f, 0.0f,	 1.0f, 0.0f, // bottom right
 				-0.5f,  0.5f, 0.0f,	 0.0f, 1.0f, // top left
-										
+
 				-0.5f,  0.5f, 0.0f,	 0.0f, 1.0f, // top left 
 				 0.5f, -0.5f, 0.0f,	 1.0f, 0.0f, // bottom right
 				 0.5f,  0.5f, 0.0f,	 1.0f, 1.0f  // top right
@@ -2123,7 +2117,7 @@ int main(int argc, char* argv[])
 
 			input_mat_file.read(header, 5);
 			bool valid_header = strcmp(header, ".jmat") == 0;
-			
+
 			if (valid_header)
 			{
 				MaterialData mat_data = {};
@@ -2224,12 +2218,12 @@ int main(int argc, char* argv[])
 						.translation = vec3(0),
 						.rotation = vec3(0),
 						.scale = vec3(1.0f),
-						.material = j_array_get(&g_materials, 1),
-						.mesh_type = E::PrimitiveType::Plane,
+						.material = j_array_get(&g_materials, 0),
+						.mesh_type = E_Primitive_Plane,
 						.uv_multiplier = 1.0f,
 					};
 					s64 new_mesh_index = add_new_mesh(new_plane);
-					select_object_index(E::Mesh, new_mesh_index);
+					select_object_index(E_Type_Mesh, new_mesh_index);
 				}
 
 				if (ImGui::Button("Add Cube"))
@@ -2238,22 +2232,22 @@ int main(int argc, char* argv[])
 						.translation = vec3(0),
 						.rotation = vec3(0),
 						.scale = vec3(1.0f),
-						.material = j_array_get(&g_materials, 1),
-						.mesh_type = E::PrimitiveType::Cube,
+						.material = j_array_get(&g_materials, 0),
+						.mesh_type = E_Primitive_Cube,
 						.uv_multiplier = 1.0f,
 					};
 					s64 new_mesh_index = add_new_mesh(new_cube);
-					select_object_index(E::Mesh, new_mesh_index);
+					select_object_index(E_Type_Mesh, new_mesh_index);
 				}
 
 				if (ImGui::Button("Add pointlight"))
 				{
 					Light new_pointlight = pointlight_init();
 					s64 new_light_index = add_new_light(new_pointlight);
-					select_object_index(E::Light, new_light_index);
+					select_object_index(E_Type_Light, new_light_index);
 				}
 
-				if (g_selected_object.type == E::Mesh)
+				if (g_selected_object.type == E_Type_Mesh)
 				{
 					char selected_mesh_str[24];
 					sprintf_s(selected_mesh_str, "Mesh index: %lld", g_selected_object.selection_index);
@@ -2282,7 +2276,7 @@ int main(int argc, char* argv[])
 					ImGui::InputFloat("Specular mult", &selected_mesh_ptr->material->specular_mult, 0, 0, "%.3f");
 					ImGui::InputFloat("Material shine", &selected_mesh_ptr->material->shininess, 0, 0, "%.3f");
 				}
-				else if (g_selected_object.type == E::Light)
+				else if (g_selected_object.type == E_Type_Light)
 				{
 					char selected_light_str[24];
 					sprintf_s(selected_light_str, "Light index: %lld", g_selected_object.selection_index);
@@ -2317,7 +2311,6 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		// -----------------
 		// Register inputs
 		{
 			g_frame_data.mouse_clicked = false;
@@ -2346,9 +2339,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		// -------
 		// Logic
-
 		g_game_metrics.prev_frame_game_time = g_game_metrics.game_time;
 		g_game_metrics.game_time = glfwGetTime();
 		g_frame_data.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time);
@@ -2370,7 +2361,7 @@ int main(int argc, char* argv[])
 
 		if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.s.pressed) save_all();
 
-		if (!g_camera_move_mode) g_transform_mode.transformation = get_curr_transformation_mode();
+		if (!g_camera_move_mode) g_transform_mode.mode = get_curr_transformation_mode();
 
 		if (g_inputs.as_struct.mouse1.pressed)
 		{
@@ -2405,21 +2396,21 @@ int main(int argc, char* argv[])
 				}
 				else if (0 <= mesh_index && light_index == -1)
 				{
-					select_object_index(E::Mesh, mesh_index);
+					select_object_index(E_Type_Mesh, mesh_index);
 				}
 				else if (mesh_index == -1 && 0 <= light_index)
 				{
-					select_object_index(E::Light, light_index);
+					select_object_index(E_Type_Light, light_index);
 				}
 				else
 				{
 					if (mesh_dist < light_dist)
 					{
-						select_object_index(E::Mesh, mesh_index);
+						select_object_index(E_Type_Mesh, mesh_index);
 					}
 					else
 					{
-						select_object_index(E::Light, light_index);
+						select_object_index(E_Type_Light, light_index);
 					}
 				}
 			}
@@ -2480,7 +2471,7 @@ int main(int argc, char* argv[])
 
 		if (has_object_selection())
 		{
-			if		(g_inputs.as_struct.del.pressed) delete_selected_object();
+			if (g_inputs.as_struct.del.pressed) delete_selected_object();
 			else if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.d.pressed) duplicate_selected_object();
 		}
 
@@ -2513,7 +2504,7 @@ int main(int argc, char* argv[])
 
 			g_debug_plane_intersection = intersection_point;
 
-			if (intersection && g_transform_mode.transformation == Transformation::Translate)
+			if (intersection && g_transform_mode.mode == E_Transform_Translate)
 			{
 				glm::vec3 travel_dist = intersection_point - g_prev_intersection;
 				vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
@@ -2522,7 +2513,7 @@ int main(int argc, char* argv[])
 				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
 				else selected_mesh_ptr->translation = g_new_translation;
 			}
-			else if (intersection && g_transform_mode.transformation == Transformation::Scale)
+			else if (intersection && g_transform_mode.mode == E_Transform_Scale)
 			{
 				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr);
 				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
@@ -2547,7 +2538,7 @@ int main(int argc, char* argv[])
 				if (selected_mesh_ptr->scale.y < 0.01f) selected_mesh_ptr->scale.y = 0.01f;
 				if (selected_mesh_ptr->scale.z < 0.01f) selected_mesh_ptr->scale.z = 0.01f;
 			}
-			else if (intersection && g_transform_mode.transformation == Transformation::Rotate)
+			else if (intersection && g_transform_mode.mode == E_Transform_Rotate)
 			{
 				auto new_line = g_debug_plane_intersection - selected_mesh_ptr->translation;
 
@@ -2601,7 +2592,7 @@ int main(int argc, char* argv[])
 
 		// -------------
 		// Draw OpenGL
-		
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		for (int i = 0; i < g_scene_meshes.items_count; i++)
@@ -2614,19 +2605,19 @@ int main(int argc, char* argv[])
 		if (has_object_selection() && g_transform_mode.is_active)
 		{
 			// Scale mode
-			if (g_transform_mode.transformation == Transformation::Scale)
+			if (g_transform_mode.mode == E_Transform_Scale)
 			{
 
 			}
 
 			// Translate mode
-			if (g_transform_mode.transformation == Transformation::Translate)
+			if (g_transform_mode.mode == E_Transform_Translate)
 			{
 
 			}
 
 			// Rotate mode
-			if (g_transform_mode.transformation == Transformation::Rotate)
+			if (g_transform_mode.mode == E_Transform_Rotate)
 			{
 				Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
 				draw_line(g_debug_plane_intersection, selected_mesh_ptr->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
@@ -2643,17 +2634,17 @@ int main(int argc, char* argv[])
 		// Draw selection
 		if (has_object_selection())
 		{
-			if (g_selected_object.type == E::Mesh)
+			if (g_selected_object.type == E_Type_Mesh)
 			{
 				Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
 				draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
 				draw_selection_arrows(selected_mesh->translation);
 			}
-			else if (g_selected_object.type == E::Light)
+			else if (g_selected_object.type == E_Type_Light)
 			{
 				Light* selected_light = (Light*)get_selected_object_ptr();
 				Mesh as_cube = {};
-				as_cube.mesh_type = E::Cube;
+				as_cube.mesh_type = E_Primitive_Cube;
 				as_cube.scale = vec3(0.35f);
 				as_cube.translation = selected_light->position;
 				draw_mesh_wireframe(&as_cube, glm::vec3(1.0f));
@@ -2704,9 +2695,9 @@ int main(int argc, char* argv[])
 			const char* ts = "Scale";
 			const char* transform_mode_debug_str_format = "Transform mode: %s";
 
-			if (g_transform_mode.transformation == Transformation::Translate) t_mode = const_cast<char*>(tt);
-			if (g_transform_mode.transformation == Transformation::Rotate) t_mode = const_cast<char*>(tr);
-			if (g_transform_mode.transformation == Transformation::Scale) t_mode = const_cast<char*>(ts);
+			if (g_transform_mode.mode == E_Transform_Translate) t_mode = const_cast<char*>(tt);
+			if (g_transform_mode.mode == E_Transform_Rotate)	t_mode = const_cast<char*>(tr);
+			if (g_transform_mode.mode == E_Transform_Scale)		t_mode = const_cast<char*>(ts);
 
 			sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
