@@ -34,8 +34,8 @@ namespace E
 	};
 }
 
-constexpr const int FILE_PATH_LEN = 128;
-constexpr const int FILENAME_LEN = FILE_PATH_LEN / 2;
+constexpr const int FILE_PATH_LEN = 256;
+constexpr const int FILENAME_LEN = FILE_PATH_LEN / 4;
 
 typedef struct Texture {
 	char file_name[FILENAME_LEN];
@@ -48,6 +48,12 @@ typedef struct Material {
 	f32 specular_mult;
 	f32 shininess;
 } Material;
+
+typedef struct MaterialData {
+	char material_name[FILENAME_LEN];
+	f32 specular_mult;
+	f32 shininess;
+} MaterialData;
 
 typedef struct Mesh {
 	glm::vec3 translation;

@@ -29,8 +29,10 @@
 
 using namespace glm;
 
-bool g_use_linear_texture_filtering = false;
-bool g_generate_texture_mipmaps = false;
+static constexpr const char* g_materials_dir_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
+
+static bool g_use_linear_texture_filtering = false;
+static bool g_generate_texture_mipmaps = false;
 
 GLFWwindow* g_window;
 glm::vec3 lastMousePos(0.0f);
@@ -1787,6 +1789,55 @@ Transformation get_curr_transformation_mode()
 	return g_transform_mode.transformation;
 }
 
+MaterialData material_serialize(Material material)
+{
+	MaterialData m_data = {
+		.material_name = "",
+		.specular_mult = material.specular_mult,
+		.shininess = material.shininess
+	};
+	strcpy_s(m_data.material_name, material.color_texture->file_name);
+	return m_data;
+}
+
+Material material_deserialize(MaterialData mat_data)
+{
+	Material mat = {
+		.color_texture = nullptr,
+		.specular_texture = nullptr,
+		.specular_mult = mat_data.specular_mult,
+		.shininess = mat_data.shininess,
+	};
+	return mat;
+}
+
+bool str_trim_file_ext(char* str)
+{
+	char* last_dot = strrchr(str, '.');
+	if (last_dot == nullptr) return false;
+	*last_dot = '\0';
+	return true;
+}
+
+void save_material(Material material)
+{
+	MaterialData m_data = material_serialize(material);
+
+	char filename[FILENAME_LEN] = { 0 };
+	strcpy_s(filename, material.color_texture->file_name);
+	str_trim_file_ext(filename);
+
+	char filepath[FILE_PATH_LEN] = { 0 };
+	sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename);
+
+	std::ofstream output_mat_file(filepath, std::ios::binary);
+	ASSERT_TRUE(output_mat_file.is_open(), ".jmat file opened");
+
+	output_mat_file.write(".jmat", 5);
+	output_mat_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
+	output_mat_file.close();
+}
+
 int main(int argc, char* argv[])
 {
 	// Init buffers
@@ -2002,34 +2053,57 @@ int main(int argc, char* argv[])
 		pointlight_texture = texture_load_from_filepath(const_cast<char*>(pointlight_image_path));
 		spotlight_texture = texture_load_from_filepath(const_cast<char*>(spotlight_image_path));
 
-		std::filesystem::path directory_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
-		ASSERT_TRUE(std::filesystem::is_directory(directory_path), "Valid materials directory");
+		ASSERT_TRUE(std::filesystem::is_directory(g_materials_dir_path), "Valid materials directory");
 		const char* material_ext = ".jmat";
 
 		s64 material_index = 0;
 
-		for (const auto& entry : std::filesystem::directory_iterator(directory_path))
+		for (const auto& entry : std::filesystem::directory_iterator(g_materials_dir_path))
 		{
 			bool valid_file = entry.is_regular_file() && entry.path().extension() == material_ext;
 			if (!valid_file) continue;
 
+			// Material file
+			Material new_material;
 			auto filename = entry.path().stem().filename().string();
-			auto filepath = directory_path.string() + "\\" + filename + ".png";
+			char filepath[FILE_PATH_LEN] = {0};
+			sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename.c_str());
 
-			Texture color_texture = texture_load_from_filepath(const_cast<char*>(filepath.c_str()));
-			Texture* color_texture_prt = j_array_add(&g_textures, color_texture);
+			std::ifstream input_mat_file(filepath, std::ios::binary);
+			ASSERT_TRUE(input_mat_file.is_open(), ".jmat file opened");
 
-			Texture* specular_texture_ptr = nullptr;
-			auto specular_filepath = directory_path.string() + "\\" + filename + "_specular.png";
-			std::ifstream gloss_file(specular_filepath);
-
-			if (gloss_file.good())
+			char header[6] = { 0 };
+			input_mat_file.read(header, 5);
+			bool valid_header = strcmp(header, ".jmat") == 0;
+			
+			if (valid_header)
 			{
-				Texture specular_texture = texture_load_from_filepath(const_cast<char*>(specular_filepath.c_str()));
-				specular_texture_ptr = j_array_add(&g_textures, specular_texture);
+				MaterialData mat_data = {};
+				input_mat_file.read(reinterpret_cast<char*>(&mat_data), sizeof(mat_data));
+				new_material = material_deserialize(mat_data);
+				printf("Mat load\n");
 			}
 
-			Material new_material = material_init(color_texture_prt, specular_texture_ptr);
+			// Texture images
+			filename = entry.path().stem().filename().string();
+			sprintf_s(filepath, "%s\\%s.png", g_materials_dir_path, filename.c_str());
+
+			Texture color_texture = texture_load_from_filepath(filepath);
+			Texture* color_texture_prt = j_array_add(&g_textures, color_texture);
+			new_material.color_texture = color_texture_prt;
+
+			Texture* specular_texture_ptr = nullptr;
+			sprintf_s(filepath, "%s\\%s._specular.png", g_materials_dir_path, filename.c_str());
+			std::ifstream spec_file(filepath);
+
+			if (spec_file.good())
+			{
+				Texture specular_texture = texture_load_from_filepath(filepath);
+				specular_texture_ptr = j_array_add(&g_textures, specular_texture);
+				new_material.specular_texture = specular_texture_ptr;
+			}
+
+			if (!valid_header) new_material = material_init(color_texture_prt, specular_texture_ptr);
 			Material* new_material_prt = j_array_add(&g_materials, new_material);
 
 			char* new_str = j_strings_add(&g_material_names, color_texture.file_name);
@@ -2121,7 +2195,7 @@ int main(int argc, char* argv[])
 					ImGui::InputFloat3("Rotation", &selected_mesh_ptr->rotation[0], "%.2f");
 					ImGui::InputFloat3("Scale", &selected_mesh_ptr->scale[0], "%.2f");
 
-					ImGui::Text("Material");
+					ImGui::Text("Select material");
 					ImGui::Image((ImTextureID)selected_mesh_ptr->material->color_texture->gpu_id, ImVec2(128, 128));
 
 					char* texture_names_ptr = (char*)g_material_names.data;
@@ -2132,8 +2206,16 @@ int main(int argc, char* argv[])
 					}
 
 					ImGui::InputFloat("UV mult", &selected_mesh_ptr->uv_multiplier, 0, 0, "%.2f");
+
+					ImGui::Text("Material properties");
 					ImGui::InputFloat("Specular mult", &selected_mesh_ptr->material->specular_mult, 0, 0, "%.3f");
 					ImGui::InputFloat("Material shine", &selected_mesh_ptr->material->shininess, 0, 0, "%.3f");
+
+					if (ImGui::Button("Save material"))
+					{
+						Material to_save = *selected_mesh_ptr->material;
+						save_material(to_save);
+					}
 				}
 				else if (g_selected_object.type == E::Light)
 				{
