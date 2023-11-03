@@ -1811,14 +1811,6 @@ Material material_deserialize(MaterialData mat_data)
 	return mat;
 }
 
-bool str_trim_file_ext(char* str)
-{
-	char* last_dot = strrchr(str, '.');
-	if (last_dot == nullptr) return false;
-	*last_dot = '\0';
-	return true;
-}
-
 void save_material(Material material)
 {
 	MaterialData m_data = material_serialize(material);
@@ -1836,6 +1828,18 @@ void save_material(Material material)
 	output_mat_file.write(".jmat", 5);
 	output_mat_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
 	output_mat_file.close();
+}
+
+void save_all()
+{
+	for (int i = 0; i < g_materials.items_count; i++)
+	{
+		Material to_save = *j_array_get(&g_materials, i);
+		save_material(to_save);
+		printf("Mat saved.\n");
+	}
+
+	save_scene();
 }
 
 int main(int argc, char* argv[])
@@ -2181,7 +2185,7 @@ int main(int argc, char* argv[])
 					s64 new_light_index = add_new_light(new_pointlight);
 					select_object_index(E::Light, new_light_index);
 				}
-				
+
 				if (g_selected_object.type == E::Mesh)
 				{
 					char selected_mesh_str[24];
@@ -2210,12 +2214,6 @@ int main(int argc, char* argv[])
 					ImGui::Text("Material properties");
 					ImGui::InputFloat("Specular mult", &selected_mesh_ptr->material->specular_mult, 0, 0, "%.3f");
 					ImGui::InputFloat("Material shine", &selected_mesh_ptr->material->shininess, 0, 0, "%.3f");
-
-					if (ImGui::Button("Save material"))
-					{
-						Material to_save = *selected_mesh_ptr->material;
-						save_material(to_save);
-					}
 				}
 				else if (g_selected_object.type == E::Light)
 				{
@@ -2303,9 +2301,9 @@ int main(int argc, char* argv[])
 			g_game_metrics.fps_prev_second = current_game_second;
 		}
 
-		if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.s.pressed) save_scene();
+		if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.s.pressed) save_all();
 
-		g_transform_mode.transformation = get_curr_transformation_mode();
+		if (!g_camera_move_mode) g_transform_mode.transformation = get_curr_transformation_mode();
 
 		if (g_inputs.as_struct.mouse1.pressed)
 		{
@@ -2609,28 +2607,29 @@ int main(int argc, char* argv[])
 
 		// Print debug info
 		{
-			char debug_str[512];
+			char debug_str[256];
 
-			const char* fps_debug_str_format = "FPS: %d";
-			sprintf_s(debug_str, fps_debug_str_format, g_game_metrics.fps);
+			sprintf_s(debug_str, "FPS: %d", g_game_metrics.fps);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
 
-			const char* delta_debug_str_format = "Delta: %.2fms";
 			float display_deltatime = g_frame_data.deltatime * 1000;
-			sprintf_s(debug_str, delta_debug_str_format, display_deltatime);
+			sprintf_s(debug_str, "Delta: %.2fms", display_deltatime);
 			append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
 
-			const char* frames_debug_str_format = "Frames: %lu";
-			sprintf_s(debug_str, frames_debug_str_format, g_game_metrics.frames);
+			sprintf_s(debug_str, "Frames: %lu", g_game_metrics.frames);
 			append_ui_text(&g_debug_font, debug_str, 10.5f, 100.0f);
 
-			const char* draw_calls_debug_str_format = "Draw calls: %d";
-			sprintf_s(debug_str, draw_calls_debug_str_format, ++g_frame_data.draw_calls);
+			sprintf_s(debug_str, "Draw calls: %d", ++g_frame_data.draw_calls);
 			append_ui_text(&g_debug_font, debug_str, 17.0f, 100.0f);
 
-			const char* camera_pos_debug_str_format = "Camera X=%.2f Y=%.2f Z=%.2f";
-			sprintf_s(debug_str, camera_pos_debug_str_format, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
+			sprintf_s(debug_str, "Camera X=%.2f Y=%.2f Z=%.2f", g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
+
+			sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
+											  
+ 			sprintf_s(debug_str, "Lights %lld / %lld", g_scene_lights.items_count, g_scene_lights.max_items);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
 
 			char* t_mode = nullptr;
 			const char* tt = "Translate";

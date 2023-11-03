@@ -90,6 +90,8 @@ void assert_true(bool assertion, const char* assertion_title, const char* file, 
 
 #define ASSERT_TRUE(assertion, assertion_title) assert_true(assertion, assertion_title, __FILE__, __func__, __LINE__)
 
+bool str_trim_file_ext(char* str);
+
 float normalize_screen_px_to_ndc(int value, int max);
 
 float normalize_value(float value, float src_max, float dest_max);

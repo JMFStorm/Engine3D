@@ -18,6 +18,14 @@ void assert_true(bool assertion, const char* assertion_title, const char* file, 
 	}
 }
 
+bool str_trim_file_ext(char* str)
+{
+	char* last_dot = strrchr(str, '.');
+	if (last_dot == nullptr) return false;
+	*last_dot = '\0';
+	return true;
+}
+
 float normalize_screen_px_to_ndc(int value, int max)
 {
 	float this1 = static_cast<float>(value) / static_cast<float>(max);

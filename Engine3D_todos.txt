@@ -1,0 +1,9 @@
+TODOS:
+- material id is saved instead of mat name into scene file
+
+on start:
+materials_data file is read from "<material_name, material_id>" pairs
+if (found new materials in folder) => add to materials_data
+
+on material load/save:
+scene.mesh.material is serialized with material_id (s64)
