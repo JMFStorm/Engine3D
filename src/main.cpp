@@ -1661,7 +1661,7 @@ inline Mesh mesh_deserialize(MeshData data)
 	return mesh;
 }
 
-void save_scene()
+inline void save_scene()
 {
 	std::ofstream output_file("scene_01.jmap", std::ios::binary);
 	ASSERT_TRUE(output_file.is_open(), ".jmap file opened for save");
@@ -1700,7 +1700,7 @@ void save_scene()
 	printf("Scene saved.\n");
 }
 
-void load_scene()
+inline void load_scene()
 {
 	const char* filename = "scene_01.jmap";
 
@@ -1795,7 +1795,7 @@ Transformation get_curr_transformation_mode()
 	return g_transform_mode.transformation;
 }
 
-MaterialData material_serialize(Material material)
+inline MaterialData material_serialize(Material material)
 {
 	s64 material_id = g_mat_data_map[material.color_texture->file_name];
 
@@ -1807,7 +1807,7 @@ MaterialData material_serialize(Material material)
 	return m_data;
 }
 
-Material material_deserialize(MaterialData mat_data)
+inline Material material_deserialize(MaterialData mat_data)
 {
 	Material mat = {
 		.color_texture = nullptr,
