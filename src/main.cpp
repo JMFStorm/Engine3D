@@ -194,7 +194,7 @@ JArray<Spotlight> g_scene_spotlights;
 
 SceneSelection g_selected_object = {
 	.selection_index = -1,
-	.type = E_Type_None,
+	.type = ObjectType::None,
 };
 
 typedef struct TransformationMode {
@@ -821,17 +821,17 @@ void draw_line_ontop(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thic
 
 void* get_selected_object_ptr()
 {
-	if (g_selected_object.type == E_Type_Mesh)
+	if (g_selected_object.type == ObjectType::Primitive)
 	{
 		return (void*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
 	}
 
-	if (g_selected_object.type == E_Type_Light)
+	if (g_selected_object.type == ObjectType::Pointlight)
 	{
 		return (void*)j_array_get(&g_scene_pointlights, g_selected_object.selection_index);
 	}
 
-	if (g_selected_object.type == E_Type_Spotlight)
+	if (g_selected_object.type == ObjectType::Spotlight)
 	{
 		return (void*)j_array_get(&g_scene_spotlights, g_selected_object.selection_index);
 	}
@@ -1194,7 +1194,7 @@ void delete_mesh(s64 mesh_index)
 	j_array_replace(&g_scene_meshes, *last_mesh, mesh_index);
 	j_array_pop_back(&g_scene_meshes);
 	g_selected_object.selection_index = -1;
-	g_selected_object.type = E_Type_None;
+	g_selected_object.type = ObjectType::None;
 }
 
 void delete_light(s64 light_index)
@@ -1203,13 +1203,13 @@ void delete_light(s64 light_index)
 	j_array_replace(&g_scene_pointlights, *last_light, light_index);
 	j_array_pop_back(&g_scene_pointlights);
 	g_selected_object.selection_index = -1;
-	g_selected_object.type = E_Type_None;
+	g_selected_object.type = ObjectType::None;
 }
 
 void delete_selected_object()
 {
-	if (g_selected_object.type == E_Type_Mesh) delete_mesh(g_selected_object.selection_index);
-	else if (g_selected_object.type == E_Type_Light) delete_light(g_selected_object.selection_index);
+	if (g_selected_object.type == ObjectType::Primitive) delete_mesh(g_selected_object.selection_index);
+	else if (g_selected_object.type == ObjectType::Pointlight) delete_light(g_selected_object.selection_index);
 }
 
 s64 add_new_mesh(Mesh new_mesh)
@@ -1235,47 +1235,47 @@ s64 add_new_spotlight(Spotlight new_light)
 
 void duplicate_selected_object()
 {
-	if (g_selected_object.type == E_Type_Mesh)
+	if (g_selected_object.type == ObjectType::Primitive)
 	{
 		Mesh mesh_copy = *j_array_get(&g_scene_meshes, g_selected_object.selection_index);
 		s64 index = add_new_mesh(mesh_copy);
-		g_selected_object.type = E_Type_Mesh;
+		g_selected_object.type = ObjectType::Primitive;
 		g_selected_object.selection_index = index;
 	}
-	else if (g_selected_object.type == E_Type_Light)
+	else if (g_selected_object.type == ObjectType::Pointlight)
 	{
 		Pointlight light_copy = *j_array_get(&g_scene_pointlights, g_selected_object.selection_index);
 		s64 index = add_new_pointlight(light_copy);
-		g_selected_object.type = E_Type_Light;
+		g_selected_object.type = ObjectType::Pointlight;
 		g_selected_object.selection_index = index;
 	}
-	else if (g_selected_object.type == E_Type_Spotlight)
+	else if (g_selected_object.type == ObjectType::Spotlight)
 	{
 		Spotlight light_copy = *j_array_get(&g_scene_spotlights, g_selected_object.selection_index);
 		s64 index = add_new_spotlight(light_copy);
-		g_selected_object.type = E_Type_Light;
+		g_selected_object.type = ObjectType::Spotlight;
 		g_selected_object.selection_index = index;
 	}
 }
 
-void select_object_index(s64 type, s64 index)
+void select_object_index(ObjectType type, s64 index)
 {
 	g_selected_object.type = type;
 	g_selected_object.selection_index = index;
 
-	if (type == E_Type_Mesh)
+	if (type == ObjectType::Primitive)
 	{
 		Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
 		auto selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
 		g_selected_texture_item = selected_texture_name;
 	}
-	else if (type == E_Type_Light) g_transform_mode.mode = E_Transform_Translate;
+	else if (type == ObjectType::Pointlight) g_transform_mode.mode = E_Transform_Translate;
 }
 
 void deselect_current_mesh()
 {
 	g_selected_object.selection_index = -1;
-	g_selected_object.type = E_Type_None;
+	g_selected_object.type = ObjectType::None;
 }
 
 bool calculate_plane_ray_intersection(
@@ -1502,8 +1502,8 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 bool try_init_transform_mode()
 {
 	bool has_valid_mode = g_transform_mode.mode == E_Transform_Translate
-		|| (g_transform_mode.mode == E_Transform_Rotate && g_selected_object.type == E_Type_Mesh)
-		|| (g_transform_mode.mode == E_Transform_Scale && g_selected_object.type == E_Type_Mesh);
+		|| (g_transform_mode.mode == E_Transform_Rotate && g_selected_object.type == ObjectType::Primitive)
+		|| (g_transform_mode.mode == E_Transform_Scale && g_selected_object.type == ObjectType::Primitive);
 
 	if (!has_valid_mode) return false;
 
@@ -1719,7 +1719,7 @@ inline void load_scene()
 
 inline bool has_object_selection()
 {
-	return g_selected_object.type != E_Type_None;
+	return g_selected_object.type != ObjectType::None;
 }
 
 Texture texture_load_from_filepath(char* path)
@@ -1752,8 +1752,8 @@ Pointlight pointlight_init()
 s64 get_curr_transformation_mode()
 {
 	if (g_inputs.as_struct.q.pressed) return E_Transform_Translate;
-	if (g_inputs.as_struct.w.pressed && g_selected_object.type == E_Type_Mesh) return E_Transform_Rotate;
-	if (g_inputs.as_struct.e.pressed && g_selected_object.type == E_Type_Mesh) return E_Transform_Scale;
+	if (g_inputs.as_struct.w.pressed && g_selected_object.type == ObjectType::Primitive) return E_Transform_Rotate;
+	if (g_inputs.as_struct.e.pressed && g_selected_object.type == ObjectType::Primitive) return E_Transform_Scale;
 	return g_transform_mode.mode;
 }
 
@@ -2210,7 +2210,7 @@ int main(int argc, char* argv[])
 						.uv_multiplier = 1.0f,
 					};
 					s64 new_mesh_index = add_new_mesh(new_plane);
-					select_object_index(E_Type_Mesh, new_mesh_index);
+					select_object_index(ObjectType::Primitive, new_mesh_index);
 				}
 
 				if (ImGui::Button("Add Cube"))
@@ -2224,17 +2224,17 @@ int main(int argc, char* argv[])
 						.uv_multiplier = 1.0f,
 					};
 					s64 new_mesh_index = add_new_mesh(new_cube);
-					select_object_index(E_Type_Mesh, new_mesh_index);
+					select_object_index(ObjectType::Primitive, new_mesh_index);
 				}
 
 				if (ImGui::Button("Add pointlight"))
 				{
 					Pointlight new_pointlight = pointlight_init();
 					s64 new_light_index = add_new_pointlight(new_pointlight);
-					select_object_index(E_Type_Light, new_light_index);
+					select_object_index(ObjectType::Pointlight, new_light_index);
 				}
 
-				if (g_selected_object.type == E_Type_Mesh)
+				if (g_selected_object.type == ObjectType::Primitive)
 				{
 					char selected_mesh_str[24];
 					sprintf_s(selected_mesh_str, "Mesh index: %lld", g_selected_object.selection_index);
@@ -2263,7 +2263,7 @@ int main(int argc, char* argv[])
 					ImGui::InputFloat("Specular mult", &selected_mesh_ptr->material->specular_mult, 0, 0, "%.3f");
 					ImGui::InputFloat("Material shine", &selected_mesh_ptr->material->shininess, 0, 0, "%.3f");
 				}
-				else if (g_selected_object.type == E_Type_Light)
+				else if (g_selected_object.type == ObjectType::Pointlight)
 				{
 					char selected_light_str[24];
 					sprintf_s(selected_light_str, "Light index: %lld", g_selected_object.selection_index);
@@ -2277,7 +2277,7 @@ int main(int argc, char* argv[])
 					ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
 					ImGui::InputFloat("Light intensity", &selected_light_ptr->intensity, 0, 0, "%.3f");
 				}
-				else if (g_selected_object.type == E_Type_Spotlight)
+				else if (g_selected_object.type == ObjectType::Spotlight)
 				{
 					Spotlight* selected_spotlight_ptr = (Spotlight*)get_selected_object_ptr();
 
@@ -2381,35 +2381,33 @@ int main(int argc, char* argv[])
 					g_debug_click_camera_pos = glm::vec3(0.0f);
 				}
 
-				f32 mesh_dist;
-				s64 mesh_index = get_mesh_selection_index(g_scene_meshes, &mesh_dist, ray_origin, ray_direction);
+				s64 object_types_count = 2;
+				ObjectType select_types[] = { ObjectType::Primitive, ObjectType::Pointlight };
+				s64 object_index[] = { -1, -1 };
+				f32 closest_dist[2] = { 0 };
 
-				f32 pointlight_dist;
-				s64 pointlight_index = get_pointlight_selection_index(g_scene_pointlights, &pointlight_dist, ray_origin, ray_direction);
+				object_index[0] = get_mesh_selection_index(g_scene_meshes, &closest_dist[0], ray_origin, ray_direction);
+				object_index[1] = get_pointlight_selection_index(g_scene_pointlights, &closest_dist[1], ray_origin, ray_direction);
 
-				if (mesh_index == -1 && pointlight_index == -1)
+				ObjectType selected_type = ObjectType::None;
+				s64 closest_obj_index = -1;
+				f32 closest_dist_result = std::numeric_limits<float>::max();
+				bool got_selection = false;
+
+				for (int i = 0; i < object_types_count; i++)
 				{
-					deselect_current_mesh();
-				}
-				else if (0 <= mesh_index && pointlight_index == -1)
-				{
-					select_object_index(E_Type_Mesh, mesh_index);
-				}
-				else if (mesh_index == -1 && 0 <= pointlight_index)
-				{
-					select_object_index(E_Type_Light, pointlight_index);
-				}
-				else
-				{
-					if (mesh_dist < pointlight_dist)
+					f32 current_dist = closest_dist[i];
+					if (current_dist < closest_dist_result)
 					{
-						select_object_index(E_Type_Mesh, mesh_index);
-					}
-					else
-					{
-						select_object_index(E_Type_Light, pointlight_index);
+						closest_dist_result = current_dist;
+						closest_obj_index = object_index[i];
+						selected_type = select_types[i];
+						got_selection = true;
 					}
 				}
+
+				if (got_selection) select_object_index(selected_type, closest_obj_index);
+				else deselect_current_mesh();
 			}
 		}
 
@@ -2631,13 +2629,13 @@ int main(int argc, char* argv[])
 		// Draw selection
 		if (has_object_selection())
 		{
-			if (g_selected_object.type == E_Type_Mesh)
+			if (g_selected_object.type == ObjectType::Primitive)
 			{
 				Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
 				draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
 				draw_selection_arrows(selected_mesh->translation);
 			}
-			else if (g_selected_object.type == E_Type_Light)
+			else if (g_selected_object.type == ObjectType::Pointlight)
 			{
 				Pointlight* selected_light = (Pointlight*)get_selected_object_ptr();
 				Mesh as_cube = {};

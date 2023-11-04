@@ -22,10 +22,12 @@ constexpr const s64 E_Axis_X = 0;
 constexpr const s64 E_Axis_Y = 1;
 constexpr const s64 E_Axis_Z = 2;
 
-constexpr const s64 E_Type_None  = 0;
-constexpr const s64 E_Type_Mesh  = 1;
-constexpr const s64 E_Type_Light = 2;
-constexpr const s64 E_Type_Spotlight = 3;
+enum class ObjectType {
+	None,
+	Primitive,
+	Pointlight,
+	Spotlight
+};
 
 constexpr const s64 E_Primitive_Plane  = 0;
 constexpr const s64 E_Primitive_Cube   = 1;
@@ -88,7 +90,7 @@ typedef struct Spotlight {
 
 typedef struct SceneSelection {
 	s64 selection_index;
-	s64 type;
+	ObjectType type;
 } SceneSelection;
 
 typedef struct GameCamera {
