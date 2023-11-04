@@ -53,6 +53,16 @@ UserSettings g_user_settings = {
 	.world_ambient = glm::vec3(0.1f),
 };
 
+static Spotlight g_debug_spotlight = {
+	.position = vec3(0, 5.0f, 0),
+	.rotation = vec3(0, -1.0f, 0),
+	.diffuse = vec3(1),
+	.intensity = 5.0f,
+	.specular = 0.5f,
+	.cutoff = 0.9978f,
+	.outer_cutoff = 0.953f,
+};
+
 int g_wireframe_shader;
 unsigned int g_wireframe_vao;
 unsigned int g_wireframe_vbo;
@@ -186,7 +196,7 @@ JArray<Mesh> g_scene_meshes;
 
 constexpr const s64 SCENE_LIGHTS_MAX_COUNT = 20;
 MemoryBuffer g_scene_lights_memory = { 0 };
-JArray<Light> g_scene_lights;
+JArray<Pointlight> g_scene_lights;
 
 SceneSelection g_selected_object = {
 	.selection_index = -1,
@@ -463,6 +473,19 @@ void draw_mesh(Mesh* mesh)
 			glUniform1f(light_spec_loc, pointlight.specular);
 			glUniform1f(light_intens_loc, pointlight.intensity);
 		}
+	}
+
+	// Spotlights
+	{
+		unsigned int sp_pos_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.position");
+		unsigned int sp_dir_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.direction");
+		unsigned int sp_cutoff_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.cut_off");
+		unsigned int sp_outer_cutoff_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.outer_cut_off");
+
+		glUniform3f(sp_pos_loc, g_debug_spotlight.position.x, g_debug_spotlight.position.y, g_debug_spotlight.position.z);
+		glUniform3f(sp_dir_loc, g_debug_spotlight.rotation.x, g_debug_spotlight.rotation.y, g_debug_spotlight.rotation.z);
+		glUniform1f(sp_cutoff_loc, g_debug_spotlight.cutoff);
+		glUniform1f(sp_outer_cutoff_loc, g_debug_spotlight.outer_cutoff);
 	}
 
 	Material* material = mesh->material;
@@ -1158,7 +1181,7 @@ void delete_mesh(s64 mesh_index)
 
 void delete_light(s64 light_index)
 {
-	Light* last_light = j_array_get(&g_scene_lights, g_scene_lights.items_count - 1);
+	Pointlight* last_light = j_array_get(&g_scene_lights, g_scene_lights.items_count - 1);
 	j_array_replace(&g_scene_lights, *last_light, light_index);
 	j_array_pop_back(&g_scene_lights);
 	g_selected_object.selection_index = -1;
@@ -1180,7 +1203,7 @@ s64 add_new_mesh(Mesh new_mesh)
 	return new_index;
 }
 
-s64 add_new_light(Light new_light)
+s64 add_new_light(Pointlight new_light)
 {
 	j_array_add(&g_scene_lights, new_light);
 	s64 new_index = g_scene_lights.items_count - 1;
@@ -1198,7 +1221,7 @@ void duplicate_selected_object()
 	}
 	else if (g_selected_object.type == E_Type_Light)
 	{
-		Light light_copy = *j_array_get(&g_scene_lights, g_selected_object.selection_index);
+		Pointlight light_copy = *j_array_get(&g_scene_lights, g_selected_object.selection_index);
 		s64 index = add_new_light(light_copy);
 		g_selected_object.type = E_Type_Light;
 		g_selected_object.selection_index = index;
@@ -1324,11 +1347,11 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 	return got_selected;
 }
 
-s64 get_light_selection_index(JArray<Light> lights, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
+s64 get_light_selection_index(JArray<Pointlight> lights, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
 	s64 index = -1;
 	Mesh as_cube;
-	Light* as_light;
+	Pointlight* as_light;
 	*select_dist = std::numeric_limits<float>::max();
 
 	for (int i = 0; i < lights.items_count; i++)
@@ -1595,13 +1618,13 @@ inline void save_scene()
 		output_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
 	}
 
-	// Light count
+	// Pointlight count
 	output_file.write(reinterpret_cast<char*>(&g_scene_lights.items_count), sizeof(s64));
 
-	// Light data
+	// Pointlight data
 	for (int i = 0; i < g_scene_lights.items_count; i++)
 	{
-		Light light = *j_array_get(&g_scene_lights, i);
+		Pointlight light = *j_array_get(&g_scene_lights, i);
 		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
 	}
 
@@ -1647,14 +1670,14 @@ inline void load_scene()
 		j_array_add(&g_scene_meshes, mesh);
 	}
 
-	// Light count
+	// Pointlight count
 	s64 light_count = 0;
 	input_file.read(reinterpret_cast<char*>(&light_count), sizeof(s64));
 
-	// Light data
+	// Pointlight data
 	for (int i = 0; i < light_count; i++)
 	{
-		Light light;
+		Pointlight light;
 		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
 		j_array_add(&g_scene_lights, light);
 	}
@@ -1685,12 +1708,12 @@ Texture texture_load_from_filepath(char* path)
 	return texture;
 }
 
-Light pointlight_init()
+Pointlight pointlight_init()
 {
-	Light p_light = {
+	Pointlight p_light = {
 		.position = glm::vec3(0.0f, 0.0f, 0.0f),
 		.diffuse = glm::vec3(1.0f),
-		.specular = 0.25f,
+		.specular = 0.5f,
 		.intensity = 1.0f
 	};
 	return p_light;
@@ -1771,8 +1794,8 @@ int main(int argc, char* argv[])
 		memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
 		g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), (Mesh*)g_scene_meshes_memory.memory);
 
-		memory_buffer_mallocate(&g_scene_lights_memory, sizeof(Light) * SCENE_LIGHTS_MAX_COUNT, const_cast<char*>("Scene lights"));
-		g_scene_lights = j_array_init(SCENE_LIGHTS_MAX_COUNT, sizeof(Light), (Light*)g_scene_lights_memory.memory);
+		memory_buffer_mallocate(&g_scene_lights_memory, sizeof(Pointlight) * SCENE_LIGHTS_MAX_COUNT, const_cast<char*>("Scene lights"));
+		g_scene_lights = j_array_init(SCENE_LIGHTS_MAX_COUNT, sizeof(Pointlight), (Pointlight*)g_scene_lights_memory.memory);
 
 		memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
 		g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), (Texture*)g_texture_memory.memory);
@@ -2157,7 +2180,7 @@ int main(int argc, char* argv[])
 
 				if (ImGui::Button("Add pointlight"))
 				{
-					Light new_pointlight = pointlight_init();
+					Pointlight new_pointlight = pointlight_init();
 					s64 new_light_index = add_new_light(new_pointlight);
 					select_object_index(E_Type_Light, new_light_index);
 				}
@@ -2197,7 +2220,7 @@ int main(int argc, char* argv[])
 					sprintf_s(selected_light_str, "Light index: %lld", g_selected_object.selection_index);
 					ImGui::Text(selected_light_str);
 
-					Light* selected_light_ptr = (Light*)get_selected_object_ptr();
+					Pointlight* selected_light_ptr = (Pointlight*)get_selected_object_ptr();
 
 					ImGui::Text("Light properties");
 					ImGui::InputFloat3("Light pos", &selected_light_ptr->position[0], "%.3f");
@@ -2205,6 +2228,10 @@ int main(int argc, char* argv[])
 					ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
 					ImGui::InputFloat("Light intensity", &selected_light_ptr->intensity, 0, 0, "%.3f");
 				}
+
+				ImGui::Text("Debug spotlight");
+				ImGui::InputFloat3("Position", &g_debug_spotlight.position[0], "%.2f");
+				ImGui::InputFloat3("Direction", &g_debug_spotlight.rotation[0], "%.2f");
 
 				ImGui::Text("Editor settings");
 				ImGui::InputFloat("Transform clip", &g_user_settings.transform_clip, 0, 0, "%.2f");
@@ -2556,7 +2583,7 @@ int main(int argc, char* argv[])
 			}
 			else if (g_selected_object.type == E_Type_Light)
 			{
-				Light* selected_light = (Light*)get_selected_object_ptr();
+				Pointlight* selected_light = (Pointlight*)get_selected_object_ptr();
 				Mesh as_cube = {};
 				as_cube.mesh_type = E_Primitive_Cube;
 				as_cube.scale = vec3(0.35f);
@@ -2571,6 +2598,13 @@ int main(int argc, char* argv[])
 		{
 			auto light = *j_array_get(&g_scene_lights, i);
 			draw_billboard(light.position, pointlight_texture, 0.5f);
+		}
+
+		// Debug spotlight
+		{
+			draw_billboard(g_debug_spotlight.position, spotlight_texture, 0.5f);
+			vec3 sp_dir = glm::normalize(g_debug_spotlight.rotation);
+			draw_line(g_debug_spotlight.position, g_debug_spotlight.position + sp_dir, glm::vec3(0.8f, 0.8f, 0.0f), 3.0f, 3.0f);
 		}
 
 		// Click ray

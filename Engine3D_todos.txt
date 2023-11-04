@@ -1,4 +1,4 @@
 TODOS:
 - pointlight radius
-- spotlights (& rotation transformations for lights)
-
+- spotlights
+- draw line width: only one value
