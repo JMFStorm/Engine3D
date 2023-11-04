@@ -1,4 +1,4 @@
 TODOS:
-- pointlight radius
-- spotlights
+- spotlight rotation => direction value
+- save spotlights on scene
 - draw line width: only one value

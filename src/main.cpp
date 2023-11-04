@@ -1377,7 +1377,7 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 	return got_selected;
 }
 
-s64 get_pointlight_selection_index(JArray<Pointlight> lights, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
+s64 get_pointlight_selection_index(JArray<Pointlight>& lights, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
 	s64 index = -1;
 	Mesh as_cube;
@@ -1386,7 +1386,7 @@ s64 get_pointlight_selection_index(JArray<Pointlight> lights, f32* select_dist, 
 
 	for (int i = 0; i < lights.items_count; i++)
 	{
-		as_light = j_array_get(&g_scene_pointlights, i);
+		as_light = j_array_get(&lights, i);
 		as_cube = {};
 		as_cube.mesh_type = E_Primitive_Cube;
 		as_cube.translation = as_light->position;
@@ -1405,7 +1405,35 @@ s64 get_pointlight_selection_index(JArray<Pointlight> lights, f32* select_dist, 
 	return index;
 }
 
-s64 get_mesh_selection_index(JArray<Mesh> meshes, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
+s64 get_spotlight_selection_index(JArray<Spotlight>& lights, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
+{
+	s64 index = -1;
+	Mesh as_cube;
+	Spotlight* as_light;
+	*select_dist = std::numeric_limits<float>::max();
+
+	for (int i = 0; i < lights.items_count; i++)
+	{
+		as_light = j_array_get(&lights, i);
+		as_cube = {};
+		as_cube.mesh_type = E_Primitive_Cube;
+		as_cube.translation = as_light->position;
+		as_cube.scale = vec3(0.35f);
+
+		f32 new_select_dist;
+		bool selected_light = get_cube_selection(&as_cube, &new_select_dist, ray_origin, ray_direction);
+
+		if (selected_light && new_select_dist < *select_dist)
+		{
+			index = i;
+			*select_dist = new_select_dist;
+		}
+	}
+
+	return index;
+}
+
+s64 get_mesh_selection_index(JArray<Mesh>& meshes, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
 {
 	s64 index = -1;
 	*select_dist = std::numeric_limits<float>::max();
@@ -1502,7 +1530,7 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 bool try_init_transform_mode()
 {
 	bool has_valid_mode = g_transform_mode.mode == E_Transform_Translate
-		|| (g_transform_mode.mode == E_Transform_Rotate && g_selected_object.type == ObjectType::Primitive)
+		|| (g_transform_mode.mode == E_Transform_Rotate && g_selected_object.type != ObjectType::Pointlight)
 		|| (g_transform_mode.mode == E_Transform_Scale && g_selected_object.type == ObjectType::Primitive);
 
 	if (!has_valid_mode) return false;
@@ -1752,7 +1780,7 @@ Pointlight pointlight_init()
 s64 get_curr_transformation_mode()
 {
 	if (g_inputs.as_struct.q.pressed) return E_Transform_Translate;
-	if (g_inputs.as_struct.w.pressed && g_selected_object.type == ObjectType::Primitive) return E_Transform_Rotate;
+	if (g_inputs.as_struct.w.pressed && g_selected_object.type != ObjectType::Pointlight) return E_Transform_Rotate;
 	if (g_inputs.as_struct.e.pressed && g_selected_object.type == ObjectType::Primitive) return E_Transform_Scale;
 	return g_transform_mode.mode;
 }
@@ -2381,13 +2409,14 @@ int main(int argc, char* argv[])
 					g_debug_click_camera_pos = glm::vec3(0.0f);
 				}
 
-				s64 object_types_count = 2;
-				ObjectType select_types[] = { ObjectType::Primitive, ObjectType::Pointlight };
-				s64 object_index[] = { -1, -1 };
-				f32 closest_dist[2] = { 0 };
+				s64 object_types_count = 3;
+				ObjectType select_types[] = { ObjectType::Primitive, ObjectType::Pointlight, ObjectType::Spotlight };
+				s64 object_index[3] = {-1, -1, -1};
+				f32 closest_dist[3] = {};
 
 				object_index[0] = get_mesh_selection_index(g_scene_meshes, &closest_dist[0], ray_origin, ray_direction);
 				object_index[1] = get_pointlight_selection_index(g_scene_pointlights, &closest_dist[1], ray_origin, ray_direction);
+				object_index[2] = get_spotlight_selection_index(g_scene_spotlights, &closest_dist[2], ray_origin, ray_direction);
 
 				ObjectType selected_type = ObjectType::None;
 				s64 closest_obj_index = -1;
@@ -2396,11 +2425,13 @@ int main(int argc, char* argv[])
 
 				for (int i = 0; i < object_types_count; i++)
 				{
+					s64 current_index = object_index[i];
 					f32 current_dist = closest_dist[i];
-					if (current_dist < closest_dist_result)
+
+					if (current_index != -1 && current_dist < closest_dist_result)
 					{
 						closest_dist_result = current_dist;
-						closest_obj_index = object_index[i];
+						closest_obj_index = current_index;
 						selected_type = select_types[i];
 						got_selection = true;
 					}
@@ -2638,6 +2669,16 @@ int main(int argc, char* argv[])
 			else if (g_selected_object.type == ObjectType::Pointlight)
 			{
 				Pointlight* selected_light = (Pointlight*)get_selected_object_ptr();
+				Mesh as_cube = {};
+				as_cube.mesh_type = E_Primitive_Cube;
+				as_cube.scale = vec3(0.35f);
+				as_cube.translation = selected_light->position;
+				draw_mesh_wireframe(&as_cube, glm::vec3(1.0f));
+				draw_selection_arrows(selected_light->position);
+			}
+			else if (g_selected_object.type == ObjectType::Spotlight)
+			{
+				Spotlight* selected_light = (Spotlight*)get_selected_object_ptr();
 				Mesh as_cube = {};
 				as_cube.mesh_type = E_Primitive_Cube;
 				as_cube.scale = vec3(0.35f);
