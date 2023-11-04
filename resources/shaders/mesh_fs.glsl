@@ -108,6 +108,5 @@ void main()
         color_result += spotlight_color(spotlights[i], norm, fragPos, view_dir);
     }
 
-    // color_result += spotlight_color(spotlight1, norm, fragPos, view_dir);
     FragColor = vec4(color_result, 1.0);
 }

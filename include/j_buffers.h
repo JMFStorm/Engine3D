@@ -67,6 +67,14 @@ void j_array_replace(JArray<T>* array, T new_element, u64 index)
 	memcpy(dest, &new_element, array->item_size_bytes);
 }
 
+template <typename T>
+void j_array_unordered_delete(JArray<T>* jarray, u64 index)
+{
+	T* last_element = j_array_get(jarray, jarray->items_count - 1);
+	j_array_replace(jarray, *last_element, index);
+	j_array_pop_back(jarray);
+}
+
 typedef struct JString {
 	s64 str_len;
 	char* str_ptr;

@@ -177,7 +177,7 @@ void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, s64 axis)
 
 glm::vec3 get_plane_middle_point(Mesh mesh)
 {
-	glm::mat4 rotation = get_rotation_matrix(&mesh);
+	glm::mat4 rotation = get_rotation_matrix(mesh.rotation);
 	glm::vec3 scale_rotated = rotation * glm::vec4(mesh.scale, 1.0f);
 	scale_rotated = scale_rotated / 2.0f;
 	scale_rotated.y = 0.0f;

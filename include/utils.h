@@ -235,14 +235,13 @@ inline glm::mat4 get_model_matrix(Mesh* mesh)
 	return model;
 }
 
-inline glm::mat4 get_rotation_matrix(Mesh* mesh)
+inline glm::mat4 get_rotation_matrix(glm::vec3 rotation)
 {
-	glm::quat quaternionX = glm::angleAxis(glm::radians(mesh->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::quat quaternionY = glm::angleAxis(glm::radians(mesh->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::quat quaternionZ = glm::angleAxis(glm::radians(mesh->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::quat quaternionX = glm::angleAxis(glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat quaternionY = glm::angleAxis(glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::quat quaternionZ = glm::angleAxis(glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
 	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
-
 	return rotation_matrix;
 }
 

@@ -402,6 +402,14 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 	glBindVertexArray(0);
 }
 
+vec3 get_spotlight_dir(Spotlight spotlight)
+{
+	vec3 spot_dir = vec3(0, -1.0f, 0);
+	glm::mat4 rotation_mat = get_rotation_matrix(spotlight.rotation);
+	spot_dir = rotation_mat * vec4(spot_dir, 1.0f);
+	return spot_dir;
+}
+
 void draw_mesh(Mesh* mesh)
 {
 	glUseProgram(g_mesh_shader);
@@ -449,18 +457,16 @@ void draw_mesh(Mesh* mesh)
 		for (int i = 0; i < g_scene_pointlights.items_count; i++)
 		{
 			auto pointlight = *j_array_get(&g_scene_pointlights, i);
+
 			sprintf_s(str_value, "pointlights[%d].position", i);
 			unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
-			memset(str_value, 0, sizeof(str_value));
 			sprintf_s(str_value, "pointlights[%d].diffuse", i);
 			unsigned int light_diff_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
-			memset(str_value, 0, sizeof(str_value));
 			sprintf_s(str_value, "pointlights[%d].specular", i);
 			unsigned int light_spec_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
-			memset(str_value, 0, sizeof(str_value));
 			sprintf_s(str_value, "pointlights[%d].intensity", i);
 			unsigned int light_intens_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
@@ -493,9 +499,11 @@ void draw_mesh(Mesh* mesh)
 			sprintf_s(str_value, "spotlights[%d].outer_cutoff", i);
 			unsigned int sp_outer_cutoff_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
+			vec3 spot_dir = get_spotlight_dir(spotlight);
+
 			glUniform3f(sp_diff_loc, spotlight.diffuse.x, spotlight.diffuse.y, spotlight.diffuse.z);
 			glUniform3f(sp_pos_loc, spotlight.position.x, spotlight.position.y, spotlight.position.z);
-			glUniform3f(sp_dir_loc, spotlight.rotation.x, spotlight.rotation.y, spotlight.rotation.z);
+			glUniform3f(sp_dir_loc, spot_dir.x, spot_dir.y, spot_dir.z);
 			glUniform1f(sp_cutoff_loc, spotlight.cutoff);
 			glUniform1f(sp_outer_cutoff_loc, spotlight.outer_cutoff);
 		}
@@ -866,7 +874,7 @@ void draw_selection_arrows(glm::vec3 position)
 		if (g_transform_mode.mode == E_Transform_Scale)
 		{
 			Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
-			glm::mat4 rotation_mat = get_rotation_matrix(mesh_ptr);
+			glm::mat4 rotation_mat = get_rotation_matrix(mesh_ptr->rotation);
 			vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
 			vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
 			vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
@@ -1188,28 +1196,19 @@ bool clicked_scene_space(int x, int y)
 	return x < g_game_metrics.scene_width_px && y < g_game_metrics.scene_height_px;
 }
 
-void delete_mesh(s64 mesh_index)
+template <typename T>
+void delete_on_object_index(JArray<T>* jarray_ptr, s64 jarray_index)
 {
-	Mesh* last_mesh = j_array_get(&g_scene_meshes, g_scene_meshes.items_count - 1);
-	j_array_replace(&g_scene_meshes, *last_mesh, mesh_index);
-	j_array_pop_back(&g_scene_meshes);
-	g_selected_object.selection_index = -1;
-	g_selected_object.type = ObjectType::None;
-}
-
-void delete_light(s64 light_index)
-{
-	Pointlight* last_light = j_array_get(&g_scene_pointlights, g_scene_pointlights.items_count - 1);
-	j_array_replace(&g_scene_pointlights, *last_light, light_index);
-	j_array_pop_back(&g_scene_pointlights);
+	j_array_unordered_delete(jarray_ptr, jarray_index);
 	g_selected_object.selection_index = -1;
 	g_selected_object.type = ObjectType::None;
 }
 
 void delete_selected_object()
 {
-	if (g_selected_object.type == ObjectType::Primitive) delete_mesh(g_selected_object.selection_index);
-	else if (g_selected_object.type == ObjectType::Pointlight) delete_light(g_selected_object.selection_index);
+	if (g_selected_object.type == ObjectType::Primitive) delete_on_object_index(&g_scene_meshes, g_selected_object.selection_index);
+	else if (g_selected_object.type == ObjectType::Pointlight) delete_on_object_index(&g_scene_pointlights, g_selected_object.selection_index);
+	else if (g_selected_object.type == ObjectType::Spotlight) delete_on_object_index(&g_scene_spotlights, g_selected_object.selection_index);
 }
 
 s64 add_new_mesh(Mesh new_mesh)
@@ -1230,7 +1229,9 @@ s64 add_new_pointlight(Pointlight new_light)
 
 s64 add_new_spotlight(Spotlight new_light)
 {
-	return -1;
+	j_array_add(&g_scene_spotlights, new_light);
+	s64 new_index = g_scene_spotlights.items_count - 1;
+	return new_index;
 }
 
 void duplicate_selected_object()
@@ -1326,7 +1327,7 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 		E_Axis_Z
 	};
 
-	glm::mat4 rotation_matrix = get_rotation_matrix(cube);
+	glm::mat4 rotation_matrix = get_rotation_matrix(cube->rotation);
 
 	for (int j = 0; j < CUBE_PLANES_COUNT; j++)
 	{
@@ -1445,7 +1446,7 @@ s64 get_mesh_selection_index(JArray<Mesh>& meshes, f32* select_dist, glm::vec3 r
 		if (mesh->mesh_type == E_Primitive_Plane)
 		{
 			auto plane_up = glm::vec3(0.0f, 1.0f, 0.0f);
-			glm::mat4 rotationMatrix = get_rotation_matrix(mesh);
+			glm::mat4 rotationMatrix = get_rotation_matrix(mesh->rotation);
 
 			auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up, 1.0f));
 			planeNormal = glm::normalize(planeNormal);
@@ -1566,7 +1567,7 @@ bool try_init_transform_mode()
 	}
 	else if (g_transform_mode.mode == E_Transform_Scale)
 	{
-		glm::mat4 model = get_rotation_matrix(selected_mesh_ptr);
+		glm::mat4 model = get_rotation_matrix(selected_mesh_ptr->rotation);
 
 		use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
 		use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
@@ -1686,6 +1687,16 @@ inline void save_scene()
 		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
 	}
 
+	// Spotlight count
+	output_file.write(reinterpret_cast<char*>(&g_scene_spotlights.items_count), sizeof(s64));
+
+	// Spotlight data
+	for (int i = 0; i < g_scene_spotlights.items_count; i++)
+	{
+		Spotlight light = *j_array_get(&g_scene_spotlights, i);
+		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
+	}
+
 	output_file.close();
 
 	printf("Scene saved.\n");
@@ -1729,15 +1740,28 @@ inline void load_scene()
 	}
 
 	// Pointlight count
-	s64 light_count = 0;
-	input_file.read(reinterpret_cast<char*>(&light_count), sizeof(s64));
+	s64 pointlight_count = 0;
+	input_file.read(reinterpret_cast<char*>(&pointlight_count), sizeof(s64));
 
 	// Pointlight data
-	for (int i = 0; i < light_count; i++)
+	for (int i = 0; i < pointlight_count; i++)
 	{
 		Pointlight light;
 		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
 		j_array_add(&g_scene_pointlights, light);
+	}
+
+	// Spotlight count
+	s64 spotlight_count = 0;
+	input_file.read(reinterpret_cast<char*>(&spotlight_count), sizeof(s64));
+
+
+	// Spotlight data
+	for (int i = 0; i < spotlight_count; i++)
+	{
+		Spotlight light;
+		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
+		j_array_add(&g_scene_spotlights, light);
 	}
 
 	input_file.close();
@@ -2206,9 +2230,6 @@ int main(int argc, char* argv[])
 	load_scene();
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 
-	Spotlight sp = spotlight_init();
-	j_array_add(&g_scene_spotlights, sp);
-
 	while (!glfwWindowShouldClose(g_window))
 	{
 		glfwPollEvents();
@@ -2260,6 +2281,13 @@ int main(int argc, char* argv[])
 					Pointlight new_pointlight = pointlight_init();
 					s64 new_light_index = add_new_pointlight(new_pointlight);
 					select_object_index(ObjectType::Pointlight, new_light_index);
+				}
+
+				if (ImGui::Button("Add spotlight"))
+				{
+					Spotlight new_spotlight = spotlight_init();
+					s64 new_light_index = add_new_spotlight(new_spotlight);
+					select_object_index(ObjectType::Spotlight, new_light_index);
 				}
 
 				if (g_selected_object.type == ObjectType::Primitive)
@@ -2541,7 +2569,7 @@ int main(int argc, char* argv[])
 			}
 			else if (intersection && g_transform_mode.mode == E_Transform_Scale)
 			{
-				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr);
+				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr->rotation);
 				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
 
 				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
@@ -2702,8 +2730,8 @@ int main(int argc, char* argv[])
 			{
 				auto spotlight = *j_array_get(&g_scene_spotlights, i);
 				draw_billboard(spotlight.position, spotlight_texture, 0.5f);
-				vec3 sp_dir = glm::normalize(spotlight.rotation);
-				draw_line(spotlight.position, spotlight.position + sp_dir, glm::vec3(0.8f, 0.8f, 0.0f), 3.0f, 3.0f);
+				vec3 sp_dir = get_spotlight_dir(spotlight);
+				draw_line(spotlight.position, spotlight.position + sp_dir, spotlight.diffuse, 2.0f, 2.0f);
 			}
 		}
 
