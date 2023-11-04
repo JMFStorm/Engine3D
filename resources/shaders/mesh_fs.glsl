@@ -69,10 +69,12 @@ vec3 point_lights_color(Pointlight light, vec3 frag_normal, vec3 frag_pos, vec3 
 vec3 spotlight_color(Spotlight light, vec3 normal, vec3 fragPos, vec3 viewDir)
 {
     vec3 lightDir = normalize(light.position - fragPos);
+    float light_linear = 0.09;
+    float light_quadratic = 0.032;
 
     float diff = max(dot(normal, lightDir), 0.0);
     float distance = length(light.position - fragPos);
-    float attenuation = 1.0 / (1.0 + light.linear * distance + light.quadratic * (distance * distance));
+    float attenuation = 1.0 / (1.0 + light_linear * distance + light_quadratic * (distance * distance));
 
     float theta = dot(lightDir, normalize(-light.direction));
     float epsilon = light.cutoff - light.outer_cutoff;
@@ -97,15 +99,6 @@ void main()
         color_result += point_lights_color(pointlights[i], norm, fragPos, view_dir);
     }
 
-    Spotlight use_spotlight;
-    use_spotlight.position = spotlight1.position;
-    use_spotlight.direction = spotlight1.direction;
-    use_spotlight.cutoff = spotlight1.cutoff;
-    use_spotlight.outer_cutoff = spotlight1.outer_cutoff;
-    use_spotlight.linear = 0.09;
-    use_spotlight.quadratic = 0.032;
-    use_spotlight.diffuse = vec3(0.5, 0.5, 0.5);
-
-    color_result += spotlight_color(use_spotlight, norm, fragPos, view_dir);
+    color_result += spotlight_color(spotlight1, norm, fragPos, view_dir);
     FragColor = vec4(color_result, 1.0);
 }

@@ -57,7 +57,6 @@ static Spotlight g_debug_spotlight = {
 	.position = vec3(0, 5.0f, 0),
 	.rotation = vec3(0, -1.0f, 0),
 	.diffuse = vec3(1),
-	.intensity = 5.0f,
 	.specular = 0.5f,
 	.cutoff = 0.9978f,
 	.outer_cutoff = 0.953f,
@@ -477,11 +476,13 @@ void draw_mesh(Mesh* mesh)
 
 	// Spotlights
 	{
+		unsigned int sp_diff_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.diffuse");
 		unsigned int sp_pos_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.position");
 		unsigned int sp_dir_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.direction");
-		unsigned int sp_cutoff_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.cut_off");
-		unsigned int sp_outer_cutoff_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.outer_cut_off");
+		unsigned int sp_cutoff_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.cutoff");
+		unsigned int sp_outer_cutoff_loc = glGetUniformLocation(g_mesh_shader, "spotlight1.outer_cutoff");
 
+		glUniform3f(sp_diff_loc, g_debug_spotlight.diffuse.x, g_debug_spotlight.diffuse.y, g_debug_spotlight.diffuse.z);
 		glUniform3f(sp_pos_loc, g_debug_spotlight.position.x, g_debug_spotlight.position.y, g_debug_spotlight.position.z);
 		glUniform3f(sp_dir_loc, g_debug_spotlight.rotation.x, g_debug_spotlight.rotation.y, g_debug_spotlight.rotation.z);
 		glUniform1f(sp_cutoff_loc, g_debug_spotlight.cutoff);
@@ -2230,8 +2231,11 @@ int main(int argc, char* argv[])
 				}
 
 				ImGui::Text("Debug spotlight");
+				ImGui::ColorEdit3("Color", &g_debug_spotlight.diffuse[0], 0);
 				ImGui::InputFloat3("Position", &g_debug_spotlight.position[0], "%.2f");
 				ImGui::InputFloat3("Direction", &g_debug_spotlight.rotation[0], "%.2f");
+				ImGui::InputFloat("Cutoff", &g_debug_spotlight.cutoff, 0, 0, "%.2f");
+				ImGui::InputFloat("Outer cutoff", &g_debug_spotlight.outer_cutoff, 0, 0, "%.2f");
 
 				ImGui::Text("Editor settings");
 				ImGui::InputFloat("Transform clip", &g_user_settings.transform_clip, 0, 0, "%.2f");
