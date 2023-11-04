@@ -24,19 +24,23 @@ struct Material {
     float shininess;
 };
 
-in vec3 fragPos;    // Fragment position in world space
-in vec3 fragNormal; // Normal in world space
+in vec3 fragPos;
+in vec3 fragNormal;
 in vec2 TexCoord;
 
+uniform Material material;
 uniform bool use_texture;
 uniform bool use_specular_texture;
-uniform vec3 view_coords; // Camera (view) position
+uniform vec3 view_coords;
+
+uniform vec3 global_ambient_light;
 
 uniform int pointlights_count;
 uniform Pointlight pointlights[20];
-uniform Spotlight spotlight1;
-uniform Material material;
-uniform vec3 global_ambient_light;
+
+uniform int spotlights_count;
+uniform Spotlight spotlights[20];
+
 
 out vec4 FragColor;
 
@@ -99,6 +103,11 @@ void main()
         color_result += point_lights_color(pointlights[i], norm, fragPos, view_dir);
     }
 
-    color_result += spotlight_color(spotlight1, norm, fragPos, view_dir);
+    for (int i = 0; i < spotlights_count; i++)
+    {
+        color_result += spotlight_color(spotlights[i], norm, fragPos, view_dir);
+    }
+
+    // color_result += spotlight_color(spotlight1, norm, fragPos, view_dir);
     FragColor = vec4(color_result, 1.0);
 }

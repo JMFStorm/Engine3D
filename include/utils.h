@@ -25,6 +25,7 @@ constexpr const s64 E_Axis_Z = 2;
 constexpr const s64 E_Type_None  = 0;
 constexpr const s64 E_Type_Mesh  = 1;
 constexpr const s64 E_Type_Light = 2;
+constexpr const s64 E_Type_Spotlight = 3;
 
 constexpr const s64 E_Primitive_Plane  = 0;
 constexpr const s64 E_Primitive_Cube   = 1;
