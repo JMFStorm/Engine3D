@@ -80,66 +80,7 @@ glm::vec3 g_debug_click_camera_pos = glm::vec3(0, 0, 0);
 glm::vec3 g_debug_click_ray_normal = glm::vec3(0, 0, 0);
 glm::vec3 g_debug_plane_intersection = glm::vec3(0, 0, 0);
 
-typedef struct FrameData {
-	float mouse_x;
-	float mouse_y;
-	float prev_mouse_x;
-	float prev_mouse_y;
-	int draw_calls;
-	float deltatime;
-	bool mouse_clicked;
-} FrameData;
-
-typedef struct ButtonState {
-	int key;
-	bool pressed;
-	bool is_down;
-} ButtonState;
-
-typedef struct GameInputs {
-	ButtonState mouse1;
-	ButtonState mouse2;
-	ButtonState q;
-	ButtonState w;
-	ButtonState e;
-	ButtonState r;
-	ButtonState a;
-	ButtonState s;
-	ButtonState d;
-	ButtonState f;
-	ButtonState z;
-	ButtonState x;
-	ButtonState c;
-	ButtonState v;
-	ButtonState y;
-	ButtonState esc;
-	ButtonState plus;
-	ButtonState minus;
-	ButtonState del;
-	ButtonState left_ctrl;
-	ButtonState space;
-} GameInputs;
-
-union GameInputsU {
-	GameInputs as_struct;
-	ButtonState as_array[sizeof(GameInputs)];
-};
-
 GameInputsU g_inputs = {};
-
-typedef struct GameMetrics {
-	unsigned long frames;
-	int game_width_px;
-	int game_height_px;
-	int scene_width_px;
-	int scene_height_px;
-	float aspect_ratio_horizontal;
-	double game_time;
-	double prev_frame_game_time;
-	int fps;
-	int fps_frames;
-	int fps_prev_second;
-} GameMetrics;
 
 typedef struct {
 	int bot_left_x;
@@ -182,20 +123,6 @@ constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
-typedef struct GameCamera {
-	glm::vec3 position;
-	glm::vec3 front_vec;
-	glm::vec3 up_vec;
-	float yaw;
-	float pitch;
-	float fov;
-	float aspect_ratio_horizontal;
-	float look_sensitivity;
-	float move_speed;
-	float near_clip;
-	float far_clip;
-} GameCamera;
-
 GameCamera scene_camera_init()
 {
 	GameCamera cam = {
@@ -222,12 +149,6 @@ float g_mouse_movement_y = 0;
 
 const char* pointlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\pointlight_billboard.png";
 const char* spotlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\spotlight_billboard.png";
-
-char material_paths[][FILE_PATH_LEN] = {
-	"G:/projects/game/Engine3D/resources/images/debug_img_01.png",
-	"G:/projects/game/Engine3D/resources/materials/tilemap_floor_01.png",
-	"G:/projects/game/Engine3D/resources/materials/tile_bricks_01.png"
-};
 
 constexpr const s64 SCENE_TEXTURES_MAX_COUNT = 100;
 MemoryBuffer g_material_names_memory = { 0 };
@@ -517,7 +438,7 @@ void draw_mesh(Mesh* mesh)
 	// Point lights
 	{
 		glUniform1i(pointlights_count_loc, g_scene_lights.items_count);
-		char str_value[128] = {0};
+		char str_value[64] = {0};
 
 		for (int i = 0; i < g_scene_lights.items_count; i++)
 		{
@@ -534,18 +455,13 @@ void draw_mesh(Mesh* mesh)
 			unsigned int light_spec_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
 			memset(str_value, 0, sizeof(str_value));
-			sprintf_s(str_value, "pointlights[%d].linear", i);
-			unsigned int light_linear_loc = glGetUniformLocation(g_mesh_shader, str_value);
-
-			memset(str_value, 0, sizeof(str_value));
-			sprintf_s(str_value, "pointlights[%d].quadratic", i);
-			unsigned int light_quadratic_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			sprintf_s(str_value, "pointlights[%d].intensity", i);
+			unsigned int light_intens_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
 			glUniform3f(light_pos_loc, pointlight.position.x, pointlight.position.y, pointlight.position.z);
 			glUniform3f(light_diff_loc, pointlight.diffuse.x, pointlight.diffuse.y, pointlight.diffuse.z);
 			glUniform1f(light_spec_loc, pointlight.specular);
-			glUniform1f(light_linear_loc, pointlight.linear);
-			glUniform1f(light_quadratic_loc, pointlight.quadratic);
+			glUniform1f(light_intens_loc, pointlight.intensity);
 		}
 	}
 
@@ -1775,8 +1691,7 @@ Light pointlight_init()
 		.position = glm::vec3(0.0f, 0.0f, 0.0f),
 		.diffuse = glm::vec3(1.0f),
 		.specular = 0.25f,
-		.linear = 0.35f,
-		.quadratic = 0.44f
+		.intensity = 1.0f
 	};
 	return p_light;
 }
@@ -2288,8 +2203,7 @@ int main(int argc, char* argv[])
 					ImGui::InputFloat3("Light pos", &selected_light_ptr->position[0], "%.3f");
 					ImGui::ColorEdit3("Color Picker", &selected_light_ptr->diffuse[0], 0);
 					ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
-					ImGui::InputFloat("Light quadratic", &selected_light_ptr->quadratic, 0, 0, "%.3f");
-					ImGui::InputFloat("Light linear", &selected_light_ptr->linear, 0, 0, "%.3f");
+					ImGui::InputFloat("Light intensity", &selected_light_ptr->intensity, 0, 0, "%.3f");
 				}
 
 				ImGui::Text("Editor settings");

@@ -73,14 +73,86 @@ typedef struct Light {
 	glm::vec3 position;
 	glm::vec3 diffuse;
 	float specular;
-	float linear;
-	float quadratic;
+	float intensity;
 } Light;
 
 typedef struct SceneSelection {
 	s64 selection_index;
 	s64 type;
 } SceneSelection;
+
+typedef struct GameCamera {
+	glm::vec3 position;
+	glm::vec3 front_vec;
+	glm::vec3 up_vec;
+	float yaw;
+	float pitch;
+	float fov;
+	float aspect_ratio_horizontal;
+	float look_sensitivity;
+	float move_speed;
+	float near_clip;
+	float far_clip;
+} GameCamera;
+
+typedef struct ButtonState {
+	int key;
+	bool pressed;
+	bool is_down;
+} ButtonState;
+
+typedef struct GameInputs {
+	ButtonState mouse1;
+	ButtonState mouse2;
+	ButtonState q;
+	ButtonState w;
+	ButtonState e;
+	ButtonState r;
+	ButtonState a;
+	ButtonState s;
+	ButtonState d;
+	ButtonState f;
+	ButtonState z;
+	ButtonState x;
+	ButtonState c;
+	ButtonState v;
+	ButtonState y;
+	ButtonState esc;
+	ButtonState plus;
+	ButtonState minus;
+	ButtonState del;
+	ButtonState left_ctrl;
+	ButtonState space;
+} GameInputs;
+
+union GameInputsU {
+	GameInputs as_struct;
+	ButtonState as_array[sizeof(GameInputs)];
+};
+
+typedef struct GameMetrics {
+	unsigned long frames;
+	int game_width_px;
+	int game_height_px;
+	int scene_width_px;
+	int scene_height_px;
+	float aspect_ratio_horizontal;
+	double game_time;
+	double prev_frame_game_time;
+	int fps;
+	int fps_frames;
+	int fps_prev_second;
+} GameMetrics;
+
+typedef struct FrameData {
+	float mouse_x;
+	float mouse_y;
+	float prev_mouse_x;
+	float prev_mouse_y;
+	int draw_calls;
+	float deltatime;
+	bool mouse_clicked;
+} FrameData;
 
 void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line);
 

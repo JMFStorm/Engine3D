@@ -4,8 +4,7 @@ struct Light {
     vec3 position;
     vec3 diffuse;
     float specular;
-    float linear;
-    float quadratic;
+    float intensity;
 };
 
 struct Material {
@@ -32,21 +31,22 @@ out vec4 FragColor;
 
 vec3 point_lights_color(Light light, vec3 frag_normal, vec3 frag_pos, vec3 view_dir)
 {
-    vec3 lightDir = normalize(light.position - frag_pos);
+    vec3 specular = vec3(0, 0, 0);
+    vec3 light_dir = normalize(light.position - frag_pos);
+    float light_radius = light.intensity;
 
     float distance = length(light.position - frag_pos);
-    float attenuation = 1.0 / (1.0 + light.linear * distance + light.quadratic * (distance * distance));
+    float attenuation = 1.0 / (1.0 + (distance / light_radius) * (distance / light_radius));
 
-    float diff = max(dot(frag_normal, lightDir), 0.0);
+    float diff = max(dot(frag_normal, light_dir), 0.0);
     vec3 diffuse = light.diffuse * diff * vec3(texture(material.color_texture, TexCoord));
-
-    vec3 specular = vec3(0, 0, 0);
 
     if (use_specular_texture)
     {
-        vec3 reflectDir = reflect(-lightDir, frag_normal);
+        vec3 reflectDir = reflect(-light_dir, frag_normal);
         float spec = pow(max(dot(view_dir, reflectDir), 0.0), material.shininess);
         specular = light.specular * spec * vec3(texture(material.specular_texture, TexCoord)) * material.specular_mult;
+        specular *= diffuse;
     }
 
     diffuse *= attenuation;
@@ -59,10 +59,9 @@ void main()
 {
     vec3 ambient = global_ambient_light * texture(material.color_texture, TexCoord).rgb;
 
+    vec3 color_result = vec3(0);
     vec3 norm = normalize(fragNormal);
     vec3 view_dir = normalize(view_coords - fragPos);
-
-    vec3 color_result = vec3(0);
 
     for (int i = 0; i < pointlights_count; i++)
     {
@@ -70,6 +69,5 @@ void main()
     }
 
     color_result += ambient;
-
     FragColor = vec4(color_result, 1.0);
 }
