@@ -199,7 +199,7 @@ SceneSelection g_selected_object = {
 
 typedef struct TransformationMode {
 	s64 axis;
-	s64 mode;
+	TransformMode mode;
 	bool is_active;
 } TransformationMode;
 
@@ -855,7 +855,7 @@ void draw_selection_arrows(glm::vec3 position)
 
 	constexpr float line_width = 14.0f;
 
-	if (g_transform_mode.mode == E_Transform_Rotate)
+	if (g_transform_mode.mode == TransformMode::Rotate)
 	{
 		auto start_x = position - vec_x * 0.5f;
 		auto start_y = position - vec_y * 0.5f;
@@ -871,7 +871,7 @@ void draw_selection_arrows(glm::vec3 position)
 	}
 	else
 	{
-		if (g_transform_mode.mode == E_Transform_Scale)
+		if (g_transform_mode.mode == TransformMode::Scale)
 		{
 			Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
 			glm::mat4 rotation_mat = get_rotation_matrix(mesh_ptr->rotation);
@@ -1270,10 +1270,10 @@ void select_object_index(ObjectType type, s64 index)
 		auto selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
 		g_selected_texture_item = selected_texture_name;
 	}
-	else if (type == ObjectType::Pointlight) g_transform_mode.mode = E_Transform_Translate;
+	else if (type == ObjectType::Pointlight) g_transform_mode.mode = TransformMode::Translate;
 }
 
-void deselect_current_mesh()
+void deselect_selection()
 {
 	g_selected_object.selection_index = -1;
 	g_selected_object.type = ObjectType::None;
@@ -1310,21 +1310,15 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 	float closest_select = std::numeric_limits<float>::max();
 
 	glm::vec3 cube_normals[CUBE_PLANES_COUNT] = {
-		glm::vec3(0.0f,  1.0f,  0.0f),
-		glm::vec3(0.0f, -1.0f,  0.0f),
-		glm::vec3(1.0f,  0.0f,  0.0f),
-		glm::vec3(-1.0f,  0.0f,  0.0f),
-		glm::vec3(0.0f,  0.0f,  1.0f),
-		glm::vec3(0.0f,  0.0f, -1.0f)
+		glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f),
+		glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f),
+		glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f,  0.0f, -1.0f)
 	};
 
 	s64 plane_axises[CUBE_PLANES_COUNT] = {
-		E_Axis_Y,
-		E_Axis_Y,
-		E_Axis_X,
-		E_Axis_X,
-		E_Axis_Z,
-		E_Axis_Z
+		E_Axis_Y, E_Axis_Y,
+		E_Axis_X, E_Axis_X,
+		E_Axis_Z, E_Axis_Z
 	};
 
 	glm::mat4 rotation_matrix = get_rotation_matrix(cube->rotation);
@@ -1530,9 +1524,9 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 
 bool try_init_transform_mode()
 {
-	bool has_valid_mode = g_transform_mode.mode == E_Transform_Translate
-		|| (g_transform_mode.mode == E_Transform_Rotate && g_selected_object.type != ObjectType::Pointlight)
-		|| (g_transform_mode.mode == E_Transform_Scale && g_selected_object.type == ObjectType::Primitive);
+	bool has_valid_mode = g_transform_mode.mode == TransformMode::Translate
+		|| (g_transform_mode.mode == TransformMode::Rotate && g_selected_object.type != ObjectType::Pointlight)
+		|| (g_transform_mode.mode == TransformMode::Scale && g_selected_object.type == ObjectType::Primitive);
 
 	if (!has_valid_mode) return false;
 
@@ -1549,7 +1543,7 @@ bool try_init_transform_mode()
 
 	Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
 
-	if (g_transform_mode.mode == E_Transform_Translate)
+	if (g_transform_mode.mode == TransformMode::Translate)
 	{
 		g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
@@ -1565,7 +1559,7 @@ bool try_init_transform_mode()
 		g_prev_intersection = intersection_point;
 		g_new_translation = selected_mesh_ptr->translation;
 	}
-	else if (g_transform_mode.mode == E_Transform_Scale)
+	else if (g_transform_mode.mode == TransformMode::Scale)
 	{
 		glm::mat4 model = get_rotation_matrix(selected_mesh_ptr->rotation);
 
@@ -1590,7 +1584,7 @@ bool try_init_transform_mode()
 		g_prev_point_on_scale_plane = point_on_scale_plane;
 		g_new_scale = selected_mesh_ptr->scale;
 	}
-	else if (g_transform_mode.mode == E_Transform_Rotate)
+	else if (g_transform_mode.mode == TransformMode::Rotate)
 	{
 		g_normal_for_ray_intersect = get_normal_for_axis(g_transform_mode.axis);
 
@@ -1801,11 +1795,11 @@ Pointlight pointlight_init()
 	return p_light;
 }
 
-s64 get_curr_transformation_mode()
+TransformMode get_curr_transformation_mode()
 {
-	if (g_inputs.as_struct.q.pressed) return E_Transform_Translate;
-	if (g_inputs.as_struct.w.pressed && g_selected_object.type != ObjectType::Pointlight) return E_Transform_Rotate;
-	if (g_inputs.as_struct.e.pressed && g_selected_object.type == ObjectType::Primitive) return E_Transform_Scale;
+	if (g_inputs.as_struct.q.pressed) return TransformMode::Translate;
+	if (g_inputs.as_struct.w.pressed && g_selected_object.type != ObjectType::Pointlight) return TransformMode::Rotate;
+	if (g_inputs.as_struct.e.pressed && g_selected_object.type == ObjectType::Primitive) return TransformMode::Scale;
 	return g_transform_mode.mode;
 }
 
@@ -2412,10 +2406,13 @@ int main(int argc, char* argv[])
 			g_game_metrics.fps_prev_second = current_game_second;
 		}
 
+		// Save scene
 		if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.s.pressed) save_all();
 
+		// Get tranformation mode
 		if (!g_camera_move_mode) g_transform_mode.mode = get_curr_transformation_mode();
 
+		// Mouse 1 => select object
 		if (g_inputs.as_struct.mouse1.pressed)
 		{
 			g_frame_data.mouse_clicked = true;
@@ -2466,16 +2463,18 @@ int main(int argc, char* argv[])
 				}
 
 				if (got_selection) select_object_index(selected_type, closest_obj_index);
-				else deselect_current_mesh();
+				else deselect_selection();
 			}
 		}
 
 		bool camera_mode_start = g_inputs.as_struct.mouse2.pressed
 			&& clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y);
 
+		// Check camero move mode
 		if (camera_mode_start) g_camera_move_mode = true;
 		else if (!g_inputs.as_struct.mouse2.is_down) g_camera_move_mode = false;
 
+		// Handle camera mode mode
 		if (g_camera_move_mode)
 		{
 			glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -2523,19 +2522,19 @@ int main(int argc, char* argv[])
 		}
 		else glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
+		// Duplicate / Delete object
 		if (has_object_selection())
 		{
 			if (g_inputs.as_struct.del.pressed) delete_selected_object();
 			else if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.d.pressed) duplicate_selected_object();
 		}
 
-		// Transformation mode start
+		// Check transformation mode start
 		if (has_object_selection()
 			&& (g_inputs.as_struct.x.pressed || g_inputs.as_struct.z.pressed || g_inputs.as_struct.c.pressed))
 		{
 			g_transform_mode.is_active = try_init_transform_mode();
 		}
-		// Check transformation mode end
 		else if (g_transform_mode.is_active
 			&& !g_inputs.as_struct.z.is_down && !g_inputs.as_struct.x.is_down && !g_inputs.as_struct.c.is_down)
 		{
@@ -2558,7 +2557,7 @@ int main(int argc, char* argv[])
 
 			g_debug_plane_intersection = intersection_point;
 
-			if (intersection && g_transform_mode.mode == E_Transform_Translate)
+			if (intersection && g_transform_mode.mode == TransformMode::Translate)
 			{
 				glm::vec3 travel_dist = intersection_point - g_prev_intersection;
 				vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
@@ -2567,7 +2566,7 @@ int main(int argc, char* argv[])
 				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
 				else selected_mesh_ptr->translation = g_new_translation;
 			}
-			else if (intersection && g_transform_mode.mode == E_Transform_Scale)
+			else if (intersection && g_transform_mode.mode == TransformMode::Scale)
 			{
 				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr->rotation);
 				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
@@ -2592,7 +2591,7 @@ int main(int argc, char* argv[])
 				if (selected_mesh_ptr->scale.y < 0.01f) selected_mesh_ptr->scale.y = 0.01f;
 				if (selected_mesh_ptr->scale.z < 0.01f) selected_mesh_ptr->scale.z = 0.01f;
 			}
-			else if (intersection && g_transform_mode.mode == E_Transform_Rotate)
+			else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
 			{
 				auto new_line = g_debug_plane_intersection - selected_mesh_ptr->translation;
 
@@ -2659,19 +2658,19 @@ int main(int argc, char* argv[])
 		if (has_object_selection() && g_transform_mode.is_active)
 		{
 			// Scale mode
-			if (g_transform_mode.mode == E_Transform_Scale)
+			if (g_transform_mode.mode == TransformMode::Scale)
 			{
 
 			}
 
 			// Translate mode
-			if (g_transform_mode.mode == E_Transform_Translate)
+			if (g_transform_mode.mode == TransformMode::Translate)
 			{
 
 			}
 
 			// Rotate mode
-			if (g_transform_mode.mode == E_Transform_Rotate)
+			if (g_transform_mode.mode == TransformMode::Rotate)
 			{
 				Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
 				draw_line(g_debug_plane_intersection, selected_mesh_ptr->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
@@ -2701,7 +2700,7 @@ int main(int argc, char* argv[])
 				as_cube.mesh_type = E_Primitive_Cube;
 				as_cube.scale = vec3(0.35f);
 				as_cube.translation = selected_light->position;
-				draw_mesh_wireframe(&as_cube, glm::vec3(1.0f));
+				draw_mesh_wireframe(&as_cube, selected_light->diffuse);
 				draw_selection_arrows(selected_light->position);
 			}
 			else if (g_selected_object.type == ObjectType::Spotlight)
@@ -2711,7 +2710,7 @@ int main(int argc, char* argv[])
 				as_cube.mesh_type = E_Primitive_Cube;
 				as_cube.scale = vec3(0.35f);
 				as_cube.translation = selected_light->position;
-				draw_mesh_wireframe(&as_cube, glm::vec3(1.0f));
+				draw_mesh_wireframe(&as_cube, selected_light->diffuse);
 				draw_selection_arrows(selected_light->position);
 			}
 		}
@@ -2762,8 +2761,11 @@ int main(int argc, char* argv[])
 			sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
 											  
- 			sprintf_s(debug_str, "Lights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
+ 			sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
+
+			sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene_spotlights.items_count, g_scene_spotlights.max_items);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 96.0f);
 
 			char* t_mode = nullptr;
 			const char* tt = "Translate";
@@ -2771,9 +2773,9 @@ int main(int argc, char* argv[])
 			const char* ts = "Scale";
 			const char* transform_mode_debug_str_format = "Transform mode: %s";
 
-			if (g_transform_mode.mode == E_Transform_Translate) t_mode = const_cast<char*>(tt);
-			if (g_transform_mode.mode == E_Transform_Rotate)	t_mode = const_cast<char*>(tr);
-			if (g_transform_mode.mode == E_Transform_Scale)		t_mode = const_cast<char*>(ts);
+			if (g_transform_mode.mode == TransformMode::Translate) t_mode = const_cast<char*>(tt);
+			if (g_transform_mode.mode == TransformMode::Rotate)	t_mode = const_cast<char*>(tr);
+			if (g_transform_mode.mode == TransformMode::Scale)		t_mode = const_cast<char*>(ts);
 
 			sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);

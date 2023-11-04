@@ -14,13 +14,15 @@ typedef long long			s64;
 typedef float				f32;
 typedef double				f64;
 
-constexpr const s64 E_Transform_Translate = 0;
-constexpr const s64 E_Transform_Rotate    = 1;
-constexpr const s64 E_Transform_Scale     = 2;
-
 constexpr const s64 E_Axis_X = 0;
 constexpr const s64 E_Axis_Y = 1;
 constexpr const s64 E_Axis_Z = 2;
+
+enum class TransformMode {
+	Translate,
+	Rotate,
+	Scale
+};
 
 enum class ObjectType {
 	None,

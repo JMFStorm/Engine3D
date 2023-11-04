@@ -1,4 +1,3 @@
 TODOS:
-- spotlight rotation => direction value
-- save spotlights on scene
 - draw line width: only one value
+- draw lines on batch render
