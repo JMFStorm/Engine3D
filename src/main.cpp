@@ -32,6 +32,10 @@ using namespace glm;
 
 static constexpr const char* g_materials_dir_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
 
+static bool g_inverse_color = false;
+static bool g_effect = false;
+static float g_effect_amount = 0.0f;
+
 static bool g_use_linear_texture_filtering = false;
 static bool g_generate_texture_mipmaps = false;
 
@@ -2326,6 +2330,11 @@ int main(int argc, char* argv[])
 					glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 				}
 
+				ImGui::Text("Post processing");
+				ImGui::Checkbox("Inverse", &g_inverse_color);
+				ImGui::Checkbox("Effect", &g_effect);
+				ImGui::InputFloat("Effect amount", &g_effect_amount, 0, 0, "%.2f");
+
 				ImGui::End();
 			}
 		}
@@ -2728,15 +2737,18 @@ int main(int argc, char* argv[])
 		glUseProgram(g_scene_framebuffer_shader);
 		glBindVertexArray(g_scene_framebuffer_vao);
 
-		bool scene_inversed = false;
-		bool editor_inversed = false;
 		unsigned int inversion_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_inversion");
+		unsigned int effect_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_effect");
+		unsigned int effect_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader, "effect_amount");
 
-		glUniform1i(inversion_loc, scene_inversed);
+		glUniform1i(inversion_loc, g_inverse_color);
+		glUniform1i(effect_loc, g_effect);
+		glUniform1f(effect_amount_loc, g_effect_amount);
 		glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer_texture);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
-		glUniform1i(inversion_loc, editor_inversed);
+		glUniform1i(inversion_loc, false);
+		glUniform1i(effect_loc, false);
 		glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer_texture);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
