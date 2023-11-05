@@ -1,6 +1,8 @@
 #pragma once
 
+#include "types.h"
 #include "utils.h"
+#include "j_assert.h"
 
 typedef struct MemoryBuffer {
 	char name[32];

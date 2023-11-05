@@ -45,6 +45,9 @@
     <ClCompile Include="src\j_buffers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\j_assert.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\shaders\ui_text_fs.glsl" />
@@ -60,6 +63,8 @@
     <None Include="resources\shaders\billboard_fs.glsl" />
     <None Include="resources\shaders\wireframe_vs.glsl" />
     <None Include="resources\shaders\wireframe_fs.glsl" />
+    <None Include="resources\shaders\framebuffer_vs.glsl" />
+    <None Include="resources\shaders\framebuffer_fs.glsl" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lib\glew32.lib" />
@@ -395,7 +400,7 @@
     <ClInclude Include="include\stb_image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\utils.h">
+    <ClInclude Include="src\utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\imgui\imconfig.h">
@@ -425,7 +430,13 @@
     <ClInclude Include="include\imgui\imstb_truetype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\j_buffers.h">
+    <ClInclude Include="src\j_buffers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\j_assert.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

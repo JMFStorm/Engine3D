@@ -2,21 +2,10 @@
 
 #include <array>
 #include <iostream>
+#include <fstream>
+#include <gtc/matrix_inverse.hpp>
 
-void assert_true(bool assertion, const char* assertion_title, const char* file, const char* func, int line)
-{
-	if (!assertion)
-	{
-		std::cerr 
-			<< "ERROR: Assertion (" << assertion_title 
-			<< ") failed in: " << file 
-			<< " at function: " << func 
-			<< "(), line: " << line 
-			<< "." << std::endl;
-
-		exit(1);
-	}
-}
+using namespace glm;
 
 bool str_trim_file_ext(char* str)
 {
@@ -202,4 +191,47 @@ void get_axis_xor(s64 axis, s64 xor_axises[])
 		xor_axises[0] = E_Axis_X;
 		xor_axises[1] = E_Axis_Y;
 	}
+}
+
+bool calculate_plane_ray_intersection(
+	glm::vec3 plane_normal,
+	glm::vec3 point_in_plane,
+	glm::vec3 ray_origin,
+	glm::vec3 ray_direction,
+	glm::vec3& result)
+{
+	// Calculate the D coefficient of the plane equation
+	float D = -glm::dot(plane_normal, point_in_plane);
+
+	// Calculate t where the ray intersects the plane
+	float t = -(glm::dot(plane_normal, ray_origin) + D) / glm::dot(plane_normal, ray_direction);
+
+	// Check if t is non-positive (ray doesn't intersect) or invalid
+	if (t <= 0.0f || std::isinf(t) || std::isnan(t))
+	{
+		return false;
+	}
+
+	glm::vec3 intersection_point = ray_origin + t * ray_direction;
+	result = intersection_point;
+	return true;
+}
+
+vec3 get_spotlight_dir(Spotlight spotlight)
+{
+	vec3 spot_dir = vec3(0, -1.0f, 0);
+	glm::mat4 rotation_mat = get_rotation_matrix(spotlight.rotation);
+	spot_dir = rotation_mat * vec4(spot_dir, 1.0f);
+	return spot_dir;
+}
+
+Material material_init(Texture* color_ptr, Texture* specular_ptr)
+{
+	Material material = {
+		.color_texture = color_ptr,
+		.specular_texture = specular_ptr,
+		.specular_mult = 0.5f,
+		.shininess = 32.0f,
+	};
+	return material;
 }

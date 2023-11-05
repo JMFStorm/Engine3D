@@ -25,6 +25,7 @@
 #include <imgui/imgui_impl_opengl3.h>
 
 #include "j_buffers.h"
+#include "j_assert.h"
 #include "utils.h"
 
 using namespace glm;
@@ -39,19 +40,17 @@ glm::vec3 lastMousePos(0.0f);
 
 constexpr int right_hand_panel_width = 400;
 
-typedef struct UserSettings {
-	int window_size_px[2];
-	float transform_clip;
-	float transform_rotation_clip;
-	glm::vec3 world_ambient;
-} UserSettings;
-
 UserSettings g_user_settings = { 
 	.window_size_px = { 1900, 1200 },
 	.transform_clip = 0.25f,
 	.transform_rotation_clip = 15.0f,
 	.world_ambient = glm::vec3(0.1f),
 };
+
+static int g_framebuffer_shader;
+static unsigned int g_framebuffer;
+static unsigned int g_frame_buffer_texture;
+static unsigned int g_framebuffer_vao;
 
 int g_wireframe_shader;
 unsigned int g_wireframe_vao;
@@ -81,33 +80,6 @@ glm::vec3 g_debug_click_ray_normal = glm::vec3(0, 0, 0);
 glm::vec3 g_debug_plane_intersection = glm::vec3(0, 0, 0);
 
 GameInputsU g_inputs = {};
-
-typedef struct {
-	int bot_left_x;
-	int bot_left_y;
-	int width;
-	int height;
-} Rectangle2D;
-
-typedef struct CharData {
-	float UV_x0;
-	float UV_y0;
-	float UV_x1;
-	float UV_y1;
-	int width;
-	int height;
-	int x_offset;
-	int y_offset;
-	int advance;
-	char character;
-} CharData;
-
-typedef struct FontData {
-	std::array<CharData, 96> char_data = { 0 };
-	int texture_id;
-	float font_scale;
-	int font_height_px;
-} FontData;
 
 GameMetrics g_game_metrics = { 0 };
 
@@ -197,12 +169,6 @@ SceneSelection g_selected_object = {
 	.type = ObjectType::None,
 };
 
-typedef struct TransformationMode {
-	s64 axis;
-	TransformMode mode;
-	bool is_active;
-} TransformationMode;
-
 TransformationMode g_transform_mode = {};
 glm::vec3 g_normal_for_ray_intersect;
 glm::vec3 g_used_transform_ray;
@@ -212,6 +178,23 @@ glm::vec3 g_new_rotation;
 glm::vec3 g_new_scale;
 glm::vec3 g_point_on_scale_plane;
 glm::vec3 g_prev_point_on_scale_plane;
+
+void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
+{
+	std::ifstream file_stream(file_path, std::ios::binary | std::ios::ate);
+	ASSERT_TRUE(file_stream.is_open(), "Open file");
+
+	std::streampos file_size = file_stream.tellg();
+	ASSERT_TRUE(file_size <= buffer->size, "File size fits buffer");
+
+	file_stream.seekg(0, std::ios::beg);
+
+	char* read_pointer = (char*)buffer->memory;
+	file_stream.read(read_pointer, file_size);
+	file_stream.close();
+
+	null_terminate_string(read_pointer, file_size);
+}
 
 inline glm::mat4 get_projection_matrix()
 {
@@ -230,23 +213,6 @@ inline glm::mat4 get_view_matrix()
 		g_scene_camera.position + g_scene_camera.front_vec,
 		g_scene_camera.up_vec);
 	return view;
-}
-
-void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
-{
-	std::ifstream file_stream(file_path, std::ios::binary | std::ios::ate);
-	ASSERT_TRUE(file_stream.is_open(), "Open file");
-
-	std::streampos file_size = file_stream.tellg();
-	ASSERT_TRUE(file_size <= buffer->size, "File size fits buffer");
-
-	file_stream.seekg(0, std::ios::beg);
-
-	char* read_pointer = (char*)buffer->memory;
-	file_stream.read(read_pointer, file_size);
-	file_stream.close();
-
-	null_terminate_string(read_pointer, file_size);
 }
 
 bool check_shader_compile_error(GLuint shader)
@@ -400,14 +366,6 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 
 	glUseProgram(0);
 	glBindVertexArray(0);
-}
-
-vec3 get_spotlight_dir(Spotlight spotlight)
-{
-	vec3 spot_dir = vec3(0, -1.0f, 0);
-	glm::mat4 rotation_mat = get_rotation_matrix(spotlight.rotation);
-	spot_dir = rotation_mat * vec4(spot_dir, 1.0f);
-	return spot_dir;
 }
 
 void draw_mesh(Mesh* mesh)
@@ -1279,30 +1237,6 @@ void deselect_selection()
 	g_selected_object.type = ObjectType::None;
 }
 
-bool calculate_plane_ray_intersection(
-	glm::vec3 plane_normal,
-	glm::vec3 point_in_plane,
-	glm::vec3 ray_origin,
-	glm::vec3 ray_direction,
-	glm::vec3& result)
-{
-	// Calculate the D coefficient of the plane equation
-	float D = -glm::dot(plane_normal, point_in_plane);
-
-	// Calculate t where the ray intersects the plane
-	float t = -(glm::dot(plane_normal, ray_origin) + D) / glm::dot(plane_normal, ray_direction);
-
-	// Check if t is non-positive (ray doesn't intersect) or invalid
-	if (t <= 0.0f || std::isinf(t) || std::isnan(t))
-	{
-		return false;
-	}
-
-	glm::vec3 intersection_point = ray_origin + t * ray_direction;
-	result = intersection_point;
-	return true;
-}
-
 bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir)
 {
 	constexpr const s64 CUBE_PLANES_COUNT = 6;
@@ -1602,17 +1536,6 @@ bool try_init_transform_mode()
 	}
 
 	return true;
-}
-
-Material material_init(Texture* color_ptr, Texture* specular_ptr)
-{
-	Material material = {
-		.color_texture = color_ptr,
-		.specular_texture = specular_ptr,
-		.specular_mult = 0.5f,
-		.shininess = 32.0f,
-	};
-	return material;
 }
 
 inline MeshData mesh_serialize(Mesh* mesh)
@@ -2053,17 +1976,16 @@ int main(int argc, char* argv[])
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_fs.glsl";
 
 		g_wireframe_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		{
-			glGenVertexArrays(1, &g_wireframe_vao);
-			glBindVertexArray(g_wireframe_vao);
 
-			glGenBuffers(1, &g_wireframe_vbo);
-			glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
+		glGenVertexArrays(1, &g_wireframe_vao);
+		glBindVertexArray(g_wireframe_vao);
 
-			// Coord attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);
-		}
+		glGenBuffers(1, &g_wireframe_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
+
+		// Coord attribute
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
 	}
 
 	// Init line shader
@@ -2072,17 +1994,46 @@ int main(int argc, char* argv[])
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_fs.glsl";
 
 		g_line_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		{
-			glGenVertexArrays(1, &g_line_vao);
-			glBindVertexArray(g_line_vao);
+		
+		glGenVertexArrays(1, &g_line_vao);
+		glBindVertexArray(g_line_vao);
+		glGenBuffers(1, &g_line_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_line_vbo);
 
-			glGenBuffers(1, &g_line_vbo);
-			glBindBuffer(GL_ARRAY_BUFFER, g_line_vbo);
+		// Coord attribute
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+	}
 
-			// Coord attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);
-		}
+	// Init framebuffer shader
+	{
+		const char* vertex_shader_path   = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
+
+		g_framebuffer_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+
+		unsigned int quadVBO;
+		glGenVertexArrays(1, &g_framebuffer_vao);
+		glGenBuffers(1, &quadVBO);
+		glBindVertexArray(g_framebuffer_vao);
+
+		float quadVertices[] = {
+			// Coords	   // Uv
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			-1.0f, -1.0f,  0.0f, 0.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
+
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
+			 1.0f,  1.0f,  1.0f, 1.0f
+		};
+
+		glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 	}
 
 	// Init textures/materials
@@ -2207,6 +2158,30 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
+
+	// Init framebuffer
+	{
+		glGenFramebuffers(1, &g_framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, g_framebuffer);
+
+		glGenTextures(1, &g_frame_buffer_texture);
+		glBindTexture(GL_TEXTURE_2D, g_frame_buffer_texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_frame_buffer_texture, 0);
+
+		unsigned int rbo;
+		glGenRenderbuffers(1, &rbo);
+		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+		ASSERT_TRUE(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer successfull");
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
 	g_use_linear_texture_filtering = false;
 	g_generate_texture_mipmaps = false;
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
@@ -2222,7 +2197,6 @@ int main(int argc, char* argv[])
 	glClearColor(0.25f, 0.35f, 0.35f, 1.0f);
 
 	load_scene();
-	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 
 	while (!glfwWindowShouldClose(g_window))
 	{
@@ -2646,6 +2620,9 @@ int main(int argc, char* argv[])
 		// -------------
 		// Draw OpenGL
 
+		glBindFramebuffer(GL_FRAMEBUFFER, g_framebuffer);
+		glEnable(GL_DEPTH_TEST);
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		for (int i = 0; i < g_scene_meshes.items_count; i++)
@@ -2737,6 +2714,20 @@ int main(int argc, char* argv[])
 		// Click ray
 		auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
 		draw_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f), 1.0f, 2.0f);
+
+		// ---------------------
+		// Switch to main framebuffer
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glDisable(GL_DEPTH_TEST);
+		glClearColor(0.25f, 0.35f, 0.35f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		// Draw framebuffer
+		glUseProgram(g_framebuffer_shader);
+		glBindVertexArray(g_framebuffer_vao);
+		glBindTexture(GL_TEXTURE_2D, g_frame_buffer_texture);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		// Print debug info
 		{
