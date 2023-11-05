@@ -52,12 +52,15 @@ UserSettings g_user_settings = {
 };
 
 static int g_scene_framebuffer_shader;
+static unsigned int g_scene_framebuffer_vao;
+
 static unsigned int g_scene_framebuffer;
 static unsigned int g_scene_framebuffer_texture;
-static unsigned int g_scene_framebuffer_vao;
+static unsigned int g_scene_framebuffer_renderbuffer;
 
 static unsigned int g_editor_framebuffer;
 static unsigned int g_editor_framebuffer_texture;
+static unsigned int g_editor_framebuffer_renderbuffer;
 
 int g_wireframe_shader;
 unsigned int g_wireframe_vao;
@@ -1110,6 +1113,27 @@ void load_font(FontData* font_data, int font_height_px, const char* font_path)
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 }
 
+void init_framebuffer_resize(unsigned int* framebuffer_texture_id, unsigned int* renderbuffer_id)
+{
+	glDeleteTextures(1, framebuffer_texture_id);
+	glDeleteRenderbuffers(1, renderbuffer_id);
+
+	glGenTextures(1, framebuffer_texture_id);
+	glBindTexture(GL_TEXTURE_2D, *framebuffer_texture_id);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *framebuffer_texture_id, 0);
+
+	glGenRenderbuffers(1, renderbuffer_id);
+	glBindRenderbuffer(GL_RENDERBUFFER, *renderbuffer_id);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, *renderbuffer_id);
+
+	ASSERT_TRUE(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer successfull");
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 inline void ResizeWindowAreaData(s64 width_px, s64 height_px)
 {
 	g_game_metrics.game_width_px = width_px;
@@ -1126,6 +1150,15 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	ResizeWindowAreaData(width, height);
 	glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+
+	glGenFramebuffers(1, &g_scene_framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer);
+	init_framebuffer_resize(&g_scene_framebuffer_texture, &g_scene_framebuffer_renderbuffer);
+
+	glGenFramebuffers(1, &g_editor_framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
+	init_framebuffer_resize(&g_editor_framebuffer_texture, &g_editor_framebuffer_renderbuffer);
+
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, (float)height);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 }
@@ -2129,46 +2162,13 @@ int main(int argc, char* argv[])
 
 	// Init framebuffer
 	{
-		{
-			glGenFramebuffers(1, &g_scene_framebuffer);
-			glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer);
+		glGenFramebuffers(1, &g_scene_framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer);
+		init_framebuffer_resize(&g_scene_framebuffer_texture, &g_scene_framebuffer_renderbuffer);
 
-			glGenTextures(1, &g_scene_framebuffer_texture);
-			glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer_texture);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_scene_framebuffer_texture, 0);
-
-			unsigned int rbo;
-			glGenRenderbuffers(1, &rbo);
-			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-			ASSERT_TRUE(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer successfull");
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		}
-		{
-			glGenFramebuffers(1, &g_editor_framebuffer);
-			glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
-
-			glGenTextures(1, &g_editor_framebuffer_texture);
-			glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer_texture);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_editor_framebuffer_texture, 0);
-
-			unsigned int rbo;
-			glGenRenderbuffers(1, &rbo);
-			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-			ASSERT_TRUE(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer successfull");
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		}
+		glGenFramebuffers(1, &g_editor_framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
+		init_framebuffer_resize(&g_editor_framebuffer_texture, &g_editor_framebuffer_renderbuffer);
 	}
 
 	g_use_linear_texture_filtering = false;

@@ -1,4 +1,3 @@
 TODOS:
 - draw lines on batch render
 - sharpening post process
-- framebuffer resize
