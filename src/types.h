@@ -200,3 +200,8 @@ typedef struct UserSettings {
 	float transform_rotation_clip;
 	glm::vec3 world_ambient;
 } UserSettings;
+
+typedef struct MaterialIdData {
+	char material_name[FILENAME_LEN];
+	s64 material_id;
+} MaterialIdData;

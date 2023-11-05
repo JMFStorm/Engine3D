@@ -235,3 +235,27 @@ Material material_init(Texture* color_ptr, Texture* specular_ptr)
 	};
 	return material;
 }
+
+Spotlight spotlight_init()
+{
+	Spotlight sp = {
+		.position = vec3(0, 2, 0),
+		.rotation = vec3(0, -1, 0),
+		.diffuse = vec3(1),
+		.specular = 0.5f,
+		.cutoff = 0.90f,
+		.outer_cutoff = 0.85,
+	};
+	return sp;
+}
+
+Pointlight pointlight_init()
+{
+	Pointlight p_light = {
+		.position = glm::vec3(0.0f, 0.0f, 0.0f),
+		.diffuse = glm::vec3(1.0f),
+		.specular = 0.5f,
+		.intensity = 1.0f
+	};
+	return p_light;
+}

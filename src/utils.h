@@ -119,3 +119,7 @@ bool calculate_plane_ray_intersection(
 vec3 get_spotlight_dir(Spotlight spotlight);
 
 Material material_init(Texture* color_ptr, Texture* specular_ptr);
+
+Spotlight spotlight_init();
+
+Pointlight pointlight_init();

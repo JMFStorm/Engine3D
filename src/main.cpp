@@ -1707,17 +1707,6 @@ Texture texture_load_from_filepath(char* path)
 	return texture;
 }
 
-Pointlight pointlight_init()
-{
-	Pointlight p_light = {
-		.position = glm::vec3(0.0f, 0.0f, 0.0f),
-		.diffuse = glm::vec3(1.0f),
-		.specular = 0.5f,
-		.intensity = 1.0f
-	};
-	return p_light;
-}
-
 TransformMode get_curr_transformation_mode()
 {
 	if (g_inputs.as_struct.q.pressed) return TransformMode::Translate;
@@ -1778,24 +1767,6 @@ void save_all()
 	}
 	save_scene();
 }
-
-Spotlight spotlight_init()
-{
-	Spotlight sp = {
-		.position = vec3(0, 2, 0),
-		.rotation = vec3(0, -1, 0),
-		.diffuse = vec3(1),
-		.specular = 0.5f,
-		.cutoff = 0.90f,
-		.outer_cutoff = 0.85,
-	};
-	return sp;
-}
-
-typedef struct MaterialIdData {
-	char material_name[FILENAME_LEN];
-	s64 material_id;
-} MaterialIdData;
 
 int main(int argc, char* argv[])
 {
@@ -2194,7 +2165,7 @@ int main(int argc, char* argv[])
 	glCullFace(GL_BACK);
 	glFrontFace(GL_CCW);
 
-	glClearColor(0.25f, 0.35f, 0.35f, 1.0f);
+	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
 	load_scene();
 
@@ -2334,14 +2305,11 @@ int main(int argc, char* argv[])
 
 		// Register inputs
 		{
+			int key_state;
+			int buttons_count = sizeof(g_inputs) / sizeof(ButtonState);
 			g_frame_data.mouse_clicked = false;
 
-			if (glfwGetKey(g_window, g_inputs.as_struct.esc.key) == GLFW_PRESS)
-			{
-				glfwSetWindowShouldClose(g_window, true);
-			}
-
-			int key_state;
+			if (glfwGetKey(g_window, g_inputs.as_struct.esc.key) == GLFW_PRESS) glfwSetWindowShouldClose(g_window, true);
 
 			key_state = glfwGetMouseButton(g_window, g_inputs.as_struct.mouse1.key);
 			g_inputs.as_struct.mouse1.pressed = !g_inputs.as_struct.mouse1.is_down && key_state == GLFW_PRESS;
@@ -2351,9 +2319,7 @@ int main(int argc, char* argv[])
 			g_inputs.as_struct.mouse2.pressed = !g_inputs.as_struct.mouse2.is_down && key_state == GLFW_PRESS;
 			g_inputs.as_struct.mouse2.is_down = key_state == GLFW_PRESS;
 
-			int buttons_count = sizeof(g_inputs) / sizeof(ButtonState);
-
-			for (int i = 2; i < buttons_count - 1; i++) // Skip 2 mouse buttons
+			for (int i = 2; i < buttons_count - 1; i++) // Skip first two mouse buttons
 			{
 				ButtonState* button = &g_inputs.as_array[i];
 				set_button_state(g_window, button);
