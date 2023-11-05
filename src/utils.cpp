@@ -242,7 +242,7 @@ Spotlight spotlight_init()
 		.position = vec3(0, 2, 0),
 		.rotation = vec3(0, -1, 0),
 		.diffuse = vec3(1),
-		.specular = 0.5f,
+		.intensity = 5.0f,
 		.cutoff = 0.90f,
 		.outer_cutoff = 0.85,
 	};
@@ -255,7 +255,25 @@ Pointlight pointlight_init()
 		.position = glm::vec3(0.0f, 0.0f, 0.0f),
 		.diffuse = glm::vec3(1.0f),
 		.specular = 0.5f,
-		.intensity = 1.0f
+		.intensity = 4.0f
 	};
 	return p_light;
+}
+
+GameCamera scene_camera_init(float horizontal_fov)
+{
+	GameCamera cam = {
+		.position = vec3(0),
+		.front_vec = vec3(1,0,0),
+		.up_vec = vec3(0,1,0),
+		.yaw = 0.0f,
+		.pitch = 0.0f,
+		.fov = 60.0f,
+		.aspect_ratio_horizontal = horizontal_fov,
+		.look_sensitivity = 0.1f,
+		.move_speed = 5.0f,
+		.near_clip = 0.1f,
+		.far_clip = 100.0f,
+	};
+	return cam;
 }

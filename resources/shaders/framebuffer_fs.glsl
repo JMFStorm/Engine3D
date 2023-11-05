@@ -19,15 +19,10 @@ void main()
         float offset = blur_amount / 1000.0;
 
         vec2 offsets[9] = vec2[](
-            vec2(-offset,  offset), // top-left
-            vec2( 0.0f,    offset), // top-center
-            vec2( offset,  offset), // top-right
-            vec2(-offset,  0.0f),   // center-left
-            vec2( 0.0f,    0.0f),   // center-center
-            vec2( offset,  0.0f),   // center-right
-            vec2(-offset, -offset), // bottom-left
-            vec2( 0.0f,   -offset), // bottom-center
-            vec2( offset, -offset)  // bottom-right    
+            // Left                 // Center               // Right
+            vec2(-offset,  offset), vec2(0.0f,     offset), vec2( offset,  offset), // top
+            vec2(-offset,  0.0f),   vec2(0.0f,     0.0f),   vec2( offset,  0.0f),   // center
+            vec2(-offset, -offset), vec2(0.0f,    -offset), vec2( offset, -offset)  // bot
         );
 
         float kernel[9] = float[](

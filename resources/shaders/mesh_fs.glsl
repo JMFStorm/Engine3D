@@ -11,10 +11,11 @@ struct Spotlight {
     vec3 position;
     vec3 direction;
     vec3 diffuse;
+    float intensity;
     float cutoff;
     float outer_cutoff;
-    float linear;
-    float quadratic;
+    // float linear;
+    // float quadratic;
 };
 
 struct Material {
@@ -70,20 +71,24 @@ vec3 point_lights_color(Pointlight light, vec3 frag_normal, vec3 frag_pos, vec3 
     return vec3(diffuse + specular);
 }
 
-vec3 spotlight_color(Spotlight light, vec3 normal, vec3 fragPos, vec3 viewDir)
+vec3 spotlight_color(Spotlight light, vec3 normal, vec3 frag_pos)
 {
-    vec3 lightDir = normalize(light.position - fragPos);
-    float light_linear = 0.09;
-    float light_quadratic = 0.032;
+    vec3 lightDir = normalize(light.position - frag_pos);
 
-    float diff = max(dot(normal, lightDir), 0.0);
-    float distance = length(light.position - fragPos);
-    float attenuation = 1.0 / (1.0 + light_linear * distance + light_quadratic * (distance * distance));
+    // float light_linear = 0.09;
+    // float light_quadratic = 0.032;
+    // float distance = length(light.position - frag_pos);
+    // float attenuation = 1.0 / (1.0 + light_linear * distance + light_quadratic * (distance * distance));
+
+    float light_radius = light.intensity;
+    float distance = length(light.position - frag_pos);
+    float attenuation = 1.0 / (1.0 + (distance / light_radius) * (distance / light_radius));
 
     float theta = dot(lightDir, normalize(-light.direction));
     float epsilon = light.cutoff - light.outer_cutoff;
     float intensity = clamp((theta - light.outer_cutoff) / epsilon, 0.0, 1.0);
 
+    float diff = max(dot(normal, lightDir), 0.0);
     vec3 diffuse = light.diffuse * diff * vec3(texture(material.color_texture, TexCoord));
     diffuse *= attenuation * intensity;
     return diffuse;
@@ -105,7 +110,7 @@ void main()
 
     for (int i = 0; i < spotlights_count; i++)
     {
-        color_result += spotlight_color(spotlights[i], norm, fragPos, view_dir);
+        color_result += spotlight_color(spotlights[i], norm, fragPos);
     }
 
     FragColor = vec4(color_result, 1.0);

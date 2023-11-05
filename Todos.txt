@@ -1,5 +1,4 @@
 TODOS:
-- draw line width: only one value
 - draw lines on batch render
-- spotlight intensity
-
+- sharpening post process
+- framebuffer resize

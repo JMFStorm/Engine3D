@@ -123,3 +123,5 @@ Material material_init(Texture* color_ptr, Texture* specular_ptr);
 Spotlight spotlight_init();
 
 Pointlight pointlight_init();
+
+GameCamera scene_camera_init(float horizontal_fov);

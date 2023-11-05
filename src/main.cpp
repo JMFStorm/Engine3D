@@ -45,7 +45,7 @@ glm::vec3 lastMousePos(0.0f);
 constexpr int right_hand_panel_width = 400;
 
 UserSettings g_user_settings = { 
-	.window_size_px = { 1900, 1200 },
+	.window_size_px = { 2000, 1000 },
 	.transform_clip = 0.25f,
 	.transform_rotation_clip = 15.0f,
 	.world_ambient = glm::vec3(0.1f),
@@ -101,24 +101,6 @@ FrameData g_frame_data = {};
 constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
-
-GameCamera scene_camera_init()
-{
-	GameCamera cam = {
-		.position = vec3(0),
-		.front_vec = vec3(1,0,0),
-		.up_vec = vec3(0,1,0),
-		.yaw = 0.0f,
-		.pitch = 0.0f,
-		.fov = 60.0f,
-		.aspect_ratio_horizontal = 1.0f,
-		.look_sensitivity = 0.1f,
-		.move_speed = 5.0f,
-		.near_clip = 0.1f,
-		.far_clip = 100.0f,
-	};
-	return cam;
-}
 
 GameCamera g_scene_camera;
 bool g_camera_move_mode = false;
@@ -455,6 +437,9 @@ void draw_mesh(Mesh* mesh)
 			sprintf_s(str_value, "spotlights[%d].position", i);
 			unsigned int sp_pos_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
+			sprintf_s(str_value, "spotlights[%d].intensity", i);
+			unsigned int sp_str_loc = glGetUniformLocation(g_mesh_shader, str_value);
+
 			sprintf_s(str_value, "spotlights[%d].direction", i);
 			unsigned int sp_dir_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
@@ -469,6 +454,7 @@ void draw_mesh(Mesh* mesh)
 			glUniform3f(sp_diff_loc, spotlight.diffuse.x, spotlight.diffuse.y, spotlight.diffuse.z);
 			glUniform3f(sp_pos_loc, spotlight.position.x, spotlight.position.y, spotlight.position.z);
 			glUniform3f(sp_dir_loc, spot_dir.x, spot_dir.y, spot_dir.z);
+			glUniform1f(sp_str_loc, spotlight.intensity);
 			glUniform1f(sp_cutoff_loc, spotlight.cutoff);
 			glUniform1f(sp_outer_cutoff_loc, spotlight.outer_cutoff);
 		}
@@ -705,7 +691,7 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 	glBindVertexArray(0);
 }
 
-void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness_min, float thickness_max)
+void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness)
 {
 	glUseProgram(g_line_shader);
 	glBindVertexArray(g_line_vao);
@@ -738,9 +724,9 @@ void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness_
 
 	glm::vec3 line_midpoint = (start + end) / 2.0f;
 	float line_distance = glm::length(g_scene_camera.position - line_midpoint);
-	float scaling = 8.0f / (line_distance);
-	float average_thickness = (thickness_max + thickness_min) / 2.0f;
-	float line_width = clamp_float(average_thickness * scaling, thickness_min, thickness_max);
+	float scaling = 10.0f / line_distance;
+	float line_width = thickness * scaling;
+	if (1.0f < line_width) line_width = 1.0f,
 
 	glLineWidth(line_width);
 	glDrawArrays(GL_LINES, 0, 2);
@@ -1633,7 +1619,8 @@ inline void load_scene()
 	if (!std::filesystem::exists(filename))
 	{
 		printf(".jmap file not found.\n");
-		g_scene_camera = scene_camera_init();
+		float h_aspect = (float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
+		g_scene_camera = scene_camera_init(h_aspect);
 		return;
 	}
 
@@ -2218,101 +2205,105 @@ int main(int argc, char* argv[])
 
 				ImGui::Begin("Properties", nullptr, 0);
 
-				if (ImGui::Button("Add plane"))
+				// Add new objects
 				{
-					Mesh new_plane = {
-						.translation = vec3(0),
-						.rotation = vec3(0),
-						.scale = vec3(1.0f),
-						.material = j_array_get(&g_materials, 0),
-						.mesh_type = E_Primitive_Plane,
-						.uv_multiplier = 1.0f,
-					};
-					s64 new_mesh_index = add_new_mesh(new_plane);
-					select_object_index(ObjectType::Primitive, new_mesh_index);
-				}
-
-				if (ImGui::Button("Add Cube"))
-				{
-					Mesh new_cube = {
-						.translation = vec3(0),
-						.rotation = vec3(0),
-						.scale = vec3(1.0f),
-						.material = j_array_get(&g_materials, 0),
-						.mesh_type = E_Primitive_Cube,
-						.uv_multiplier = 1.0f,
-					};
-					s64 new_mesh_index = add_new_mesh(new_cube);
-					select_object_index(ObjectType::Primitive, new_mesh_index);
-				}
-
-				if (ImGui::Button("Add pointlight"))
-				{
-					Pointlight new_pointlight = pointlight_init();
-					s64 new_light_index = add_new_pointlight(new_pointlight);
-					select_object_index(ObjectType::Pointlight, new_light_index);
-				}
-
-				if (ImGui::Button("Add spotlight"))
-				{
-					Spotlight new_spotlight = spotlight_init();
-					s64 new_light_index = add_new_spotlight(new_spotlight);
-					select_object_index(ObjectType::Spotlight, new_light_index);
-				}
-
-				if (g_selected_object.type == ObjectType::Primitive)
-				{
-					char selected_mesh_str[24];
-					sprintf_s(selected_mesh_str, "Mesh index: %lld", g_selected_object.selection_index);
-					ImGui::Text(selected_mesh_str);
-
-					Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
-
-					ImGui::Text("Mesh properties");
-					ImGui::InputFloat3("Translation", &selected_mesh_ptr->translation[0], "%.2f");
-					ImGui::InputFloat3("Rotation", &selected_mesh_ptr->rotation[0], "%.2f");
-					ImGui::InputFloat3("Scale", &selected_mesh_ptr->scale[0], "%.2f");
-
-					ImGui::Text("Select material");
-					ImGui::Image((ImTextureID)selected_mesh_ptr->material->color_texture->gpu_id, ImVec2(128, 128));
-
-					char* texture_names_ptr = (char*)g_material_names.data;
-
-					if (ImGui::Combo("Material", &g_selected_texture_item, texture_names_ptr, g_material_names.strings_count))
+					if (ImGui::Button("Add plane"))
 					{
-						selected_mesh_ptr->material = j_array_get(&g_materials, g_selected_texture_item);
+						Mesh new_plane = {
+							.translation = vec3(0),
+							.rotation = vec3(0),
+							.scale = vec3(1.0f),
+							.material = j_array_get(&g_materials, 0),
+							.mesh_type = E_Primitive_Plane,
+							.uv_multiplier = 1.0f,
+						};
+						s64 new_mesh_index = add_new_mesh(new_plane);
+						select_object_index(ObjectType::Primitive, new_mesh_index);
 					}
-
-					ImGui::InputFloat("UV mult", &selected_mesh_ptr->uv_multiplier, 0, 0, "%.2f");
-
-					ImGui::Text("Material properties");
-					ImGui::InputFloat("Specular mult", &selected_mesh_ptr->material->specular_mult, 0, 0, "%.3f");
-					ImGui::InputFloat("Material shine", &selected_mesh_ptr->material->shininess, 0, 0, "%.3f");
+					if (ImGui::Button("Add Cube"))
+					{
+						Mesh new_cube = {
+							.translation = vec3(0),
+							.rotation = vec3(0),
+							.scale = vec3(1.0f),
+							.material = j_array_get(&g_materials, 0),
+							.mesh_type = E_Primitive_Cube,
+							.uv_multiplier = 1.0f,
+						};
+						s64 new_mesh_index = add_new_mesh(new_cube);
+						select_object_index(ObjectType::Primitive, new_mesh_index);
+					}
+					if (ImGui::Button("Add pointlight"))
+					{
+						Pointlight new_pointlight = pointlight_init();
+						s64 new_light_index = add_new_pointlight(new_pointlight);
+						select_object_index(ObjectType::Pointlight, new_light_index);
+					}
+					if (ImGui::Button("Add spotlight"))
+					{
+						Spotlight new_spotlight = spotlight_init();
+						s64 new_light_index = add_new_spotlight(new_spotlight);
+						select_object_index(ObjectType::Spotlight, new_light_index);
+					}
 				}
-				else if (g_selected_object.type == ObjectType::Pointlight)
+
+				// Selection properties
 				{
-					char selected_light_str[24];
-					sprintf_s(selected_light_str, "Light index: %lld", g_selected_object.selection_index);
-					ImGui::Text(selected_light_str);
+					if (g_selected_object.type == ObjectType::Primitive)
+					{
+						char selected_mesh_str[24];
+						sprintf_s(selected_mesh_str, "Mesh index: %lld", g_selected_object.selection_index);
+						ImGui::Text(selected_mesh_str);
 
-					Pointlight* selected_light_ptr = (Pointlight*)get_selected_object_ptr();
+						Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
 
-					ImGui::Text("Pointight properties");
-					ImGui::InputFloat3("Light pos", &selected_light_ptr->position[0], "%.3f");
-					ImGui::ColorEdit3("Color Picker", &selected_light_ptr->diffuse[0], 0);
-					ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
-					ImGui::InputFloat("Light intensity", &selected_light_ptr->intensity, 0, 0, "%.3f");
-				}
-				else if (g_selected_object.type == ObjectType::Spotlight)
-				{
-					Spotlight* selected_spotlight_ptr = (Spotlight*)get_selected_object_ptr();
+						ImGui::Text("Mesh properties");
+						ImGui::InputFloat3("Translation", &selected_mesh_ptr->translation[0], "%.2f");
+						ImGui::InputFloat3("Rotation", &selected_mesh_ptr->rotation[0], "%.2f");
+						ImGui::InputFloat3("Scale", &selected_mesh_ptr->scale[0], "%.2f");
 
-					ImGui::Text("Spotlight properties");
-					ImGui::ColorEdit3("Color", &selected_spotlight_ptr->diffuse[0], 0);
-					ImGui::InputFloat3("Position", &selected_spotlight_ptr->position[0], "%.2f");
-					ImGui::InputFloat3("Direction", &selected_spotlight_ptr->rotation[0], "%.2f");
-					ImGui::InputFloat("Cutoff", &selected_spotlight_ptr->cutoff, 0, 0, "%.2f");
-					ImGui::InputFloat("Outer cutoff", &selected_spotlight_ptr->outer_cutoff, 0, 0, "%.2f");
+						ImGui::Text("Select material");
+						ImGui::Image((ImTextureID)selected_mesh_ptr->material->color_texture->gpu_id, ImVec2(128, 128));
+
+						char* texture_names_ptr = (char*)g_material_names.data;
+
+						if (ImGui::Combo("Material", &g_selected_texture_item, texture_names_ptr, g_material_names.strings_count))
+						{
+							selected_mesh_ptr->material = j_array_get(&g_materials, g_selected_texture_item);
+						}
+
+						ImGui::InputFloat("UV mult", &selected_mesh_ptr->uv_multiplier, 0, 0, "%.2f");
+
+						ImGui::Text("Material properties");
+						ImGui::InputFloat("Specular mult", &selected_mesh_ptr->material->specular_mult, 0, 0, "%.3f");
+						ImGui::InputFloat("Material shine", &selected_mesh_ptr->material->shininess, 0, 0, "%.3f");
+					}
+					else if (g_selected_object.type == ObjectType::Pointlight)
+					{
+						char selected_light_str[24];
+						sprintf_s(selected_light_str, "Light index: %lld", g_selected_object.selection_index);
+						ImGui::Text(selected_light_str);
+
+						Pointlight* selected_light_ptr = (Pointlight*)get_selected_object_ptr();
+
+						ImGui::Text("Pointight properties");
+						ImGui::InputFloat3("Light pos", &selected_light_ptr->position[0], "%.3f");
+						ImGui::ColorEdit3("Color Picker", &selected_light_ptr->diffuse[0], 0);
+						ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
+						ImGui::InputFloat("Light intensity", &selected_light_ptr->intensity, 0, 0, "%.3f");
+					}
+					else if (g_selected_object.type == ObjectType::Spotlight)
+					{
+						Spotlight* selected_spotlight_ptr = (Spotlight*)get_selected_object_ptr();
+
+						ImGui::Text("Spotlight properties");
+						ImGui::ColorEdit3("Color", &selected_spotlight_ptr->diffuse[0], 0);
+						ImGui::InputFloat3("Position", &selected_spotlight_ptr->position[0], "%.2f");
+						ImGui::InputFloat3("Direction", &selected_spotlight_ptr->rotation[0], "%.2f");
+						ImGui::InputFloat("Intensity", &selected_spotlight_ptr->intensity, 0, 0, "%.2f");
+						ImGui::InputFloat("Cutoff", &selected_spotlight_ptr->cutoff, 0, 0, "%.2f");
+						ImGui::InputFloat("Outer cutoff", &selected_spotlight_ptr->outer_cutoff, 0, 0, "%.2f");
+					}
 				}
 
 				ImGui::Text("Editor settings");
@@ -2662,14 +2653,14 @@ int main(int argc, char* argv[])
 				if (g_transform_mode.mode == TransformMode::Rotate)
 				{
 					Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
-					draw_line(g_debug_plane_intersection, selected_mesh_ptr->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
+					draw_line(g_debug_plane_intersection, selected_mesh_ptr->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f);
 				}
 			}
 
 			// Coordinate lines
-			draw_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), 1.0f, 1.0f);
-			draw_line(glm::vec3(0.0f, -1000.0f, 0.0f), glm::vec3(0.0f, 1000.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 1.0f);
-			draw_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f), 1.0f, 1.0f);
+			draw_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), 1.0f);
+			draw_line(glm::vec3(0.0f, -1000.0f, 0.0f), glm::vec3(0.0f, 1000.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), 1.0f);
+			draw_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f), 1.0f);
 
 			// Draw selection
 			if (has_object_selection())
@@ -2717,13 +2708,13 @@ int main(int argc, char* argv[])
 					auto spotlight = *j_array_get(&g_scene_spotlights, i);
 					draw_billboard(spotlight.position, spotlight_texture, 0.5f);
 					vec3 sp_dir = get_spotlight_dir(spotlight);
-					draw_line(spotlight.position, spotlight.position + sp_dir, spotlight.diffuse, 2.0f, 2.0f);
+					draw_line(spotlight.position, spotlight.position + sp_dir, spotlight.diffuse, 2.0f);
 				}
 			}
 
 			// Click ray
 			auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
-			draw_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f), 1.0f, 2.0f);
+			draw_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f), 1.0f);
 
 		}
 
