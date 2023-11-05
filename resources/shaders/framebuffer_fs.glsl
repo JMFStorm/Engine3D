@@ -5,9 +5,18 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
+uniform bool use_inversion;
 
 void main()
 {
-    vec3 col = texture(screenTexture, TexCoords).rgb;
-    FragColor = vec4(col, 1.0);
+    if (use_inversion)
+    {
+        vec4 texture_color = texture(screenTexture, TexCoords);
+        vec3 inversed_color = vec3(1.0) - texture_color.rgb;
+        FragColor = vec4(inversed_color, texture_color.a);
+    }
+    else
+    {
+        FragColor = texture(screenTexture, TexCoords);
+    }
 }

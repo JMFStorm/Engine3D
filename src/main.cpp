@@ -47,10 +47,13 @@ UserSettings g_user_settings = {
 	.world_ambient = glm::vec3(0.1f),
 };
 
-static int g_framebuffer_shader;
-static unsigned int g_framebuffer;
-static unsigned int g_frame_buffer_texture;
-static unsigned int g_framebuffer_vao;
+static int g_scene_framebuffer_shader;
+static unsigned int g_scene_framebuffer;
+static unsigned int g_scene_framebuffer_texture;
+static unsigned int g_scene_framebuffer_vao;
+
+static unsigned int g_editor_framebuffer;
+static unsigned int g_editor_framebuffer_texture;
 
 int g_wireframe_shader;
 unsigned int g_wireframe_vao;
@@ -1976,35 +1979,37 @@ int main(int argc, char* argv[])
 		glEnableVertexAttribArray(0);
 	}
 
-	// Init framebuffer shader
+	// Init framebuffer shaders
 	{
-		const char* vertex_shader_path   = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
+		{
+			const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
+			const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
 
-		g_framebuffer_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+			g_scene_framebuffer_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 
-		unsigned int quadVBO;
-		glGenVertexArrays(1, &g_framebuffer_vao);
-		glGenBuffers(1, &quadVBO);
-		glBindVertexArray(g_framebuffer_vao);
+			unsigned int quadVBO;
+			glGenVertexArrays(1, &g_scene_framebuffer_vao);
+			glGenBuffers(1, &quadVBO);
+			glBindVertexArray(g_scene_framebuffer_vao);
 
-		float quadVertices[] = {
-			// Coords	   // Uv
-			-1.0f,  1.0f,  0.0f, 1.0f,
-			-1.0f, -1.0f,  0.0f, 0.0f,
-			 1.0f, -1.0f,  1.0f, 0.0f,
+			float quadVertices[] = {
+				// Coords	   // Uv
+				-1.0f,  1.0f,  0.0f, 1.0f,
+				-1.0f, -1.0f,  0.0f, 0.0f,
+				 1.0f, -1.0f,  1.0f, 0.0f,
 
-			-1.0f,  1.0f,  0.0f, 1.0f,
-			 1.0f, -1.0f,  1.0f, 0.0f,
-			 1.0f,  1.0f,  1.0f, 1.0f
-		};
+				-1.0f,  1.0f,  0.0f, 1.0f,
+				 1.0f, -1.0f,  1.0f, 0.0f,
+				 1.0f,  1.0f,  1.0f, 1.0f
+			};
 
-		glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+			glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+			glEnableVertexAttribArray(0);
+			glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+			glEnableVertexAttribArray(1);
+			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+		}
 	}
 
 	// Init textures/materials
@@ -2133,24 +2138,46 @@ int main(int argc, char* argv[])
 
 	// Init framebuffer
 	{
-		glGenFramebuffers(1, &g_framebuffer);
-		glBindFramebuffer(GL_FRAMEBUFFER, g_framebuffer);
+		{
+			glGenFramebuffers(1, &g_scene_framebuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer);
 
-		glGenTextures(1, &g_frame_buffer_texture);
-		glBindTexture(GL_TEXTURE_2D, g_frame_buffer_texture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_frame_buffer_texture, 0);
+			glGenTextures(1, &g_scene_framebuffer_texture);
+			glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer_texture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_scene_framebuffer_texture, 0);
 
-		unsigned int rbo;
-		glGenRenderbuffers(1, &rbo);
-		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+			unsigned int rbo;
+			glGenRenderbuffers(1, &rbo);
+			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
-		ASSERT_TRUE(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer successfull");
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			ASSERT_TRUE(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer successfull");
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+		{
+			glGenFramebuffers(1, &g_editor_framebuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
+
+			glGenTextures(1, &g_editor_framebuffer_texture);
+			glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer_texture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_editor_framebuffer_texture, 0);
+
+			unsigned int rbo;
+			glGenRenderbuffers(1, &rbo);
+			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+			ASSERT_TRUE(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer successfull");
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
 	}
 
 	g_use_linear_texture_filtering = false;
@@ -2586,113 +2613,131 @@ int main(int argc, char* argv[])
 		// -------------
 		// Draw OpenGL
 
-		glBindFramebuffer(GL_FRAMEBUFFER, g_framebuffer);
-		glEnable(GL_DEPTH_TEST);
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		for (int i = 0; i < g_scene_meshes.items_count; i++)
+		// Scene framebuffer
 		{
-			Mesh plane = *j_array_get(&g_scene_meshes, i);
-			draw_mesh(&plane);
-		}
+			glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer);
+			glEnable(GL_DEPTH_TEST);
+			glClearColor(0.34f, 0.44f, 0.42f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		// Transformation mode debug lines
-		if (has_object_selection() && g_transform_mode.is_active)
-		{
-			// Scale mode
-			if (g_transform_mode.mode == TransformMode::Scale)
+			for (int i = 0; i < g_scene_meshes.items_count; i++)
 			{
-
-			}
-
-			// Translate mode
-			if (g_transform_mode.mode == TransformMode::Translate)
-			{
-
-			}
-
-			// Rotate mode
-			if (g_transform_mode.mode == TransformMode::Rotate)
-			{
-				Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
-				draw_line(g_debug_plane_intersection, selected_mesh_ptr->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
+				Mesh plane = *j_array_get(&g_scene_meshes, i);
+				draw_mesh(&plane);
 			}
 		}
 
-		// Coordinate lines
+		// Editor framebuffer
 		{
+			glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
+			glEnable(GL_DEPTH_TEST);
+			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			// Transformation mode debug lines
+			if (has_object_selection() && g_transform_mode.is_active)
+			{
+				// Scale mode
+				if (g_transform_mode.mode == TransformMode::Scale)
+				{
+
+				}
+
+				// Translate mode
+				if (g_transform_mode.mode == TransformMode::Translate)
+				{
+
+				}
+
+				// Rotate mode
+				if (g_transform_mode.mode == TransformMode::Rotate)
+				{
+					Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
+					draw_line(g_debug_plane_intersection, selected_mesh_ptr->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f, 2.0f);
+				}
+			}
+
+			// Coordinate lines
 			draw_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), 1.0f, 1.0f);
 			draw_line(glm::vec3(0.0f, -1000.0f, 0.0f), glm::vec3(0.0f, 1000.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 1.0f);
 			draw_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f), 1.0f, 1.0f);
+
+			// Draw selection
+			if (has_object_selection())
+			{
+				if (g_selected_object.type == ObjectType::Primitive)
+				{
+					Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
+					draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
+					draw_selection_arrows(selected_mesh->translation);
+				}
+				else if (g_selected_object.type == ObjectType::Pointlight)
+				{
+					Pointlight* selected_light = (Pointlight*)get_selected_object_ptr();
+					Mesh as_cube = {};
+					as_cube.mesh_type = E_Primitive_Cube;
+					as_cube.scale = vec3(0.35f);
+					as_cube.translation = selected_light->position;
+					draw_mesh_wireframe(&as_cube, selected_light->diffuse);
+					draw_selection_arrows(selected_light->position);
+				}
+				else if (g_selected_object.type == ObjectType::Spotlight)
+				{
+					Spotlight* selected_light = (Spotlight*)get_selected_object_ptr();
+					Mesh as_cube = {};
+					as_cube.mesh_type = E_Primitive_Cube;
+					as_cube.scale = vec3(0.35f);
+					as_cube.translation = selected_light->position;
+					draw_mesh_wireframe(&as_cube, selected_light->diffuse);
+					draw_selection_arrows(selected_light->position);
+				}
+			}
+
+			// Draw billboards
+			{
+				// Pointlights
+				for (int i = 0; i < g_scene_pointlights.items_count; i++)
+				{
+					auto light = *j_array_get(&g_scene_pointlights, i);
+					draw_billboard(light.position, pointlight_texture, 0.5f);
+				}
+
+				// Spotlights
+				for (int i = 0; i < g_scene_spotlights.items_count; i++)
+				{
+					auto spotlight = *j_array_get(&g_scene_spotlights, i);
+					draw_billboard(spotlight.position, spotlight_texture, 0.5f);
+					vec3 sp_dir = get_spotlight_dir(spotlight);
+					draw_line(spotlight.position, spotlight.position + sp_dir, spotlight.diffuse, 2.0f, 2.0f);
+				}
+			}
+
+			// Click ray
+			auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
+			draw_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f), 1.0f, 2.0f);
+
 		}
 
-		// Draw selection
-		if (has_object_selection())
-		{
-			if (g_selected_object.type == ObjectType::Primitive)
-			{
-				Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
-				draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
-				draw_selection_arrows(selected_mesh->translation);
-			}
-			else if (g_selected_object.type == ObjectType::Pointlight)
-			{
-				Pointlight* selected_light = (Pointlight*)get_selected_object_ptr();
-				Mesh as_cube = {};
-				as_cube.mesh_type = E_Primitive_Cube;
-				as_cube.scale = vec3(0.35f);
-				as_cube.translation = selected_light->position;
-				draw_mesh_wireframe(&as_cube, selected_light->diffuse);
-				draw_selection_arrows(selected_light->position);
-			}
-			else if (g_selected_object.type == ObjectType::Spotlight)
-			{
-				Spotlight* selected_light = (Spotlight*)get_selected_object_ptr();
-				Mesh as_cube = {};
-				as_cube.mesh_type = E_Primitive_Cube;
-				as_cube.scale = vec3(0.35f);
-				as_cube.translation = selected_light->position;
-				draw_mesh_wireframe(&as_cube, selected_light->diffuse);
-				draw_selection_arrows(selected_light->position);
-			}
-		}
-
-		// Draw billboards
-		{
-			// Pointlights
-			for (int i = 0; i < g_scene_pointlights.items_count; i++)
-			{
-				auto light = *j_array_get(&g_scene_pointlights, i);
-				draw_billboard(light.position, pointlight_texture, 0.5f);
-			}
-
-			// Spotlights
-			for (int i = 0; i < g_scene_spotlights.items_count; i++)
-			{
-				auto spotlight = *j_array_get(&g_scene_spotlights, i);
-				draw_billboard(spotlight.position, spotlight_texture, 0.5f);
-				vec3 sp_dir = get_spotlight_dir(spotlight);
-				draw_line(spotlight.position, spotlight.position + sp_dir, spotlight.diffuse, 2.0f, 2.0f);
-			}
-		}
-
-		// Click ray
-		auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
-		draw_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f), 1.0f, 2.0f);
-
-		// ---------------------
-		// Switch to main framebuffer
+		// -------------------
+		// Draw framebuffers
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glDisable(GL_DEPTH_TEST);
-		glClearColor(0.25f, 0.35f, 0.35f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		// Draw framebuffer
-		glUseProgram(g_framebuffer_shader);
-		glBindVertexArray(g_framebuffer_vao);
-		glBindTexture(GL_TEXTURE_2D, g_frame_buffer_texture);
+		glUseProgram(g_scene_framebuffer_shader);
+		glBindVertexArray(g_scene_framebuffer_vao);
+
+		bool scene_inversed = false;
+		bool editor_inversed = false;
+		unsigned int inversion_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_inversion");
+
+		glUniform1i(inversion_loc, scene_inversed);
+		glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer_texture);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		glUniform1i(inversion_loc, editor_inversed);
+		glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer_texture);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		// Print debug info
@@ -2717,8 +2762,8 @@ int main(int argc, char* argv[])
 
 			sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
-											  
- 			sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
+
+			sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
 
 			sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene_spotlights.items_count, g_scene_spotlights.max_items);
