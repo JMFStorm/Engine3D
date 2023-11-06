@@ -1,6 +1,5 @@
 TODOS:
-- draw lines on batch render
-- too many indicies on text draw
+
 
 Post process:
 - sharpening

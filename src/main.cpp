@@ -897,10 +897,11 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 			x1, y0, 0.0f,		current.UV_x1, current.UV_y0  // bottom right
 		};
 
-		memcpy(&memory_location[g_text_indicies], vertices, sizeof(vertices));
+		s64 index = g_text_indicies * 5;
+		memcpy(&memory_location[index], vertices, sizeof(vertices));
 
 		g_text_buffer_size += sizeof(vertices);
-		g_text_indicies += 30;
+		g_text_indicies += 6;
 
 		text_offset_x_px += current.advance;
 		text++;
@@ -1648,11 +1649,11 @@ inline void save_scene()
 inline void load_scene()
 {
 	const char* filename = "scene_01.jmap";
+	float h_aspect = (float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
 
 	if (!std::filesystem::exists(filename))
 	{
 		printf(".jmap file not found.\n");
-		float h_aspect = (float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
 		g_scene_camera = scene_camera_init(h_aspect);
 		return;
 	}
@@ -1669,6 +1670,7 @@ inline void load_scene()
 	GameCamera cam_data = {};
 	input_file.read(reinterpret_cast<char*>(&cam_data), sizeof(cam_data));
 	g_scene_camera = cam_data;
+	g_scene_camera.aspect_ratio_horizontal = h_aspect;
 
 	// Mesh count
 	s64 mesh_count = 0;
