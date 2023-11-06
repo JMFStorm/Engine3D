@@ -277,3 +277,15 @@ GameCamera scene_camera_init(float horizontal_fov)
 	};
 	return cam;
 }
+
+float get_line_distance_width(glm::vec3 line_start, glm::vec3 line_end, glm::vec3 view_pos, float thickness)
+{
+	glm::vec3 line_midpoint = (line_start + line_end) / 2.0f;
+	float line_distance = glm::length(view_pos - line_midpoint);
+	float scaling = 10.0f / line_distance;
+
+	float line_width = thickness * scaling;
+	if (1.0f < line_width) line_width = 1.0f;
+
+	return line_width;
+}

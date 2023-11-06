@@ -45,7 +45,7 @@ glm::vec3 lastMousePos(0.0f);
 constexpr int right_hand_panel_width = 400;
 
 UserSettings g_user_settings = { 
-	.window_size_px = { 2000, 1000 },
+	.window_size_px = { 1900, 1200 },
 	.transform_clip = 0.25f,
 	.transform_rotation_clip = 15.0f,
 	.world_ambient = glm::vec3(0.1f),
@@ -70,6 +70,11 @@ int g_line_shader;
 unsigned int g_line_vao;
 unsigned int g_line_vbo;
 
+MemoryBuffer g_line_vertex_buffer = {};
+constexpr const s64 MAX_LINES_BUFFER = 200;
+s64 g_line_buffer_size = 0;
+s64 g_line_indicies = 0;
+
 int g_billboard_shader;
 unsigned int g_billboard_vao;
 unsigned int g_billboard_vbo;
@@ -82,8 +87,8 @@ int g_ui_text_shader;
 unsigned int g_ui_text_vao;
 unsigned int g_ui_text_vbo;
 
-int g_text_buffer_size = 0;
-int g_text_indicies = 0;
+s64 g_text_buffer_size = 0;
+s64 g_text_indicies = 0;
 
 glm::vec3 g_debug_click_camera_pos = glm::vec3(0, 0, 0);
 glm::vec3 g_debug_click_ray_normal = glm::vec3(0, 0, 0);
@@ -96,7 +101,7 @@ GameMetrics g_game_metrics = { 0 };
 float debug_font_vh = 1.0f;
 const char* g_debug_font_path = "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf";
 
-int g_max_UI_chars = 1000;
+constexpr const s64 g_max_UI_chars = 1000;
 FontData g_debug_font;
 
 FrameData g_frame_data = {};
@@ -694,7 +699,25 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 	glBindVertexArray(0);
 }
 
-void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness)
+void append_line(glm::vec3 start, glm::vec3 end, glm::vec3 color)
+{
+	float vertices[] =
+	{
+		// Coords				   // Color					 
+		start.x, start.y, start.z, color.r, color.g, color.b,
+		end.x,   end.y,   end.z,   color.r, color.g, color.b,
+	};
+
+	float* memory_location = (float*)g_line_vertex_buffer.memory;
+
+	s64 index = g_line_indicies * 6;
+	memcpy(&memory_location[index], vertices, sizeof(vertices));
+
+	g_line_buffer_size += sizeof(vertices);
+	g_line_indicies += 2;
+}
+
+void draw_lines(float thickness)
 {
 	glUseProgram(g_line_shader);
 	glBindVertexArray(g_line_vao);
@@ -712,73 +735,25 @@ void draw_line(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness)
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
-	unsigned int color_loc = glGetUniformLocation(g_line_shader, "lineColor");
-	glUniform3f(color_loc, color.r, color.g, color.b);
-
-	float vertices[] =
-	{
-		// Coords
-		start.x, start.y, start.z,
-		end.x,   end.y,   end.z
-	};
-
 	glBindBuffer(GL_ARRAY_BUFFER, g_line_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, g_line_buffer_size, g_line_vertex_buffer.memory, GL_DYNAMIC_DRAW);
 
-	glm::vec3 line_midpoint = (start + end) / 2.0f;
-	float line_distance = glm::length(g_scene_camera.position - line_midpoint);
-	float scaling = 10.0f / line_distance;
-	float line_width = thickness * scaling;
-	if (1.0f < line_width) line_width = 1.0f,
+	glLineWidth(thickness);
+	glDrawArrays(GL_LINES, 0, g_line_indicies);
 
-	glLineWidth(line_width);
-	glDrawArrays(GL_LINES, 0, 2);
+	g_line_buffer_size = 0;
+	g_line_indicies = 0;
 	g_frame_data.draw_calls++;
 
 	glUseProgram(0);
 	glBindVertexArray(0);
 }
 
-void draw_line_ontop(glm::vec3 start, glm::vec3 end, glm::vec3 color, float thickness)
+void draw_lines_ontop(float thickness)
 {
-	glUseProgram(g_line_shader);
-	glBindVertexArray(g_line_vao);
-
 	glDisable(GL_DEPTH_TEST);
-
-	glm::mat4 model = glm::mat4(1.0f);
-	glm::mat4 projection = glm::perspective(glm::radians(g_scene_camera.fov), g_scene_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
-	auto new_mat_4 = g_scene_camera.position + g_scene_camera.front_vec;
-	glm::mat4 view = glm::lookAt(g_scene_camera.position, new_mat_4, g_scene_camera.up_vec);
-
-	unsigned int model_loc = glGetUniformLocation(g_line_shader, "model");
-	unsigned int view_loc = glGetUniformLocation(g_line_shader, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_line_shader, "projection");
-
-	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
-	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
-
-	unsigned int color_loc = glGetUniformLocation(g_line_shader, "lineColor");
-	glUniform3f(color_loc, color.r, color.g, color.b);
-
-	float vertices[] =
-	{
-		// Coords
-		start.x, start.y, start.z,
-		end.x,   end.y,   end.z
-	};
-
-	glBindBuffer(GL_ARRAY_BUFFER, g_line_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-
-	glLineWidth(thickness);
-	glDrawArrays(GL_LINES, 0, 2);
-	g_frame_data.draw_calls++;
-
+	draw_lines(thickness);
 	glEnable(GL_DEPTH_TEST);
-	glUseProgram(0);
-	glBindVertexArray(0);
 }
 
 void* get_selected_object_ptr()
@@ -801,6 +776,29 @@ void* get_selected_object_ptr()
 	return nullptr;
 }
 
+vec3 get_selected_object_translation()
+{
+	if (g_selected_object.type == ObjectType::Primitive)
+	{
+		Mesh* mesh = j_array_get(&g_scene_meshes, g_selected_object.selection_index);
+		return mesh->translation;
+	}
+
+	if (g_selected_object.type == ObjectType::Pointlight)
+	{
+		Pointlight* p_light = j_array_get(&g_scene_pointlights, g_selected_object.selection_index);
+		return p_light->position;
+	}
+
+	if (g_selected_object.type == ObjectType::Spotlight)
+	{
+		Spotlight* s_light = j_array_get(&g_scene_spotlights, g_selected_object.selection_index);
+		return s_light->position;
+	}
+
+	return vec3(0);
+}
+
 void draw_selection_arrows(glm::vec3 position)
 {
 	auto vec_x = glm::vec3(1.0f, 0, 0);
@@ -819,9 +817,10 @@ void draw_selection_arrows(glm::vec3 position)
 		auto end_y = position + vec_y * 0.5f;
 		auto end_z = position + vec_z * 0.5f;
 
-		draw_line_ontop(start_y, end_y, glm::vec3(0.0f, 1.0f, 0.0f), line_width / 2);
-		draw_line_ontop(start_x, end_x, glm::vec3(1.0f, 0.0f, 0.0f), line_width / 4);
-		draw_line_ontop(start_z, end_z, glm::vec3(0.0f, 0.0f, 1.0f), line_width / 4);
+		append_line(start_y, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
+		append_line(start_x, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
+		append_line(start_z, end_z, glm::vec3(0.0f, 0.0f, 1.0f));
+		draw_lines_ontop(line_width);
 	}
 	else
 	{
@@ -838,9 +837,10 @@ void draw_selection_arrows(glm::vec3 position)
 		auto end_y = position + vec_y;
 		auto end_z = position + vec_z;
 
-		draw_line_ontop(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f), line_width);
-		draw_line_ontop(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f), line_width);
-		draw_line_ontop(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f), line_width);
+		append_line(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
+		append_line(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
+		append_line(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f));
+		draw_lines_ontop(line_width);
 	}
 }
 
@@ -920,7 +920,7 @@ void draw_ui_text(FontData* font_data, float red, float green, float blue)
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
-	glDrawArrays(GL_TRIANGLES, 0, g_text_buffer_size);
+	glDrawArrays(GL_TRIANGLES, 0, g_text_indicies);
 
 	glUseProgram(0);
 	glBindVertexArray(0);
@@ -1819,6 +1819,14 @@ int main(int argc, char* argv[])
 		constexpr const s64 material_names_arr_size = FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
 		memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material items"));
 		g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
+
+		int vertex_bytes_for_char = sizeof(float) * 30;
+		int text_buffer_size = vertex_bytes_for_char * g_max_UI_chars;
+		memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text draw verticies"));
+
+		int vertex_bytes_for_line = sizeof(float) * 12;
+		int line_buffer_size = vertex_bytes_for_line * MAX_LINES_BUFFER;
+		memory_buffer_mallocate(&g_line_vertex_buffer, text_buffer_size, const_cast<char*>("Line draw verticies"));
 	}
 
 	// Init window and context
@@ -1933,11 +1941,6 @@ int main(int argc, char* argv[])
 			// UV attribute
 			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 			glEnableVertexAttribArray(1);
-
-			// Reserve vertex array
-			int vertex_data_for_char = 120;
-			int text_buffer_size = vertex_data_for_char * g_max_UI_chars;
-			memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text verticies"));
 		}
 	}
 
@@ -1992,15 +1995,19 @@ int main(int argc, char* argv[])
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_fs.glsl";
 
 		g_line_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		
+
 		glGenVertexArrays(1, &g_line_vao);
 		glBindVertexArray(g_line_vao);
 		glGenBuffers(1, &g_line_vbo);
 		glBindBuffer(GL_ARRAY_BUFFER, g_line_vbo);
 
 		// Coord attribute
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
+
+		// Color attribute
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(1);
 	}
 
 	// Init framebuffer shaders
@@ -2620,6 +2627,12 @@ int main(int argc, char* argv[])
 			glClearColor(0.34f, 0.44f, 0.42f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+			// Coordinate lines
+			append_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+			append_line(glm::vec3(0.0f, -1000.0f, 0.0f), glm::vec3(0.0f, 1000.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+			append_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+			draw_lines(1.0f);
+
 			for (int i = 0; i < g_scene_meshes.items_count; i++)
 			{
 				Mesh plane = *j_array_get(&g_scene_meshes, i);
@@ -2637,30 +2650,31 @@ int main(int argc, char* argv[])
 			// Transformation mode debug lines
 			if (has_object_selection() && g_transform_mode.is_active)
 			{
-				// Scale mode
-				if (g_transform_mode.mode == TransformMode::Scale)
-				{
+				vec3 line_color;
 
-				}
+				if (g_transform_mode.axis == E_Axis_X) line_color = glm::vec3(1.0f, 0.2f, 0.2f);
+				if (g_transform_mode.axis == E_Axis_Y) line_color = glm::vec3(0.2f, 1.0f, 0.2f);
+				if (g_transform_mode.axis == E_Axis_Z) line_color = glm::vec3(0.2f, 0.2f, 1.0f);
 
-				// Translate mode
 				if (g_transform_mode.mode == TransformMode::Translate)
 				{
-
+					append_line(g_debug_plane_intersection, g_new_translation, line_color);
+					draw_lines(3.0f);
 				}
-
-				// Rotate mode
-				if (g_transform_mode.mode == TransformMode::Rotate)
+				else if (g_transform_mode.mode == TransformMode::Rotate)
 				{
-					Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
-					draw_line(g_debug_plane_intersection, selected_mesh_ptr->translation, glm::vec3(1.0f, 1.0f, 0.0f), 2.0f);
+					vec3 selected_obj_origin = get_selected_object_translation();
+					append_line(g_debug_plane_intersection, selected_obj_origin, line_color);
+					draw_lines(3.0f);
+				}
+				else if (g_transform_mode.mode == TransformMode::Scale)
+				{
+					vec3 selected_obj_origin = get_selected_object_translation();
+					append_line(g_debug_plane_intersection, g_point_on_scale_plane, line_color);
+					append_line(g_debug_plane_intersection, selected_obj_origin, vec3(1.0f, 1.0f, 0.0f));
+					draw_lines(1.0f);
 				}
 			}
-
-			// Coordinate lines
-			draw_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), 1.0f);
-			draw_line(glm::vec3(0.0f, -1000.0f, 0.0f), glm::vec3(0.0f, 1000.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), 1.0f);
-			draw_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f), 1.0f);
 
 			// Draw selection
 			if (has_object_selection())
@@ -2708,14 +2722,15 @@ int main(int argc, char* argv[])
 					auto spotlight = *j_array_get(&g_scene_spotlights, i);
 					draw_billboard(spotlight.position, spotlight_texture, 0.5f);
 					vec3 sp_dir = get_spotlight_dir(spotlight);
-					draw_line(spotlight.position, spotlight.position + sp_dir, spotlight.diffuse, 2.0f);
+					append_line(spotlight.position, spotlight.position + sp_dir, spotlight.diffuse);
 				}
+				draw_lines(2.0f);
 			}
 
 			// Click ray
 			auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
-			draw_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f), 1.0f);
-
+			append_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f));
+			draw_lines(1.0f);
 		}
 
 		// -------------------
