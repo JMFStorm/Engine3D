@@ -1,3 +1,4 @@
 TODOS:
 -spotlight specular
+-material.data -file reorganizes items when adding new material
 

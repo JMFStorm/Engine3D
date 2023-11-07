@@ -445,6 +445,9 @@ void draw_mesh(Mesh* mesh)
 			sprintf_s(str_value, "spotlights[%d].position", i);
 			unsigned int sp_pos_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
+			sprintf_s(str_value, "spotlights[%d].specular", i);
+			unsigned int sp_spec_loc = glGetUniformLocation(g_mesh_shader, str_value);
+
 			sprintf_s(str_value, "spotlights[%d].intensity", i);
 			unsigned int sp_str_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
@@ -462,6 +465,7 @@ void draw_mesh(Mesh* mesh)
 			glUniform3f(sp_diff_loc, spotlight.diffuse.x, spotlight.diffuse.y, spotlight.diffuse.z);
 			glUniform3f(sp_pos_loc, spotlight.position.x, spotlight.position.y, spotlight.position.z);
 			glUniform3f(sp_dir_loc, spot_dir.x, spot_dir.y, spot_dir.z);
+			glUniform1f(sp_spec_loc, spotlight.specular);
 			glUniform1f(sp_str_loc, spotlight.intensity);
 			glUniform1f(sp_cutoff_loc, spotlight.cutoff);
 			glUniform1f(sp_outer_cutoff_loc, spotlight.outer_cutoff);
@@ -2309,6 +2313,7 @@ int main(int argc, char* argv[])
 						ImGui::ColorEdit3("Color", &selected_spotlight_ptr->diffuse[0], 0);
 						ImGui::InputFloat3("Position", &selected_spotlight_ptr->position[0], "%.2f");
 						ImGui::InputFloat3("Direction", &selected_spotlight_ptr->rotation[0], "%.2f");
+						ImGui::InputFloat("Specular", &selected_spotlight_ptr->specular, 0, 0, "%.2f");
 						ImGui::InputFloat("Intensity", &selected_spotlight_ptr->intensity, 0, 0, "%.2f");
 						ImGui::InputFloat("Cutoff", &selected_spotlight_ptr->cutoff, 0, 0, "%.2f");
 						ImGui::InputFloat("Outer cutoff", &selected_spotlight_ptr->outer_cutoff, 0, 0, "%.2f");

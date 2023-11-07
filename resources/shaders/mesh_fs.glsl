@@ -11,11 +11,10 @@ struct Spotlight {
     vec3 position;
     vec3 direction;
     vec3 diffuse;
+    float specular;
     float intensity;
     float cutoff;
     float outer_cutoff;
-    // float linear;
-    // float quadratic;
 };
 
 struct Material {
@@ -72,21 +71,34 @@ vec3 point_lights_color(Pointlight light, vec3 frag_normal, vec3 frag_pos, vec3 
     return vec3(diffuse + specular);
 }
 
-vec3 spotlight_color(Spotlight light, vec3 normal, vec3 frag_pos)
+vec3 spotlight_color(Spotlight light, vec3 frag_normal, vec3 frag_pos, vec3 view_dir)
 {
-    vec3 lightDir = normalize(light.position - frag_pos);
+    vec3 specular = vec3(0, 0, 0);
+    vec3 light_dir = normalize(light.position - frag_pos);
     float light_radius = light.intensity;
     float distance = length(light.position - frag_pos);
     float attenuation = 1.0 / (1.0 + (distance / light_radius) * (distance / light_radius));
 
-    float theta = dot(lightDir, normalize(-light.direction));
+    float theta = dot(light_dir, normalize(-light.direction));
     float epsilon = light.cutoff - light.outer_cutoff;
     float intensity = clamp((theta - light.outer_cutoff) / epsilon, 0.0, 1.0);
 
-    float diff = max(dot(normal, lightDir), 0.0);
+    float diff = max(dot(frag_normal, light_dir), 0.0);
     vec3 diffuse = light.diffuse * diff * vec3(texture(material.color_texture, TexCoord));
+
+    if (use_specular_texture)
+    {
+        vec3 halfway_dir = normalize(light_dir + view_dir);  
+        float spec = pow(max(dot(frag_normal, halfway_dir), 0.0), material.shininess);
+
+        specular = light.specular * spec * vec3(texture(material.specular_texture, TexCoord)) * material.specular_mult;
+        specular *= diffuse;
+    }
+
     diffuse *= attenuation * intensity;
-    return diffuse;
+    specular *= attenuation * intensity;
+
+    return vec3(diffuse + specular);
 }
 
 void main()
@@ -105,7 +117,7 @@ void main()
 
     for (int i = 0; i < spotlights_count; i++)
     {
-        color_result += spotlight_color(spotlights[i], norm, fragPos);
+        color_result += spotlight_color(spotlights[i], norm, fragPos, view_dir);
     }
 
     FragColor = vec4(color_result, 1.0);

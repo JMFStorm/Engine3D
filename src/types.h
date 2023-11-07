@@ -85,6 +85,7 @@ typedef struct Spotlight {
 	glm::vec3 position;
 	glm::vec3 rotation;
 	glm::vec3 diffuse;
+	float specular;
 	float intensity;
 	float cutoff;
 	float outer_cutoff;
