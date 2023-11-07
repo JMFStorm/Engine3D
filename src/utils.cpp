@@ -242,8 +242,8 @@ Spotlight spotlight_init()
 		.position = vec3(0, 2, 0),
 		.rotation = vec3(0, -1, 0),
 		.diffuse = vec3(1),
-		.specular = 1.0f,
-		.intensity = 5.0f,
+		.specular = 2.0f,
+		.range = 5.0f,
 		.cutoff = 0.90f,
 		.outer_cutoff = 0.85,
 	};
@@ -255,8 +255,9 @@ Pointlight pointlight_init()
 	Pointlight p_light = {
 		.position = glm::vec3(0.0f, 0.0f, 0.0f),
 		.diffuse = glm::vec3(1.0f),
+		.range = 6.0f,
 		.specular = 1.0f,
-		.intensity = 4.0f
+		.intensity = 1.0f
 	};
 	return p_light;
 }

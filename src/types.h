@@ -77,6 +77,7 @@ typedef struct MeshData {
 typedef struct Pointlight {
 	glm::vec3 position;
 	glm::vec3 diffuse;
+	float range;
 	float specular;
 	float intensity;
 } Pointlight;
@@ -86,7 +87,7 @@ typedef struct Spotlight {
 	glm::vec3 rotation;
 	glm::vec3 diffuse;
 	float specular;
-	float intensity;
+	float range;
 	float cutoff;
 	float outer_cutoff;
 } Spotlight;

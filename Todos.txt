@@ -1,4 +1,3 @@
 TODOS:
--spotlight specular
--material.data -file reorganizes items when adding new material
-
+- light on/off
+- material.data -file re-organizes items when adding new material

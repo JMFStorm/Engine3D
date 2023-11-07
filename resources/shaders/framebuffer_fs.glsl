@@ -6,6 +6,7 @@ uniform sampler2D screenTexture;
 uniform bool use_inversion;
 uniform bool use_blur;
 uniform float blur_amount;
+uniform float gamma_amount;
 
 out vec4 FragColor;
 
@@ -44,6 +45,9 @@ void main()
     {
         final_color = vec3(1.0) - final_color;
     }
+
+    // Gamma correction
+    final_color = pow(final_color, vec3(1.0/gamma_amount));
 
     FragColor = vec4(final_color, texture_color.a);
 }

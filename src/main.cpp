@@ -35,9 +35,11 @@ static constexpr const char* g_materials_dir_path = "G:\\projects\\game\\Engine3
 static bool g_inverse_color = false;
 static bool g_blur_effect = false;
 static float g_blur_effect_amount = 0.0f;
+static float g_gamma_amount = 1.6f;
 
 static bool g_use_linear_texture_filtering = false;
 static bool g_generate_texture_mipmaps = false;
+static bool g_load_texture_sRGB = false;
 
 GLFWwindow* g_window;
 glm::vec3 lastMousePos(0.0f);
@@ -315,7 +317,12 @@ int load_image_into_texture_id(const char* image_path)
 	else glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filtering_mode);
 
 	GLint use_format = n == 3 ? GL_RGB : GL_RGBA;
-	glTexImage2D(GL_TEXTURE_2D, 0, use_format, x, y, 0, use_format, GL_UNSIGNED_BYTE, data);
+	GLint internal_format;
+
+	if (g_load_texture_sRGB) internal_format = n == 3 ? GL_SRGB : GL_SRGB_ALPHA;
+	else internal_format = n == 3 ? GL_RGB : GL_RGBA;
+
+	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, use_format, GL_UNSIGNED_BYTE, data);
 
 	if (g_generate_texture_mipmaps) glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -425,10 +432,14 @@ void draw_mesh(Mesh* mesh)
 			sprintf_s(str_value, "pointlights[%d].intensity", i);
 			unsigned int light_intens_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
+			sprintf_s(str_value, "pointlights[%d].range", i);
+			unsigned int light_range_loc = glGetUniformLocation(g_mesh_shader, str_value);
+
 			glUniform3f(light_pos_loc, pointlight.position.x, pointlight.position.y, pointlight.position.z);
 			glUniform3f(light_diff_loc, pointlight.diffuse.x, pointlight.diffuse.y, pointlight.diffuse.z);
 			glUniform1f(light_spec_loc, pointlight.specular);
 			glUniform1f(light_intens_loc, pointlight.intensity);
+			glUniform1f(light_range_loc, pointlight.range);
 		}
 
 		// Spotlights
@@ -448,8 +459,8 @@ void draw_mesh(Mesh* mesh)
 			sprintf_s(str_value, "spotlights[%d].specular", i);
 			unsigned int sp_spec_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
-			sprintf_s(str_value, "spotlights[%d].intensity", i);
-			unsigned int sp_str_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			sprintf_s(str_value, "spotlights[%d].range", i);
+			unsigned int sp_rng_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].direction", i);
 			unsigned int sp_dir_loc = glGetUniformLocation(g_mesh_shader, str_value);
@@ -466,7 +477,7 @@ void draw_mesh(Mesh* mesh)
 			glUniform3f(sp_pos_loc, spotlight.position.x, spotlight.position.y, spotlight.position.z);
 			glUniform3f(sp_dir_loc, spot_dir.x, spot_dir.y, spot_dir.z);
 			glUniform1f(sp_spec_loc, spotlight.specular);
-			glUniform1f(sp_str_loc, spotlight.intensity);
+			glUniform1f(sp_rng_loc, spotlight.range);
 			glUniform1f(sp_cutoff_loc, spotlight.cutoff);
 			glUniform1f(sp_outer_cutoff_loc, spotlight.outer_cutoff);
 		}
@@ -2053,6 +2064,7 @@ int main(int argc, char* argv[])
 	{
 		g_use_linear_texture_filtering = true;
 		g_generate_texture_mipmaps = true;
+		g_load_texture_sRGB = false;
 
 		char path_str[FILE_PATH_LEN] = { 0 };
 		strcpy_s(path_str, pointlight_image_path);
@@ -2123,6 +2135,7 @@ int main(int argc, char* argv[])
 			filename = entry.path().stem().filename().string();
 			sprintf_s(filepath, "%s\\%s.png", g_materials_dir_path, filename.c_str());
 
+			g_load_texture_sRGB = true;
 			Texture color_texture = texture_load_from_filepath(filepath);
 			Texture* color_texture_prt = j_array_add(&g_textures, color_texture);
 			new_material.color_texture = color_texture_prt;
@@ -2133,6 +2146,7 @@ int main(int argc, char* argv[])
 
 			if (spec_file.good())
 			{
+				g_load_texture_sRGB = false;
 				Texture specular_texture = texture_load_from_filepath(filepath);
 				specular_texture_ptr = j_array_add(&g_textures, specular_texture);
 				new_material.specular_texture = specular_texture_ptr;
@@ -2186,6 +2200,7 @@ int main(int argc, char* argv[])
 
 	g_use_linear_texture_filtering = false;
 	g_generate_texture_mipmaps = false;
+	g_load_texture_sRGB = false;
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 
@@ -2300,10 +2315,11 @@ int main(int argc, char* argv[])
 						Pointlight* selected_light_ptr = (Pointlight*)get_selected_object_ptr();
 
 						ImGui::Text("Pointight properties");
-						ImGui::InputFloat3("Light pos", &selected_light_ptr->position[0], "%.3f");
-						ImGui::ColorEdit3("Color Picker", &selected_light_ptr->diffuse[0], 0);
-						ImGui::InputFloat("Light specular", &selected_light_ptr->specular, 0, 0, "%.3f");
-						ImGui::InputFloat("Light intensity", &selected_light_ptr->intensity, 0, 0, "%.3f");
+						ImGui::InputFloat3("Position", &selected_light_ptr->position[0], "%.3f");
+						ImGui::ColorEdit3("Color", &selected_light_ptr->diffuse[0], 0);
+						ImGui::InputFloat("Range", &selected_light_ptr->range, 0, 0, "%.2f");
+						ImGui::InputFloat("Specular", &selected_light_ptr->specular, 0, 0, "%.2f");
+						ImGui::InputFloat("Intensity", &selected_light_ptr->intensity, 0, 0, "%.2f");
 					}
 					else if (g_selected_object.type == ObjectType::Spotlight)
 					{
@@ -2314,7 +2330,7 @@ int main(int argc, char* argv[])
 						ImGui::InputFloat3("Position", &selected_spotlight_ptr->position[0], "%.2f");
 						ImGui::InputFloat3("Direction", &selected_spotlight_ptr->rotation[0], "%.2f");
 						ImGui::InputFloat("Specular", &selected_spotlight_ptr->specular, 0, 0, "%.2f");
-						ImGui::InputFloat("Intensity", &selected_spotlight_ptr->intensity, 0, 0, "%.2f");
+						ImGui::InputFloat("Range", &selected_spotlight_ptr->range, 0, 0, "%.2f");
 						ImGui::InputFloat("Cutoff", &selected_spotlight_ptr->cutoff, 0, 0, "%.2f");
 						ImGui::InputFloat("Outer cutoff", &selected_spotlight_ptr->outer_cutoff, 0, 0, "%.2f");
 					}
@@ -2338,7 +2354,8 @@ int main(int argc, char* argv[])
 				ImGui::Text("Post processing");
 				ImGui::Checkbox("Inverse", &g_inverse_color);
 				ImGui::Checkbox("Blur", &g_blur_effect);
-				ImGui::InputFloat("Blur amount", &g_blur_effect_amount, 0, 0, "%.2f");
+				ImGui::InputFloat("Blur amount", &g_blur_effect_amount, 0, 0, "%.1f");
+				ImGui::InputFloat("Gamma", &g_gamma_amount, 0, 0, "%.1f");
 
 				ImGui::End();
 			}
@@ -2753,10 +2770,13 @@ int main(int argc, char* argv[])
 		unsigned int inversion_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_inversion");
 		unsigned int blur_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_blur");
 		unsigned int blur_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader, "blur_amount");
+		unsigned int gamma_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader, "gamma_amount");
 
 		glUniform1i(inversion_loc, g_inverse_color);
 		glUniform1i(blur_loc, g_blur_effect);
 		glUniform1f(blur_amount_loc, g_blur_effect_amount);
+		glUniform1f(gamma_amount_loc, g_gamma_amount);
+
 		glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer_texture);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
