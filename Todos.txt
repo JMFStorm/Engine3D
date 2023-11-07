@@ -1,7 +1,3 @@
 TODOS:
+-spotlight specular
 
-
-Post process:
-- sharpening
-- noise/grain
-- depth of field

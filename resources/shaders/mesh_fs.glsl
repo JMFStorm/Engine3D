@@ -59,8 +59,9 @@ vec3 point_lights_color(Pointlight light, vec3 frag_normal, vec3 frag_pos, vec3 
 
     if (use_specular_texture)
     {
-        vec3 reflectDir = reflect(-light_dir, frag_normal);
-        float spec = pow(max(dot(view_dir, reflectDir), 0.0), material.shininess);
+        vec3 halfway_dir = normalize(light_dir + view_dir);  
+        float spec = pow(max(dot(frag_normal, halfway_dir), 0.0), material.shininess);
+
         specular = light.specular * spec * vec3(texture(material.specular_texture, TexCoord)) * material.specular_mult;
         specular *= diffuse;
     }
@@ -74,12 +75,6 @@ vec3 point_lights_color(Pointlight light, vec3 frag_normal, vec3 frag_pos, vec3 
 vec3 spotlight_color(Spotlight light, vec3 normal, vec3 frag_pos)
 {
     vec3 lightDir = normalize(light.position - frag_pos);
-
-    // float light_linear = 0.09;
-    // float light_quadratic = 0.032;
-    // float distance = length(light.position - frag_pos);
-    // float attenuation = 1.0 / (1.0 + light_linear * distance + light_quadratic * (distance * distance));
-
     float light_radius = light.intensity;
     float distance = length(light.position - frag_pos);
     float attenuation = 1.0 / (1.0 + (distance / light_radius) * (distance / light_radius));
