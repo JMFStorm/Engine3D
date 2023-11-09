@@ -39,6 +39,8 @@ uniform bool use_texture;
 uniform bool use_specular_texture;
 uniform vec3 view_coords;
 
+uniform vec3 shadow_map_light_pos;
+
 uniform vec3 global_ambient_light;
 
 uniform int pointlights_count;
@@ -106,7 +108,7 @@ vec3 spotlight_color(Spotlight light, vec3 frag_normal, vec3 frag_pos, vec3 view
     return vec3(diffuse + specular) * intensity;
 }
 
-float ShadowCalculation(vec4 fragPosLightSpace)
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm)
 {
     // perform perspective divide
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -120,8 +122,11 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
 
-    // check whether current frag pos is in shadow
-    float shadow = currentDepth > closestDepth  ? 1.0 : 0.0;
+    vec3 light_dir = normalize(shadow_map_light_pos - fs_in.fragPos);
+    float fragment_dot = (1.0 - dot(frag_norm, light_dir));
+
+    float bias = max(0.005 * fragment_dot, 0.001);
+    float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
 
     return shadow;
 }  
@@ -133,7 +138,6 @@ void main()
     vec3 view_dir = normalize(view_coords - fs_in.fragPos);
 
     vec3 ambient = global_ambient_light * texture(material.color_texture, fs_in.TexCoord).rgb;
-    color_result += ambient;
 
     for (int i = 0; i < pointlights_count; i++)
     {
@@ -145,8 +149,8 @@ void main()
         color_result += spotlight_color(spotlights[i], norm, fs_in.fragPos, view_dir);
     }
 
-    float shadow = ShadowCalculation(fs_in.FragPosLightSpace);
-    color_result = color_result * (1.0 - shadow);
+    float shadow = ShadowCalculation(fs_in.FragPosLightSpace, fs_in.fragNormal);
+    color_result = color_result * (1.0 - shadow) + ambient;
 
     FragColor = vec4(color_result, 1.0);
 }

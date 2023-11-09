@@ -36,12 +36,18 @@ static unsigned int g_shadow_map_debug_shader;
 static unsigned int g_shadow_map_debug_vao;
 static unsigned int g_shadow_map_debug_vbo;
 
-static glm::vec3 g_shadow_map_light(0, 4.0f, 0);
+static f32 g_shadow_map_near_plane = 0.25f;
+static f32 g_shadow_map_far_plane = 15.0f;
+static glm::vec3 g_shadow_map_light_pos(0, 4.0f, 0);
+static glm::vec3 g_shadow_map_light_look_at(0, 0, 6.0f);
+
 static unsigned int g_shadow_map_shader;
 static unsigned int g_shadow_map_vao;
 static unsigned int g_shadow_map_vbo;
 
-static const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+static const unsigned int SHADOW_WIDTH = 1024 * 2;
+static const unsigned int SHADOW_HEIGHT = 1024 * 2;
+
 unsigned int g_shadow_map_framebuffer;
 static unsigned int g_shadow_map_texture;
 
@@ -65,7 +71,7 @@ UserSettings g_user_settings = {
 	.window_size_px = { 1900, 1200 },
 	.transform_clip = 0.25f,
 	.transform_rotation_clip = 15.0f,
-	.world_ambient = glm::vec3(0.1f),
+	.world_ambient = glm::vec3(0.075f),
 };
 
 static int g_scene_framebuffer_shader;
@@ -508,9 +514,8 @@ void draw_mesh(Mesh* mesh)
 
 	// Shadow map for dev
 	{
-		float near_plane = 0.25f, far_plane = 15.0f;
-		glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-		glm::mat4 lightView = glm::lookAt(g_shadow_map_light, glm::vec3(0, 0, 6.0f), glm::vec3(0.0, 1.0, 0.0));
+		glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
+		glm::mat4 lightView = glm::lookAt(g_shadow_map_light_pos, g_shadow_map_light_look_at, glm::vec3(0.0, 1.0, 0.0));
 		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 		unsigned int light_matrix_loc = glGetUniformLocation(g_mesh_shader, "lightSpaceMatrix");
@@ -518,6 +523,10 @@ void draw_mesh(Mesh* mesh)
 
 		unsigned int shadow_texture_loc = glGetUniformLocation(g_mesh_shader, "shadowMap");
 		glUniform1i(shadow_texture_loc, 2);
+
+		unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, "shadow_map_light_pos");
+		glUniform3f(light_pos_loc, g_shadow_map_light_pos.x, g_shadow_map_light_pos.y, g_shadow_map_light_pos.z);
+
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
 	}
@@ -2542,7 +2551,8 @@ int main(int argc, char* argv[])
 
 				// g_shadow_map_light
 				ImGui::Checkbox("DEBUG_SHADOWMAP", &DEBUG_SHADOWMAP);
-				ImGui::InputFloat3("Shadow light position", &g_shadow_map_light[0], "%.2f");
+				ImGui::InputFloat3("Shadow light position", &g_shadow_map_light_pos[0], "%.2f");
+				ImGui::InputFloat3("Shadow light lookat", &g_shadow_map_light_look_at[0], "%.2f");
 
 				ImGui::End();
 			}
@@ -2834,13 +2844,12 @@ int main(int argc, char* argv[])
 
 		// Shadow map framebuffer
 		{
-			glm::mat4 lightProjection, lightView;
-			glm::mat4 lightSpaceMatrix;
+			glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
+			glm::mat4 lightView = glm::lookAt(g_shadow_map_light_pos, g_shadow_map_light_look_at, glm::vec3(0.0, 1.0, 0.0));
+			glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
-			float near_plane = 0.25f, far_plane = 15.0f;
-			lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-			lightView = glm::lookAt(g_shadow_map_light, glm::vec3(0, 0, 6.0f), glm::vec3(0.0, 1.0, 0.0));
-			lightSpaceMatrix = lightProjection * lightView;
+			glFrontFace(GL_CW);
+			glCullFace(GL_FRONT);
 
 			glUseProgram(g_shadow_map_shader);
 			unsigned int light_matrix_loc = glGetUniformLocation(g_shadow_map_shader, "lightSpaceMatrix");
@@ -2864,6 +2873,9 @@ int main(int argc, char* argv[])
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			glFrontFace(GL_CCW);
+			glCullFace(GL_BACK);
 		}
 
 		// Scene framebuffer
