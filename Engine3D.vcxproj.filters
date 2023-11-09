@@ -65,6 +65,10 @@
     <None Include="resources\shaders\framebuffer_fs.glsl" />
     <None Include="resources\shaders\line_vs.glsl" />
     <None Include="resources\shaders\line_fs.glsl" />
+    <None Include="resources\shaders\shadow_map_vs.glsl" />
+    <None Include="resources\shaders\shadow_map_fs.glsl" />
+    <None Include="resources\shaders\shadow_map_debug_vs.glsl" />
+    <None Include="resources\shaders\shadow_map_debug_fs.glsl" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lib\glew32.lib" />

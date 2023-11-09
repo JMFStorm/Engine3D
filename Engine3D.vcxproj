@@ -165,6 +165,10 @@
     <None Include="resources\shaders\line_vs.glsl" />
     <None Include="resources\shaders\mesh_fs.glsl" />
     <None Include="resources\shaders\mesh_vs.glsl" />
+    <None Include="resources\shaders\shadow_map_debug_fs.glsl" />
+    <None Include="resources\shaders\shadow_map_fs.glsl" />
+    <None Include="resources\shaders\shadow_map_vs.glsl" />
+    <None Include="resources\shaders\shadow_map_debug_vs.glsl" />
     <None Include="resources\shaders\simple_reactangle_fs.glsl" />
     <None Include="resources\shaders\simple_reactangle_vs.glsl" />
     <None Include="resources\shaders\ui_text_fs.glsl" />

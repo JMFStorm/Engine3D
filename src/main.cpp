@@ -30,6 +30,19 @@
 
 using namespace glm;
 
+static unsigned int g_shadow_map_debug_shader;
+static unsigned int g_shadow_map_debug_vao;
+static unsigned int g_shadow_map_debug_vbo;
+
+static glm::vec3 g_shadow_map_light(0, 4.0f, 0);
+static unsigned int g_shadow_map_shader;
+static unsigned int g_shadow_map_vao;
+static unsigned int g_shadow_map_vbo;
+
+static const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+unsigned int g_shadow_map_framebuffer;
+static unsigned int g_shadow_map_texture;
+
 static constexpr const char* g_materials_dir_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
 
 static bool g_inverse_color = false;
@@ -370,6 +383,103 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 
 	glUseProgram(0);
 	glBindVertexArray(0);
+}
+
+void draw_mesh_shadow_map(Mesh* mesh)
+{
+	glm::mat4 model = get_model_matrix(mesh);
+	unsigned int model_loc = glGetUniformLocation(g_shadow_map_shader, "model");
+	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+
+	s64 draw_indicies = 0;
+
+	if (mesh->mesh_type == E_Primitive_Plane)
+	{
+		float vertices[] =
+		{
+			// Coords		
+			1.0f, 0.0f, 0.0f, // top right
+			0.0f, 0.0f, 0.0f, // top left
+			0.0f, 0.0f, 1.0f, // bot left
+
+			1.0f, 0.0f, 0.0f, // top right
+			0.0f, 0.0f, 1.0f, // bot left 
+			1.0f, 0.0f, 1.0f, // bot right
+		};
+
+		draw_indicies = 6;
+		glBindBuffer(GL_ARRAY_BUFFER, g_shadow_map_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	}
+	else if (mesh->mesh_type == E_Primitive_Cube)
+	{
+		float vertices[] =
+		{
+			// Coords		
+			// Ceiling
+			0.5f,  0.5f, -0.5f,// top right
+		   -0.5f,  0.5f, -0.5f,// top left
+		   -0.5f,  0.5f,  0.5f,// bot left
+
+			0.5f,  0.5f, -0.5f,// top right
+		   -0.5f,  0.5f,  0.5f,// bot left 
+			0.5f,  0.5f,  0.5f,// bot right
+
+			// Floor
+		   -0.5f, -0.5f,  0.5f,// bot left 
+			0.5f, -0.5f, -0.5f,// top right
+			0.5f, -0.5f,  0.5f,// bot right
+
+		   -0.5f, -0.5f,  0.5f,// bot left
+		   -0.5f, -0.5f, -0.5f,// top left
+			0.5f, -0.5f, -0.5f,// top right
+
+			// North
+		   -0.5f, -0.5f, -0.5f, // bot left 
+			0.5f,  0.5f, -0.5f, // top right
+			0.5f, -0.5f, -0.5f, // bot right
+
+		   -0.5f, -0.5f, -0.5f, // bot left
+		   -0.5f,  0.5f, -0.5f, // top left
+			0.5f,  0.5f, -0.5f, // top right
+
+			// South
+			0.5f,  0.5f,  0.5f, // top right
+		   -0.5f, -0.5f,  0.5f, // bot left 
+			0.5f, -0.5f,  0.5f, // bot right
+
+		   -0.5f,  0.5f,  0.5f, // top left
+		   -0.5f, -0.5f,  0.5f, // bot left
+			0.5f,  0.5f,  0.5f, // top right
+
+			// West
+		   -0.5f, -0.5f,  0.5f, // bot left 
+		   -0.5f,  0.5f, -0.5f, // top right
+		   -0.5f, -0.5f, -0.5f, // bot right
+
+		   -0.5f, -0.5f,  0.5f, // bot left
+		   -0.5f,  0.5f,  0.5f, // top left
+		   -0.5f,  0.5f, -0.5f, // top right
+
+		   // East
+		   0.5f,  0.5f, -0.5f, // top right
+		   0.5f, -0.5f,  0.5f, // bot left 
+		   0.5f, -0.5f, -0.5f, // bot right
+
+		   0.5f,  0.5f,  0.5f, // top left
+		   0.5f, -0.5f,  0.5f, // bot left
+		   0.5f,  0.5f, -0.5f, // top right
+		};
+
+		draw_indicies = 36;
+		glBindBuffer(GL_ARRAY_BUFFER, g_shadow_map_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	}
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDrawArrays(GL_TRIANGLES, 0, draw_indicies);
+	g_frame_data.draw_calls++;
 }
 
 void draw_mesh(Mesh* mesh)
@@ -2029,35 +2139,84 @@ int main(int argc, char* argv[])
 
 	// Init framebuffer shaders
 	{
-		{
-			const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
-			const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
+		
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
 
-			g_scene_framebuffer_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_scene_framebuffer_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 
-			unsigned int quadVBO;
-			glGenVertexArrays(1, &g_scene_framebuffer_vao);
-			glGenBuffers(1, &quadVBO);
-			glBindVertexArray(g_scene_framebuffer_vao);
+		unsigned int quadVBO;
+		glGenVertexArrays(1, &g_scene_framebuffer_vao);
+		glGenBuffers(1, &quadVBO);
+		glBindVertexArray(g_scene_framebuffer_vao);
 
-			float quadVertices[] = {
-				// Coords	   // Uv
-				-1.0f,  1.0f,  0.0f, 1.0f,
-				-1.0f, -1.0f,  0.0f, 0.0f,
-				 1.0f, -1.0f,  1.0f, 0.0f,
+		float quadVertices[] = {
+			// Coords	   // Uv
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			-1.0f, -1.0f,  0.0f, 0.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
 
-				-1.0f,  1.0f,  0.0f, 1.0f,
-				 1.0f, -1.0f,  1.0f, 0.0f,
-				 1.0f,  1.0f,  1.0f, 1.0f
-			};
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
+			 1.0f,  1.0f,  1.0f, 1.0f
+		};
 
-			glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-			glEnableVertexAttribArray(0);
-			glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(1);
-			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-		}
+		glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+	}
+
+	// Init shadow map shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_fs.glsl";
+
+		g_shadow_map_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+
+		glGenVertexArrays(1, &g_shadow_map_vao);
+		glGenBuffers(1, &g_shadow_map_vbo);
+		glBindVertexArray(g_shadow_map_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, g_shadow_map_vbo);
+
+		// Position attribute
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	}
+
+	// Init shadow map debug shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_fs.glsl";
+
+		g_shadow_map_debug_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+
+		unsigned int vbo;
+		glGenVertexArrays(1, &g_shadow_map_debug_vao);
+		glGenBuffers(1, &vbo);
+		glBindVertexArray(g_shadow_map_debug_vao);
+
+		float quadVertices[] = {
+			// Coords	   // Uv
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			-1.0f, -1.0f,  0.0f, 0.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
+
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
+			 1.0f,  1.0f,  1.0f, 1.0f
+		};
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 	}
 
 	// Init textures/materials
@@ -2187,7 +2346,7 @@ int main(int argc, char* argv[])
 
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 
-	// Init framebuffer
+	// Init framebuffers
 	{
 		glGenFramebuffers(1, &g_scene_framebuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer);
@@ -2196,6 +2355,24 @@ int main(int argc, char* argv[])
 		glGenFramebuffers(1, &g_editor_framebuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
 		init_framebuffer_resize(&g_editor_framebuffer_texture, &g_editor_framebuffer_renderbuffer);
+
+		// Shadow map
+		{
+			glGenFramebuffers(1, &g_shadow_map_framebuffer);
+			glGenTextures(1, &g_shadow_map_texture);
+			glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+			glBindFramebuffer(GL_FRAMEBUFFER, g_shadow_map_framebuffer);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, g_shadow_map_texture, 0);
+			glDrawBuffer(GL_NONE);
+			glReadBuffer(GL_NONE);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
 	}
 
 	g_use_linear_texture_filtering = false;
@@ -2357,12 +2534,16 @@ int main(int argc, char* argv[])
 				ImGui::InputFloat("Blur amount", &g_blur_effect_amount, 0, 0, "%.1f");
 				ImGui::InputFloat("Gamma", &g_gamma_amount, 0, 0, "%.1f");
 
+				// g_shadow_map_light
+				ImGui::InputFloat3("Shadow light position", &g_shadow_map_light[0], "%.2f");
+
 				ImGui::End();
 			}
 		}
 
 		// Register inputs
 		{
+
 			int key_state;
 			int buttons_count = sizeof(g_inputs) / sizeof(ButtonState);
 			g_frame_data.mouse_clicked = false;
@@ -2546,103 +2727,160 @@ int main(int argc, char* argv[])
 
 			Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
 
-			bool intersection = calculate_plane_ray_intersection(
-				g_normal_for_ray_intersect,
-				selected_mesh_ptr->translation,
-				g_scene_camera.position,
-				g_used_transform_ray,
-				intersection_point);
+bool intersection = calculate_plane_ray_intersection(
+	g_normal_for_ray_intersect,
+	selected_mesh_ptr->translation,
+	g_scene_camera.position,
+	g_used_transform_ray,
+	intersection_point);
 
-			g_debug_plane_intersection = intersection_point;
+g_debug_plane_intersection = intersection_point;
 
-			if (intersection && g_transform_mode.mode == TransformMode::Translate)
+if (intersection && g_transform_mode.mode == TransformMode::Translate)
+{
+	glm::vec3 travel_dist = intersection_point - g_prev_intersection;
+	vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
+	g_prev_intersection = intersection_point;
+
+	if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
+	else selected_mesh_ptr->translation = g_new_translation;
+}
+else if (intersection && g_transform_mode.mode == TransformMode::Scale)
+{
+	glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr->rotation);
+	glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
+
+	used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
+	glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, selected_mesh_ptr->translation, used_normal);
+	g_point_on_scale_plane = point_on_scale_plane;
+
+	// Reverse the rotation by applying the inverse rotation matrix to the vector
+	glm::vec3 reversedVector = glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
+	glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_prev_point_on_scale_plane, 1.0f);
+
+	glm::vec3 travel_dist = reversedVector - reversedVector2;
+	g_prev_point_on_scale_plane = point_on_scale_plane;
+
+	vec3_add_for_axis(g_new_scale, travel_dist, g_transform_mode.axis);
+
+	if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
+	else selected_mesh_ptr->scale = g_new_scale;
+
+	if (selected_mesh_ptr->scale.x < 0.01f) selected_mesh_ptr->scale.x = 0.01f;
+	if (selected_mesh_ptr->scale.y < 0.01f) selected_mesh_ptr->scale.y = 0.01f;
+	if (selected_mesh_ptr->scale.z < 0.01f) selected_mesh_ptr->scale.z = 0.01f;
+}
+else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
+{
+	auto new_line = g_debug_plane_intersection - selected_mesh_ptr->translation;
+
+	if (0.15f < glm::length(new_line))
+	{
+		glm::vec3 prev_vec = glm::normalize(g_prev_intersection - selected_mesh_ptr->translation);
+		glm::vec3 current_vec = glm::normalize(new_line);
+
+		g_prev_intersection = g_debug_plane_intersection;
+
+		bool equal = glm::all(glm::equal(prev_vec, current_vec));
+
+		if (!equal)
+		{
+			// Calculate the rotation axis using the cross product of the unit vectors
+			glm::vec3 rotation_axis_cross = glm::normalize(glm::cross(prev_vec, current_vec));
+
+			// Calculate the rotation angle in radians
+			float angle = glm::acos(glm::dot(glm::normalize(prev_vec), glm::normalize(current_vec)));
+
+			// Create the rotation matrix
+			glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis_cross);
+
+			// Extract the rotation as a quaternion
+			glm::quat rotation_quaternion = rotation_matrix;
+
+			// Convert the quaternion to Euler angles
+			glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
+
+			if (!(glm::isnan(eulerAngles.x) || glm::isnan(eulerAngles.y) || glm::isnan(eulerAngles.z)))
 			{
-				glm::vec3 travel_dist = intersection_point - g_prev_intersection;
-				vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
-				g_prev_intersection = intersection_point;
+				g_new_rotation += eulerAngles;
 
-				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
-				else selected_mesh_ptr->translation = g_new_translation;
-			}
-			else if (intersection && g_transform_mode.mode == TransformMode::Scale)
-			{
-				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr->rotation);
-				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
-
-				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
-				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, selected_mesh_ptr->translation, used_normal);
-				g_point_on_scale_plane = point_on_scale_plane;
-
-				// Reverse the rotation by applying the inverse rotation matrix to the vector
-				glm::vec3 reversedVector = glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
-				glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_prev_point_on_scale_plane, 1.0f);
-
-				glm::vec3 travel_dist = reversedVector - reversedVector2;
-				g_prev_point_on_scale_plane = point_on_scale_plane;
-
-				vec3_add_for_axis(g_new_scale, travel_dist, g_transform_mode.axis);
-
-				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
-				else selected_mesh_ptr->scale = g_new_scale;
-
-				if (selected_mesh_ptr->scale.x < 0.01f) selected_mesh_ptr->scale.x = 0.01f;
-				if (selected_mesh_ptr->scale.y < 0.01f) selected_mesh_ptr->scale.y = 0.01f;
-				if (selected_mesh_ptr->scale.z < 0.01f) selected_mesh_ptr->scale.z = 0.01f;
-			}
-			else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
-			{
-				auto new_line = g_debug_plane_intersection - selected_mesh_ptr->translation;
-
-				if (0.15f < glm::length(new_line))
+				if (0.0f < g_user_settings.transform_rotation_clip)
 				{
-					glm::vec3 prev_vec = glm::normalize(g_prev_intersection - selected_mesh_ptr->translation);
-					glm::vec3 current_vec = glm::normalize(new_line);
-
-					g_prev_intersection = g_debug_plane_intersection;
-
-					bool equal = glm::all(glm::equal(prev_vec, current_vec));
-
-					if (!equal)
-					{
-						// Calculate the rotation axis using the cross product of the unit vectors
-						glm::vec3 rotation_axis_cross = glm::normalize(glm::cross(prev_vec, current_vec));
-
-						// Calculate the rotation angle in radians
-						float angle = glm::acos(glm::dot(glm::normalize(prev_vec), glm::normalize(current_vec)));
-
-						// Create the rotation matrix
-						glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis_cross);
-
-						// Extract the rotation as a quaternion
-						glm::quat rotation_quaternion = rotation_matrix;
-
-						// Convert the quaternion to Euler angles
-						glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
-
-						if (!(glm::isnan(eulerAngles.x) || glm::isnan(eulerAngles.y) || glm::isnan(eulerAngles.z)))
-						{
-							g_new_rotation += eulerAngles;
-
-							if (0.0f < g_user_settings.transform_rotation_clip)
-							{
-								selected_mesh_ptr->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
-							}
-							else
-							{
-								selected_mesh_ptr->rotation = g_new_rotation;
-							}
-
-							selected_mesh_ptr->rotation.x = float_modulus_operation(selected_mesh_ptr->rotation.x, 360.0f);
-							selected_mesh_ptr->rotation.y = float_modulus_operation(selected_mesh_ptr->rotation.y, 360.0f);
-							selected_mesh_ptr->rotation.z = float_modulus_operation(selected_mesh_ptr->rotation.z, 360.0f);
-						}
-					}
+					selected_mesh_ptr->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
 				}
+				else
+				{
+					selected_mesh_ptr->rotation = g_new_rotation;
+				}
+
+				selected_mesh_ptr->rotation.x = float_modulus_operation(selected_mesh_ptr->rotation.x, 360.0f);
+				selected_mesh_ptr->rotation.y = float_modulus_operation(selected_mesh_ptr->rotation.y, 360.0f);
+				selected_mesh_ptr->rotation.z = float_modulus_operation(selected_mesh_ptr->rotation.z, 360.0f);
 			}
+		}
+	}
+}
 		}
 
 		// -------------
 		// Draw OpenGL
+
+		// Shadow map framebuffer
+		{
+			glm::mat4 lightProjection, lightView;
+			glm::mat4 lightSpaceMatrix;
+
+			float near_plane = 0.25f, far_plane = 15.0f;
+			lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+			lightView = glm::lookAt(g_shadow_map_light, glm::vec3(0, 0, 6.0f), glm::vec3(0.0, 1.0, 0.0));
+			lightSpaceMatrix = lightProjection * lightView;
+
+			glUseProgram(g_shadow_map_shader);
+			unsigned int light_matrix_loc = glGetUniformLocation(g_shadow_map_shader, "lightSpaceMatrix");
+			glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+
+			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+			glBindFramebuffer(GL_FRAMEBUFFER, g_shadow_map_framebuffer);
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			glUseProgram(g_shadow_map_shader);
+			glBindVertexArray(g_shadow_map_vao);
+
+			for (int i = 0; i < g_scene_meshes.items_count; i++)
+			{
+				Mesh mesh = *j_array_get(&g_scene_meshes, i);
+				draw_mesh_shadow_map(&mesh);
+			}
+
+			glUseProgram(0);
+			glBindVertexArray(0);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+// #define DEBUG_SHADOWMAP
+
+#ifdef DEBUG_SHADOWMAP
+
+			glUseProgram(g_shadow_map_debug_shader);
+			glBindVertexArray(g_shadow_map_debug_vao);
+
+			unsigned int near_loc = glGetUniformLocation(g_shadow_map_debug_shader, "near_plane");
+			glUniform1f(near_loc, near_plane);
+			unsigned int far_loc = glGetUniformLocation(g_shadow_map_debug_shader, "far_plane");
+			glUniform1f(far_loc, far_plane);
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
+
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			g_frame_data.draw_calls++;
+
+#endif
+		}
+
+#ifndef DEBUG_SHADOWMAP
 
 		// Scene framebuffer
 		{
@@ -2659,8 +2897,8 @@ int main(int argc, char* argv[])
 
 			for (int i = 0; i < g_scene_meshes.items_count; i++)
 			{
-				Mesh plane = *j_array_get(&g_scene_meshes, i);
-				draw_mesh(&plane);
+				Mesh mesh = *j_array_get(&g_scene_meshes, i);
+				draw_mesh(&mesh);
 			}
 		}
 
@@ -2759,31 +2997,32 @@ int main(int argc, char* argv[])
 
 		// -------------------
 		// Draw framebuffers
+		{
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			glDisable(GL_DEPTH_TEST);
+			glClear(GL_COLOR_BUFFER_BIT);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glDisable(GL_DEPTH_TEST);
-		glClear(GL_COLOR_BUFFER_BIT);
+			glUseProgram(g_scene_framebuffer_shader);
+			glBindVertexArray(g_scene_framebuffer_vao);
 
-		glUseProgram(g_scene_framebuffer_shader);
-		glBindVertexArray(g_scene_framebuffer_vao);
+			unsigned int inversion_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_inversion");
+			unsigned int blur_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_blur");
+			unsigned int blur_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader, "blur_amount");
+			unsigned int gamma_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader, "gamma_amount");
 
-		unsigned int inversion_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_inversion");
-		unsigned int blur_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_blur");
-		unsigned int blur_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader, "blur_amount");
-		unsigned int gamma_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader, "gamma_amount");
+			glUniform1i(inversion_loc, g_inverse_color);
+			glUniform1i(blur_loc, g_blur_effect);
+			glUniform1f(blur_amount_loc, g_blur_effect_amount);
+			glUniform1f(gamma_amount_loc, g_gamma_amount);
 
-		glUniform1i(inversion_loc, g_inverse_color);
-		glUniform1i(blur_loc, g_blur_effect);
-		glUniform1f(blur_amount_loc, g_blur_effect_amount);
-		glUniform1f(gamma_amount_loc, g_gamma_amount);
+			glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer_texture);
+			glDrawArrays(GL_TRIANGLES, 0, 6);
 
-		glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer_texture);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-
-		glUniform1i(inversion_loc, false);
-		glUniform1i(blur_loc, false);
-		glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer_texture);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+			glUniform1i(inversion_loc, false);
+			glUniform1i(blur_loc, false);
+			glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer_texture);
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+		}
 
 		// Print debug info
 		{
@@ -2828,6 +3067,8 @@ int main(int argc, char* argv[])
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
 			draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
 		}
+
+#endif
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
