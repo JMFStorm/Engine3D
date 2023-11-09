@@ -30,6 +30,8 @@
 
 using namespace glm;
 
+static bool DEBUG_SHADOWMAP = false;
+
 static unsigned int g_shadow_map_debug_shader;
 static unsigned int g_shadow_map_debug_vao;
 static unsigned int g_shadow_map_debug_vbo;
@@ -520,13 +522,10 @@ void draw_mesh(Mesh* mesh)
 
 	// Shadow map for dev
 	{
-		glm::mat4 lightProjection, lightView;
-		glm::mat4 lightSpaceMatrix;
-
 		float near_plane = 0.25f, far_plane = 15.0f;
-		lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-		lightView = glm::lookAt(g_shadow_map_light, glm::vec3(0, 0, 6.0f), glm::vec3(0.0, 1.0, 0.0));
-		lightSpaceMatrix = lightProjection * lightView;
+		glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+		glm::mat4 lightView = glm::lookAt(g_shadow_map_light, glm::vec3(0, 0, 6.0f), glm::vec3(0.0, 1.0, 0.0));
+		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 		unsigned int light_matrix_loc = glGetUniformLocation(g_mesh_shader, "lightSpaceMatrix");
 		glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
@@ -2554,6 +2553,7 @@ int main(int argc, char* argv[])
 				ImGui::InputFloat("Gamma", &g_gamma_amount, 0, 0, "%.1f");
 
 				// g_shadow_map_light
+				ImGui::Checkbox("DEBUG_SHADOWMAP", &DEBUG_SHADOWMAP);
 				ImGui::InputFloat3("Shadow light position", &g_shadow_map_light[0], "%.2f");
 
 				ImGui::End();
@@ -2634,7 +2634,7 @@ int main(int argc, char* argv[])
 
 				s64 object_types_count = 3;
 				ObjectType select_types[] = { ObjectType::Primitive, ObjectType::Pointlight, ObjectType::Spotlight };
-				s64 object_index[3] = {-1, -1, -1};
+				s64 object_index[3] = { -1, -1, -1 };
 				f32 closest_dist[3] = {};
 
 				object_index[0] = get_mesh_selection_index(g_scene_meshes, &closest_dist[0], ray_origin, ray_direction);
@@ -2746,99 +2746,99 @@ int main(int argc, char* argv[])
 
 			Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
 
-bool intersection = calculate_plane_ray_intersection(
-	g_normal_for_ray_intersect,
-	selected_mesh_ptr->translation,
-	g_scene_camera.position,
-	g_used_transform_ray,
-	intersection_point);
+			bool intersection = calculate_plane_ray_intersection(
+				g_normal_for_ray_intersect,
+				selected_mesh_ptr->translation,
+				g_scene_camera.position,
+				g_used_transform_ray,
+				intersection_point);
 
-g_debug_plane_intersection = intersection_point;
+			g_debug_plane_intersection = intersection_point;
 
-if (intersection && g_transform_mode.mode == TransformMode::Translate)
-{
-	glm::vec3 travel_dist = intersection_point - g_prev_intersection;
-	vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
-	g_prev_intersection = intersection_point;
-
-	if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
-	else selected_mesh_ptr->translation = g_new_translation;
-}
-else if (intersection && g_transform_mode.mode == TransformMode::Scale)
-{
-	glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr->rotation);
-	glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
-
-	used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
-	glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, selected_mesh_ptr->translation, used_normal);
-	g_point_on_scale_plane = point_on_scale_plane;
-
-	// Reverse the rotation by applying the inverse rotation matrix to the vector
-	glm::vec3 reversedVector = glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
-	glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_prev_point_on_scale_plane, 1.0f);
-
-	glm::vec3 travel_dist = reversedVector - reversedVector2;
-	g_prev_point_on_scale_plane = point_on_scale_plane;
-
-	vec3_add_for_axis(g_new_scale, travel_dist, g_transform_mode.axis);
-
-	if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
-	else selected_mesh_ptr->scale = g_new_scale;
-
-	if (selected_mesh_ptr->scale.x < 0.01f) selected_mesh_ptr->scale.x = 0.01f;
-	if (selected_mesh_ptr->scale.y < 0.01f) selected_mesh_ptr->scale.y = 0.01f;
-	if (selected_mesh_ptr->scale.z < 0.01f) selected_mesh_ptr->scale.z = 0.01f;
-}
-else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
-{
-	auto new_line = g_debug_plane_intersection - selected_mesh_ptr->translation;
-
-	if (0.15f < glm::length(new_line))
-	{
-		glm::vec3 prev_vec = glm::normalize(g_prev_intersection - selected_mesh_ptr->translation);
-		glm::vec3 current_vec = glm::normalize(new_line);
-
-		g_prev_intersection = g_debug_plane_intersection;
-
-		bool equal = glm::all(glm::equal(prev_vec, current_vec));
-
-		if (!equal)
-		{
-			// Calculate the rotation axis using the cross product of the unit vectors
-			glm::vec3 rotation_axis_cross = glm::normalize(glm::cross(prev_vec, current_vec));
-
-			// Calculate the rotation angle in radians
-			float angle = glm::acos(glm::dot(glm::normalize(prev_vec), glm::normalize(current_vec)));
-
-			// Create the rotation matrix
-			glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis_cross);
-
-			// Extract the rotation as a quaternion
-			glm::quat rotation_quaternion = rotation_matrix;
-
-			// Convert the quaternion to Euler angles
-			glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
-
-			if (!(glm::isnan(eulerAngles.x) || glm::isnan(eulerAngles.y) || glm::isnan(eulerAngles.z)))
+			if (intersection && g_transform_mode.mode == TransformMode::Translate)
 			{
-				g_new_rotation += eulerAngles;
+				glm::vec3 travel_dist = intersection_point - g_prev_intersection;
+				vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
+				g_prev_intersection = intersection_point;
 
-				if (0.0f < g_user_settings.transform_rotation_clip)
-				{
-					selected_mesh_ptr->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
-				}
-				else
-				{
-					selected_mesh_ptr->rotation = g_new_rotation;
-				}
-
-				selected_mesh_ptr->rotation.x = float_modulus_operation(selected_mesh_ptr->rotation.x, 360.0f);
-				selected_mesh_ptr->rotation.y = float_modulus_operation(selected_mesh_ptr->rotation.y, 360.0f);
-				selected_mesh_ptr->rotation.z = float_modulus_operation(selected_mesh_ptr->rotation.z, 360.0f);
+				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
+				else selected_mesh_ptr->translation = g_new_translation;
 			}
-		}
-	}
-}
+			else if (intersection && g_transform_mode.mode == TransformMode::Scale)
+			{
+				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr->rotation);
+				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
+
+				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
+				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, selected_mesh_ptr->translation, used_normal);
+				g_point_on_scale_plane = point_on_scale_plane;
+
+				// Reverse the rotation by applying the inverse rotation matrix to the vector
+				glm::vec3 reversedVector = glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
+				glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_prev_point_on_scale_plane, 1.0f);
+
+				glm::vec3 travel_dist = reversedVector - reversedVector2;
+				g_prev_point_on_scale_plane = point_on_scale_plane;
+
+				vec3_add_for_axis(g_new_scale, travel_dist, g_transform_mode.axis);
+
+				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
+				else selected_mesh_ptr->scale = g_new_scale;
+
+				if (selected_mesh_ptr->scale.x < 0.01f) selected_mesh_ptr->scale.x = 0.01f;
+				if (selected_mesh_ptr->scale.y < 0.01f) selected_mesh_ptr->scale.y = 0.01f;
+				if (selected_mesh_ptr->scale.z < 0.01f) selected_mesh_ptr->scale.z = 0.01f;
+			}
+			else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
+			{
+				auto new_line = g_debug_plane_intersection - selected_mesh_ptr->translation;
+
+				if (0.15f < glm::length(new_line))
+				{
+					glm::vec3 prev_vec = glm::normalize(g_prev_intersection - selected_mesh_ptr->translation);
+					glm::vec3 current_vec = glm::normalize(new_line);
+
+					g_prev_intersection = g_debug_plane_intersection;
+
+					bool equal = glm::all(glm::equal(prev_vec, current_vec));
+
+					if (!equal)
+					{
+						// Calculate the rotation axis using the cross product of the unit vectors
+						glm::vec3 rotation_axis_cross = glm::normalize(glm::cross(prev_vec, current_vec));
+
+						// Calculate the rotation angle in radians
+						float angle = glm::acos(glm::dot(glm::normalize(prev_vec), glm::normalize(current_vec)));
+
+						// Create the rotation matrix
+						glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis_cross);
+
+						// Extract the rotation as a quaternion
+						glm::quat rotation_quaternion = rotation_matrix;
+
+						// Convert the quaternion to Euler angles
+						glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
+
+						if (!(glm::isnan(eulerAngles.x) || glm::isnan(eulerAngles.y) || glm::isnan(eulerAngles.z)))
+						{
+							g_new_rotation += eulerAngles;
+
+							if (0.0f < g_user_settings.transform_rotation_clip)
+							{
+								selected_mesh_ptr->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
+							}
+							else
+							{
+								selected_mesh_ptr->rotation = g_new_rotation;
+							}
+
+							selected_mesh_ptr->rotation.x = float_modulus_operation(selected_mesh_ptr->rotation.x, 360.0f);
+							selected_mesh_ptr->rotation.y = float_modulus_operation(selected_mesh_ptr->rotation.y, 360.0f);
+							selected_mesh_ptr->rotation.z = float_modulus_operation(selected_mesh_ptr->rotation.z, 360.0f);
+						}
+					}
+				}
+			}
 		}
 
 		// -------------
@@ -2995,30 +2995,6 @@ else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
-// #define DEBUG_SHADOWMAP
-#ifdef DEBUG_SHADOWMAP
-
-		glUseProgram(g_shadow_map_debug_shader);
-		glBindVertexArray(g_shadow_map_debug_vao);
-
-		float near_plane = 0.25f, far_plane = 15.0f;
-		unsigned int near_loc = glGetUniformLocation(g_shadow_map_debug_shader, "near_plane");
-		glUniform1f(near_loc, near_plane);
-		unsigned int far_loc = glGetUniformLocation(g_shadow_map_debug_shader, "far_plane");
-		glUniform1f(far_loc, far_plane);
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
-
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-		g_frame_data.draw_calls++;
-
-		glUseProgram(0);
-		glBindVertexArray(0);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-#endif
-
-#ifndef DEBUG_SHADOWMAP
 		// -------------------
 		// Draw framebuffers
 		{
@@ -3046,52 +3022,77 @@ else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
 			glUniform1i(blur_loc, false);
 			glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer_texture);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
+			glEnable(GL_DEPTH_TEST);
 		}
 
 		// Print debug info
 		{
-			char debug_str[256];
+				char debug_str[256];
 
-			sprintf_s(debug_str, "FPS: %d", g_game_metrics.fps);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
+				sprintf_s(debug_str, "FPS: %d", g_game_metrics.fps);
+				append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
 
-			float display_deltatime = g_frame_data.deltatime * 1000;
-			sprintf_s(debug_str, "Delta: %.2fms", display_deltatime);
-			append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
+				float display_deltatime = g_frame_data.deltatime * 1000;
+				sprintf_s(debug_str, "Delta: %.2fms", display_deltatime);
+				append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
 
-			sprintf_s(debug_str, "Frames: %lu", g_game_metrics.frames);
-			append_ui_text(&g_debug_font, debug_str, 10.5f, 100.0f);
+				sprintf_s(debug_str, "Frames: %lu", g_game_metrics.frames);
+				append_ui_text(&g_debug_font, debug_str, 10.5f, 100.0f);
 
-			sprintf_s(debug_str, "Draw calls: %d", ++g_frame_data.draw_calls);
-			append_ui_text(&g_debug_font, debug_str, 17.0f, 100.0f);
+				sprintf_s(debug_str, "Draw calls: %d", ++g_frame_data.draw_calls);
+				append_ui_text(&g_debug_font, debug_str, 17.0f, 100.0f);
 
-			sprintf_s(debug_str, "Camera X=%.2f Y=%.2f Z=%.2f", g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
+				sprintf_s(debug_str, "Camera X=%.2f Y=%.2f Z=%.2f", g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
+				append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
 
-			sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
+				sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
+				append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
 
-			sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
+				sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
+				append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
 
-			sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene_spotlights.items_count, g_scene_spotlights.max_items);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 96.0f);
+				sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene_spotlights.items_count, g_scene_spotlights.max_items);
+				append_ui_text(&g_debug_font, debug_str, 0.5f, 96.0f);
 
-			char* t_mode = nullptr;
-			const char* tt = "Translate";
-			const char* tr = "Rotate";
-			const char* ts = "Scale";
-			const char* transform_mode_debug_str_format = "Transform mode: %s";
+				char* t_mode = nullptr;
+				const char* tt = "Translate";
+				const char* tr = "Rotate";
+				const char* ts = "Scale";
+				const char* transform_mode_debug_str_format = "Transform mode: %s";
 
-			if (g_transform_mode.mode == TransformMode::Translate) t_mode = const_cast<char*>(tt);
-			if (g_transform_mode.mode == TransformMode::Rotate)	t_mode = const_cast<char*>(tr);
-			if (g_transform_mode.mode == TransformMode::Scale)		t_mode = const_cast<char*>(ts);
+				if (g_transform_mode.mode == TransformMode::Translate) t_mode = const_cast<char*>(tt);
+				if (g_transform_mode.mode == TransformMode::Rotate)	t_mode = const_cast<char*>(tr);
+				if (g_transform_mode.mode == TransformMode::Scale)		t_mode = const_cast<char*>(ts);
 
-			sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
-			draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
+				sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
+				append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
+				draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
+			}
+
+		if (DEBUG_SHADOWMAP)
+		{
+			glEnable(GL_DEPTH_TEST);
+			glViewport(0, 0, 500, 500);
+			glUseProgram(g_shadow_map_debug_shader);
+			glBindVertexArray(g_shadow_map_debug_vao);
+
+			float near_plane = 0.25f, far_plane = 15.0f;
+			unsigned int near_loc = glGetUniformLocation(g_shadow_map_debug_shader, "near_plane");
+			glUniform1f(near_loc, near_plane);
+			unsigned int far_loc = glGetUniformLocation(g_shadow_map_debug_shader, "far_plane");
+			glUniform1f(far_loc, far_plane);
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
+
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			g_frame_data.draw_calls++;
+
+			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+			glUseProgram(0);
+			glBindVertexArray(0);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
-#endif
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -3103,6 +3104,5 @@ else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
 	}
 
 	glfwTerminate();
-
 	return 0;
 }
