@@ -518,6 +518,25 @@ void draw_mesh(Mesh* mesh)
 	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
 	glUniform3f(camera_view_loc, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 
+	// Shadow map for dev
+	{
+		glm::mat4 lightProjection, lightView;
+		glm::mat4 lightSpaceMatrix;
+
+		float near_plane = 0.25f, far_plane = 15.0f;
+		lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+		lightView = glm::lookAt(g_shadow_map_light, glm::vec3(0, 0, 6.0f), glm::vec3(0.0, 1.0, 0.0));
+		lightSpaceMatrix = lightProjection * lightView;
+
+		unsigned int light_matrix_loc = glGetUniformLocation(g_mesh_shader, "lightSpaceMatrix");
+		glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+
+		unsigned int shadow_texture_loc = glGetUniformLocation(g_mesh_shader, "shadowMap");
+		glUniform1i(shadow_texture_loc, 2);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
+	}
+
 	// Lights
 	{
 		char str_value[64] = { 0 };
@@ -677,7 +696,7 @@ void draw_mesh(Mesh* mesh)
 		   0.5f,  0.5f, -0.5f,	 1.0f, 1.0f,	 1.0f,  0.0f,  0.0f, // top right
 		};
 
-		draw_indicies = 40;
+		draw_indicies = 36;
 		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
@@ -2855,32 +2874,9 @@ else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
 			glUseProgram(0);
 			glBindVertexArray(0);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-// #define DEBUG_SHADOWMAP
-
-#ifdef DEBUG_SHADOWMAP
-
-			glUseProgram(g_shadow_map_debug_shader);
-			glBindVertexArray(g_shadow_map_debug_vao);
-
-			unsigned int near_loc = glGetUniformLocation(g_shadow_map_debug_shader, "near_plane");
-			glUniform1f(near_loc, near_plane);
-			unsigned int far_loc = glGetUniformLocation(g_shadow_map_debug_shader, "far_plane");
-			glUniform1f(far_loc, far_plane);
-
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
-
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-			g_frame_data.draw_calls++;
-
-#endif
 		}
-
-#ifndef DEBUG_SHADOWMAP
 
 		// Scene framebuffer
 		{
@@ -2900,6 +2896,8 @@ else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
 				Mesh mesh = *j_array_get(&g_scene_meshes, i);
 				draw_mesh(&mesh);
 			}
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
 		// Editor framebuffer
@@ -2993,8 +2991,34 @@ else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
 			auto debug_click_end = g_debug_click_camera_pos + g_debug_click_ray_normal * 20.0f;
 			append_line(g_debug_click_camera_pos, debug_click_end, glm::vec3(1.0f, 0.2f, 1.0f));
 			draw_lines(1.0f);
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
+// #define DEBUG_SHADOWMAP
+#ifdef DEBUG_SHADOWMAP
+
+		glUseProgram(g_shadow_map_debug_shader);
+		glBindVertexArray(g_shadow_map_debug_vao);
+
+		float near_plane = 0.25f, far_plane = 15.0f;
+		unsigned int near_loc = glGetUniformLocation(g_shadow_map_debug_shader, "near_plane");
+		glUniform1f(near_loc, near_plane);
+		unsigned int far_loc = glGetUniformLocation(g_shadow_map_debug_shader, "far_plane");
+		glUniform1f(far_loc, far_plane);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
+
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		g_frame_data.draw_calls++;
+
+		glUseProgram(0);
+		glBindVertexArray(0);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+#endif
+
+#ifndef DEBUG_SHADOWMAP
 		// -------------------
 		// Draw framebuffers
 		{
@@ -3067,7 +3091,6 @@ else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
 			draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
 		}
-
 #endif
 
 		ImGui::Render();

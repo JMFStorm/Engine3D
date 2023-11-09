@@ -7,12 +7,15 @@ layout (location = 2) in vec3 aNormal;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
-
+uniform mat4 lightSpaceMatrix;
 uniform float uv_multiplier;
 
-out vec2 TexCoord;
-out vec3 fragPos;	  // Fragment position in world space
-out vec3 fragNormal;  // Normal in world space
+out VS_OUT {
+    vec3 fragPos;
+    vec3 fragNormal;
+    vec2 TexCoord;
+    vec4 FragPosLightSpace;
+} vs_out;
 
 void main()
 {
@@ -23,9 +26,11 @@ void main()
 	float used_uv_mult_v = scale_v / uv_multiplier;
 
 	gl_Position = projection * view * model * vec4(aPos, 1.0);
-	TexCoord = vec2(aTexCoord.x * used_uv_mult_u, aTexCoord.y * used_uv_mult_v);
+	vs_out.TexCoord = vec2(aTexCoord.x * used_uv_mult_u, aTexCoord.y * used_uv_mult_v);
 
 	// Calculate the position and normal in world space
-    fragPos = vec3(model * vec4(aPos, 1.0));
-    fragNormal = mat3(transpose(inverse(model))) * aNormal;
+    vs_out.fragPos = vec3(model * vec4(aPos, 1.0));
+    vs_out.fragNormal = mat3(transpose(inverse(model))) * aNormal;
+
+    vs_out.FragPosLightSpace = lightSpaceMatrix * vec4(vs_out.fragPos, 1.0);
 }
