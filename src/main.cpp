@@ -79,30 +79,19 @@ static unsigned int g_editor_framebuffer;
 static unsigned int g_editor_framebuffer_texture;
 static unsigned int g_editor_framebuffer_renderbuffer;
 
-int g_wireframe_shader;
-unsigned int g_wireframe_vao;
-unsigned int g_wireframe_vbo;
-
-int g_line_shader;
-unsigned int g_line_vao;
-unsigned int g_line_vbo;
-
 MemoryBuffer g_line_vertex_buffer = {};
 constexpr const s64 MAX_LINES_BUFFER = 200;
 s64 g_line_buffer_size = 0;
 s64 g_line_indicies = 0;
 
-int g_billboard_shader;
-unsigned int g_billboard_vao;
-unsigned int g_billboard_vbo;
+static SimpleShader g_billboard_shader;
+static SimpleShader g_ui_text_shader;
+static SimpleShader g_line_shader;
+static SimpleShader g_wireframe_shader;
 
 int g_mesh_shader;
 unsigned int g_mesh_vao;
 unsigned int g_mesh_vbo;
-
-int g_ui_text_shader;
-unsigned int g_ui_text_vao;
-unsigned int g_ui_text_vbo;
 
 s64 g_text_buffer_size = 0;
 s64 g_text_indicies = 0;
@@ -129,9 +118,6 @@ MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
 GameCamera g_scene_camera;
 bool g_camera_move_mode = false;
-
-float g_mouse_movement_x = 0;
-float g_mouse_movement_y = 0;
 
 const char* pointlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\pointlight_billboard.png";
 const char* spotlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\spotlight_billboard.png";
@@ -347,8 +333,8 @@ int load_image_into_texture_id(const char* image_path)
 
 void draw_billboard(glm::vec3 position, Texture texture, float scale)
 {
-	glUseProgram(g_billboard_shader);
-	glBindVertexArray(g_billboard_vao);
+	glUseProgram(g_billboard_shader.id);
+	glBindVertexArray(g_billboard_shader.vao);
 
 	glm::mat4 model = glm::mat4(1.0f);
 	model = glm::translate(model, position);
@@ -370,9 +356,9 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 	glm::mat4 projection = get_projection_matrix();
 	glm::mat4 view = get_view_matrix();
 
-	unsigned int model_loc = glGetUniformLocation(g_billboard_shader, "model");
-	unsigned int view_loc = glGetUniformLocation(g_billboard_shader, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_billboard_shader, "projection");
+	unsigned int model_loc = glGetUniformLocation(g_billboard_shader.id, "model");
+	unsigned int view_loc = glGetUniformLocation(g_billboard_shader.id, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_billboard_shader.id, "projection");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
@@ -722,17 +708,17 @@ void draw_mesh(Mesh* mesh)
 
 void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 {
-	glUseProgram(g_wireframe_shader);
-	glBindVertexArray(g_wireframe_vao);
+	glUseProgram(g_wireframe_shader.id);
+	glBindVertexArray(g_wireframe_shader.vao);
 
 	glm::mat4 model = get_model_matrix(mesh);
 	glm::mat4 projection = get_projection_matrix();
 	glm::mat4 view = get_view_matrix();
 
-	unsigned int model_loc = glGetUniformLocation(g_wireframe_shader, "model");
-	unsigned int view_loc = glGetUniformLocation(g_wireframe_shader, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_wireframe_shader, "projection");
-	unsigned int color_loc = glGetUniformLocation(g_wireframe_shader, "color");
+	unsigned int model_loc = glGetUniformLocation(g_wireframe_shader.id, "model");
+	unsigned int view_loc = glGetUniformLocation(g_wireframe_shader.id, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_wireframe_shader.id, "projection");
+	unsigned int color_loc = glGetUniformLocation(g_wireframe_shader.id, "color");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
@@ -764,7 +750,7 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 		};
 
 		draw_indicies = 12;
-		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
 	else if (mesh->mesh_type == E_Primitive_Cube)
@@ -828,7 +814,7 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 		};
 
 		draw_indicies = 40;
-		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
 
@@ -862,23 +848,23 @@ void append_line(glm::vec3 start, glm::vec3 end, glm::vec3 color)
 
 void draw_lines(float thickness)
 {
-	glUseProgram(g_line_shader);
-	glBindVertexArray(g_line_vao);
+	glUseProgram(g_line_shader.id);
+	glBindVertexArray(g_line_shader.vao);
 
 	glm::mat4 model = glm::mat4(1.0f);
 	glm::mat4 projection = glm::perspective(glm::radians(g_scene_camera.fov), g_scene_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
 	auto new_mat_4 = g_scene_camera.position + g_scene_camera.front_vec;
 	glm::mat4 view = glm::lookAt(g_scene_camera.position, new_mat_4, g_scene_camera.up_vec);
 
-	unsigned int model_loc = glGetUniformLocation(g_line_shader, "model");
-	unsigned int view_loc = glGetUniformLocation(g_line_shader, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_line_shader, "projection");
+	unsigned int model_loc = glGetUniformLocation(g_line_shader.id, "model");
+	unsigned int view_loc = glGetUniformLocation(g_line_shader.id, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_line_shader.id, "projection");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
-	glBindBuffer(GL_ARRAY_BUFFER, g_line_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
 	glBufferData(GL_ARRAY_BUFFER, g_line_buffer_size, g_line_vertex_buffer.memory, GL_DYNAMIC_DRAW);
 
 	glLineWidth(thickness);
@@ -1053,13 +1039,13 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 
 void draw_ui_text(FontData* font_data, float red, float green, float blue)
 {
-	glUseProgram(g_ui_text_shader);
-	glBindVertexArray(g_ui_text_vao);
+	glUseProgram(g_ui_text_shader.id);
+	glBindVertexArray(g_ui_text_shader.vao);
 
-	int color_uniform = glGetUniformLocation(g_ui_text_shader, "textColor");
+	int color_uniform = glGetUniformLocation(g_ui_text_shader.id, "textColor");
 	glUniform3f(color_uniform, red, green, blue);
 
-	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
 	glBufferData(GL_ARRAY_BUFFER, g_text_buffer_size, g_ui_text_vertex_buffer.memory, GL_DYNAMIC_DRAW);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1099,10 +1085,10 @@ void draw_ui_character(FontData* font_data, const char character, int x, int y)
 		x1, y0, 0.0f,	current.UV_x1, current.UV_y0  // bottom right
 	};
 
-	glUseProgram(g_ui_text_shader);
-	glBindVertexArray(g_ui_text_vao);
+	glUseProgram(g_ui_text_shader.id);
+	glBindVertexArray(g_ui_text_shader.vao);
 
-	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 
 	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
@@ -1312,8 +1298,8 @@ void mouse_move_callback(GLFWwindow* window, double xposIn, double yposIn)
 	float xpos = static_cast<float>(xposIn);
 	float ypos = static_cast<float>(yposIn);
 
-	g_mouse_movement_x = xpos - g_frame_data.prev_mouse_x;
-	g_mouse_movement_y = g_frame_data.prev_mouse_y - ypos;
+	g_frame_data.mouse_move_x = xpos - g_frame_data.prev_mouse_x;
+	g_frame_data.mouse_move_y = g_frame_data.prev_mouse_y - ypos;
 
 	g_frame_data.prev_mouse_x = xpos;
 	g_frame_data.prev_mouse_y = ypos;
@@ -2034,13 +2020,15 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/billboard_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/billboard_fs.glsl";
 
-		g_billboard_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		{
-			glGenVertexArrays(1, &g_billboard_vao);
-			glGenBuffers(1, &g_billboard_vbo);
+		g_billboard_shader = simple_shader_init();
 
-			glBindVertexArray(g_billboard_vao);
-			glBindBuffer(GL_ARRAY_BUFFER, g_billboard_vbo);
+		g_billboard_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		{
+			glGenVertexArrays(1, &g_billboard_shader.vao);
+			glGenBuffers(1, &g_billboard_shader.vbo);
+
+			glBindVertexArray(g_billboard_shader.vao);
+			glBindBuffer(GL_ARRAY_BUFFER, g_billboard_shader.vbo);
 
 			float vertices[] =
 			{
@@ -2071,13 +2059,13 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_fs.glsl";
 
-		g_ui_text_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_ui_text_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 		{
-			glGenVertexArrays(1, &g_ui_text_vao);
-			glGenBuffers(1, &g_ui_text_vbo);
+			glGenVertexArrays(1, &g_ui_text_shader.vao);
+			glGenBuffers(1, &g_ui_text_shader.vbo);
 
-			glBindVertexArray(g_ui_text_vao);
-			glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_vbo);
+			glBindVertexArray(g_ui_text_shader.vao);
+			glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
 
 			// Coord attribute
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
@@ -2121,13 +2109,13 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_fs.glsl";
 
-		g_wireframe_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_wireframe_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 
-		glGenVertexArrays(1, &g_wireframe_vao);
-		glBindVertexArray(g_wireframe_vao);
+		glGenVertexArrays(1, &g_wireframe_shader.vao);
+		glBindVertexArray(g_wireframe_shader.vao);
 
-		glGenBuffers(1, &g_wireframe_vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_vbo);
+		glGenBuffers(1, &g_wireframe_shader.vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_shader.vbo);
 
 		// Coord attribute
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
@@ -2139,12 +2127,12 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_fs.glsl";
 
-		g_line_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_line_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 
-		glGenVertexArrays(1, &g_line_vao);
-		glBindVertexArray(g_line_vao);
-		glGenBuffers(1, &g_line_vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, g_line_vbo);
+		glGenVertexArrays(1, &g_line_shader.vao);
+		glBindVertexArray(g_line_shader.vao);
+		glGenBuffers(1, &g_line_shader.vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
 
 		// Coord attribute
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
@@ -2677,11 +2665,11 @@ int main(int argc, char* argv[])
 		{
 			glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-			g_mouse_movement_x *= g_scene_camera.look_sensitivity;
-			g_mouse_movement_y *= g_scene_camera.look_sensitivity;
+			g_frame_data.mouse_move_x *= g_scene_camera.look_sensitivity;
+			g_frame_data.mouse_move_y *= g_scene_camera.look_sensitivity;
 
-			g_scene_camera.yaw += g_mouse_movement_x;
-			g_scene_camera.pitch += g_mouse_movement_y;
+			g_scene_camera.yaw   += g_frame_data.mouse_move_x;
+			g_scene_camera.pitch += g_frame_data.mouse_move_y;
 
 			if (g_scene_camera.pitch > 89.0f)
 			{

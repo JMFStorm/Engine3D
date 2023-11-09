@@ -291,3 +291,13 @@ float get_line_distance_width(glm::vec3 line_start, glm::vec3 line_end, glm::vec
 
 	return line_width;
 }
+
+SimpleShader simple_shader_init()
+{
+	SimpleShader shader = {
+		.id = 0,
+		.vao = 0,
+		.vbo = 0,
+	};
+	return shader;
+}

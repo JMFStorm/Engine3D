@@ -31,6 +31,12 @@ enum class ObjectType {
 	Spotlight
 };
 
+typedef struct SimpleShader {
+	u32 id;
+	u32 vao;
+	u32 vbo;
+} SimpleShader;
+
 constexpr const s64 E_Primitive_Plane = 0;
 constexpr const s64 E_Primitive_Cube = 1;
 constexpr const s64 E_Primitive_Sphere = 2;
@@ -161,12 +167,14 @@ typedef struct GameMetrics {
 } GameMetrics;
 
 typedef struct FrameData {
-	float mouse_x;
-	float mouse_y;
-	float prev_mouse_x;
-	float prev_mouse_y;
-	int draw_calls;
-	float deltatime;
+	s64 draw_calls;
+	f32 mouse_x;
+	f32 mouse_y;
+	f32 mouse_move_x;
+	f32 mouse_move_y;
+	f32 prev_mouse_x;
+	f32 prev_mouse_y;
+	f32 deltatime;
 	bool mouse_clicked;
 } FrameData;
 

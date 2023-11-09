@@ -1,3 +1,4 @@
 TODOS:
 - light on/off
+- tranform mode revisited
 - material.data -file re-organizes items when adding new material

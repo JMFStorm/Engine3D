@@ -127,3 +127,5 @@ Pointlight pointlight_init();
 GameCamera scene_camera_init(float horizontal_fov);
 
 float get_line_distance_width(glm::vec3 line_start, glm::vec3 line_end, glm::vec3 view_pos, float thickness);
+
+SimpleShader simple_shader_init();
