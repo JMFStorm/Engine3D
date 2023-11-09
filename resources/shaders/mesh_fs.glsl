@@ -127,7 +127,9 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm)
     vec3 light_dir = normalize(shadow_map_light_pos - fs_in.fragPos);
     float fragment_dot = (1.0 - dot(frag_norm, light_dir));
 
-    float bias = max(0.005 * fragment_dot, 0.001);
+    float bias_max = 0.0005;
+    float bias_min = 0.00005;
+    float bias = max(bias_max * fragment_dot, bias_min);
     if (currentDepth - bias < closestDepth) return 0.0;
 
     float shadow = 0;

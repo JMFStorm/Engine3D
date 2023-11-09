@@ -514,7 +514,8 @@ void draw_mesh(Mesh* mesh)
 
 	// Shadow map for dev
 	{
-		glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
+		glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
+		// glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
 		glm::mat4 lightView = glm::lookAt(g_shadow_map_light_pos, g_shadow_map_light_look_at, glm::vec3(0.0, 1.0, 0.0));
 		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
@@ -2848,7 +2849,8 @@ int main(int argc, char* argv[])
 
 		// Shadow map framebuffer
 		{
-			glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
+			// glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
+			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
 			glm::mat4 lightView = glm::lookAt(g_shadow_map_light_pos, g_shadow_map_light_look_at, glm::vec3(0.0, 1.0, 0.0));
 			glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
