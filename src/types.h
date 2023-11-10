@@ -76,9 +76,7 @@ typedef struct Mesh {
 } Mesh;
 
 typedef struct MeshData {
-	glm::vec3 translation;
-	glm::vec3 rotation;
-	glm::vec3 scale;
+	Transforms transforms;
 	s64 mesh_type;
 	s64 material_id;
 	f32 uv_multiplier;
@@ -91,22 +89,21 @@ typedef struct Framebuffer {
 } Framebuffer;
 
 typedef struct Pointlight {
-	glm::vec3 position;
+	Transforms transforms;
 	glm::vec3 diffuse;
-	float range;
-	float specular;
-	float intensity;
+	f32 range;
+	f32 specular;
+	f32 intensity;
 } Pointlight;
 
 typedef struct Spotlight {
 	Framebuffer shadow_map;
-	glm::vec3 position;
-	glm::vec3 rotation;
+	Transforms transforms;
 	glm::vec3 diffuse;
-	float specular;
-	float range;
-	float cutoff;
-	float outer_cutoff;
+	f32 specular;
+	f32 range;
+	f32 cutoff;
+	f32 outer_cutoff;
 } Spotlight;
 
 typedef struct SceneSelection {

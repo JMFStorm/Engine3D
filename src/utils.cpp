@@ -230,7 +230,7 @@ Transforms transforms_init()
 vec3 get_spotlight_dir(Spotlight spotlight)
 {
 	vec3 spot_dir = vec3(0, -1.0f, 0);
-	glm::mat4 rotation_mat = get_rotation_matrix(spotlight.rotation);
+	glm::mat4 rotation_mat = get_rotation_matrix(spotlight.transforms.rotation);
 	spot_dir = rotation_mat * vec4(spot_dir, 1.0f);
 	return glm::normalize(spot_dir);
 }
@@ -260,9 +260,8 @@ Spotlight spotlight_init()
 {
 	Spotlight sp = {
 		.shadow_map = framebuffer_init(),
-		.position = vec3(0, 2, 0),
-		.rotation = vec3(0, -1, 0),
-		.diffuse = vec3(1),
+		.transforms = transforms_init(),
+		.diffuse = glm::vec3(1),
 		.specular = 2.0f,
 		.range = 5.0f,
 		.cutoff = 0.90f,
@@ -274,7 +273,7 @@ Spotlight spotlight_init()
 Pointlight pointlight_init()
 {
 	Pointlight p_light = {
-		.position = glm::vec3(0.0f, 0.0f, 0.0f),
+		.transforms = transforms_init(),
 		.diffuse = glm::vec3(1.0f),
 		.range = 6.0f,
 		.specular = 1.0f,
