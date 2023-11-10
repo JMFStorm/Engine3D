@@ -38,8 +38,6 @@ static unsigned int g_shadow_map_debug_vbo;
 
 static f32 g_shadow_map_near_plane = 0.25f;
 static f32 g_shadow_map_far_plane = 15.0f;
-static glm::vec3 g_shadow_map_light_pos(0, 4.0f, 0);
-static glm::vec3 g_shadow_map_light_look_at(0, 0, 6.0f);
 
 static unsigned int g_shadow_map_shader;
 static unsigned int g_shadow_map_vao;
@@ -512,11 +510,20 @@ void draw_mesh(Mesh* mesh)
 	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
 	glUniform3f(camera_view_loc, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 
+	unsigned int use_shadow_loc = glGetUniformLocation(g_mesh_shader, "use_shadow_map");
+
 	// Shadow map for dev
+	if (0 < g_scene_spotlights.items_count)
 	{
-		glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
-		// glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
-		glm::mat4 lightView = glm::lookAt(g_shadow_map_light_pos, g_shadow_map_light_look_at, glm::vec3(0.0, 1.0, 0.0));
+		glUniform1i(use_shadow_loc, 1);
+
+		Spotlight* first_spot = j_array_get(&g_scene_spotlights, 0);
+		vec3 light_pos = first_spot->position;
+		vec3 spot_dir = get_spotlight_dir(*first_spot);
+		vec3 spot_look_at = first_spot->position + spot_dir;
+
+		glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, first_spot->range * 10);
+		glm::mat4 lightView = glm::lookAt(light_pos, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
 		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 		unsigned int light_matrix_loc = glGetUniformLocation(g_mesh_shader, "lightSpaceMatrix");
@@ -526,10 +533,14 @@ void draw_mesh(Mesh* mesh)
 		glUniform1i(shadow_texture_loc, 2);
 
 		unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, "shadow_map_light_pos");
-		glUniform3f(light_pos_loc, g_shadow_map_light_pos.x, g_shadow_map_light_pos.y, g_shadow_map_light_pos.z);
+		glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z);
 
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
+	}
+	else
+	{
+		glUniform1i(use_shadow_loc, 0);
 	}
 
 	// Lights
@@ -2554,10 +2565,12 @@ int main(int argc, char* argv[])
 				ImGui::InputFloat("Blur amount", &g_blur_effect_amount, 0, 0, "%.1f");
 				ImGui::InputFloat("Gamma", &g_gamma_amount, 0, 0, "%.1f");
 
-				// g_shadow_map_light
-				ImGui::Checkbox("DEBUG_SHADOWMAP", &DEBUG_SHADOWMAP);
-				ImGui::InputFloat3("Shadow light position", &g_shadow_map_light_pos[0], "%.2f");
-				ImGui::InputFloat3("Shadow light lookat", &g_shadow_map_light_look_at[0], "%.2f");
+				if (0 < g_scene_spotlights.items_count)
+				{
+					Spotlight* first_spot = j_array_get(&g_scene_spotlights, 0);
+					ImGui::Checkbox("DEBUG_SHADOWMAP", &DEBUG_SHADOWMAP);
+					ImGui::InputFloat3("Shadow light position", &first_spot->position[0], "%.2f");
+				}
 
 				ImGui::End();
 			}
@@ -2848,10 +2861,14 @@ int main(int argc, char* argv[])
 		// Draw OpenGL
 
 		// Shadow map framebuffer
+		if (0 < g_scene_spotlights.items_count)
 		{
-			// glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
-			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, g_shadow_map_far_plane);
-			glm::mat4 lightView = glm::lookAt(g_shadow_map_light_pos, g_shadow_map_light_look_at, glm::vec3(0.0, 1.0, 0.0));
+			Spotlight* first_spot = j_array_get(&g_scene_spotlights, 0);
+			vec3 spot_dir = get_spotlight_dir(*first_spot);
+			vec3 spot_look_at = first_spot->position + spot_dir;
+
+			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, first_spot->range * 10);
+			glm::mat4 lightView = glm::lookAt(first_spot->position, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
 			glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 			glFrontFace(GL_CW);

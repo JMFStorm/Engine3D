@@ -222,7 +222,7 @@ vec3 get_spotlight_dir(Spotlight spotlight)
 	vec3 spot_dir = vec3(0, -1.0f, 0);
 	glm::mat4 rotation_mat = get_rotation_matrix(spotlight.rotation);
 	spot_dir = rotation_mat * vec4(spot_dir, 1.0f);
-	return spot_dir;
+	return glm::normalize(spot_dir);
 }
 
 Material material_init(Texture* color_ptr, Texture* specular_ptr)

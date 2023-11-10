@@ -32,6 +32,7 @@ in VS_OUT {
     vec4 FragPosLightSpace;
 } fs_in;
 
+uniform bool use_shadow_map;
 uniform sampler2D shadowMap;
 
 uniform Material material;
@@ -50,6 +51,44 @@ uniform int spotlights_count;
 uniform Spotlight spotlights[20];
 
 out vec4 FragColor;
+
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm)
+{
+    // perform perspective divide
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
+    // transform to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+
+    if(projCoords.z > 1.0) return 0.0;
+
+    // get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
+    float closestDepth = texture(shadowMap, projCoords.xy).r; 
+
+    // get depth of current fragment from light's perspective
+    float currentDepth = projCoords.z;
+
+    vec3 light_dir = normalize(shadow_map_light_pos - fs_in.fragPos);
+    float fragment_dot = (1.0 - dot(frag_norm, light_dir));
+
+    float bias_max = 0.0005;
+    float bias_min = 0.00005;
+    float bias = max(bias_max * fragment_dot, bias_min);
+    if (currentDepth - bias < closestDepth) return 0.0;
+
+    float shadow = 0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+        }    
+    }
+
+    shadow /= 9.0;
+    return shadow;
+}  
 
 vec3 point_lights_color(Pointlight light, vec3 frag_normal, vec3 frag_pos, vec3 view_dir)
 {
@@ -105,46 +144,16 @@ vec3 spotlight_color(Spotlight light, vec3 frag_normal, vec3 frag_pos, vec3 view
     diffuse *= attenuation;
     specular *= attenuation;
 
-    return vec3(diffuse + specular) * intensity;
+    vec3 result = vec3(diffuse + specular) * intensity;
+
+    float shadow = use_shadow_map
+        ? ShadowCalculation(fs_in.FragPosLightSpace, fs_in.fragNormal)
+        : 0.0;
+
+    result = result * (1.0 - shadow);
+
+    return result;
 }
-
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm)
-{
-    // perform perspective divide
-    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-
-    // transform to [0,1] range
-    projCoords = projCoords * 0.5 + 0.5;
-
-    if(projCoords.z > 1.0) return 0.0;
-
-    // get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
-    float closestDepth = texture(shadowMap, projCoords.xy).r; 
-
-    // get depth of current fragment from light's perspective
-    float currentDepth = projCoords.z;
-
-    vec3 light_dir = normalize(shadow_map_light_pos - fs_in.fragPos);
-    float fragment_dot = (1.0 - dot(frag_norm, light_dir));
-
-    float bias_max = 0.0005;
-    float bias_min = 0.00005;
-    float bias = max(bias_max * fragment_dot, bias_min);
-    if (currentDepth - bias < closestDepth) return 0.0;
-
-    float shadow = 0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-
-    for(int x = -1; x <= 1; ++x) {
-        for(int y = -1; y <= 1; ++y) {
-            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
-        }    
-    }
-
-    shadow /= 9.0;
-    return shadow;
-}  
 
 void main()
 {
@@ -164,8 +173,7 @@ void main()
         color_result += spotlight_color(spotlights[i], norm, fs_in.fragPos, view_dir);
     }
 
-    float shadow = ShadowCalculation(fs_in.FragPosLightSpace, fs_in.fragNormal);
-    color_result = color_result * (1.0 - shadow) + ambient;
+    color_result = color_result + ambient;
 
     FragColor = vec4(color_result, 1.0);
 }
