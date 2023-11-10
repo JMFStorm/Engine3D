@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include <glm.hpp>
+#include <glm/glm.hpp>
 
 #define KILOBYTES(x) (x * 1024)
 #define MEGABYTES(x) (KILOBYTES(x) * 1024)
