@@ -60,16 +60,16 @@ inline glm::vec3 clip_vec3(glm::vec3 vec3, float clip_amount)
 inline glm::mat4 get_model_matrix(Mesh* mesh)
 {
 	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::translate(model, mesh->translation);
+	model = glm::translate(model, mesh->transforms.translation);
 
-	glm::quat quaternionX = glm::angleAxis(glm::radians(mesh->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::quat quaternionY = glm::angleAxis(glm::radians(mesh->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::quat quaternionZ = glm::angleAxis(glm::radians(mesh->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::quat quaternionX = glm::angleAxis(glm::radians(mesh->transforms.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat quaternionY = glm::angleAxis(glm::radians(mesh->transforms.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::quat quaternionZ = glm::angleAxis(glm::radians(mesh->transforms.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
 
 	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
 	model = model * rotation_matrix;
-	model = glm::scale(model, mesh->scale);
+	model = glm::scale(model, mesh->transforms.scale);
 	return model;
 }
 
@@ -116,6 +116,8 @@ bool calculate_plane_ray_intersection(
 	glm::vec3 ray_direction,
 	glm::vec3& result);
 
+Transforms transforms_init();
+
 vec3 get_spotlight_dir(Spotlight spotlight);
 
 Material material_init(Texture* color_ptr, Texture* specular_ptr);
@@ -129,3 +131,5 @@ GameCamera scene_camera_init(float horizontal_fov);
 float get_line_distance_width(glm::vec3 line_start, glm::vec3 line_end, glm::vec3 view_pos, float thickness);
 
 SimpleShader simple_shader_init();
+
+Framebuffer framebuffer_init();

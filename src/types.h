@@ -37,6 +37,12 @@ typedef struct SimpleShader {
 	u32 vbo;
 } SimpleShader;
 
+typedef struct Transforms {
+	glm::vec3 translation;
+	glm::vec3 rotation;
+	glm::vec3 scale;
+} Transforms;
+
 constexpr const s64 E_Primitive_Plane = 0;
 constexpr const s64 E_Primitive_Cube = 1;
 constexpr const s64 E_Primitive_Sphere = 2;
@@ -63,9 +69,7 @@ typedef struct MaterialData {
 } MaterialData;
 
 typedef struct Mesh {
-	glm::vec3 translation;
-	glm::vec3 rotation;
-	glm::vec3 scale;
+	Transforms transforms;
 	Material* material;
 	s64 mesh_type;
 	f32 uv_multiplier;
@@ -80,6 +84,12 @@ typedef struct MeshData {
 	f32 uv_multiplier;
 } MeshData;
 
+typedef struct Framebuffer {
+	u32 id;
+	u32 texture_gpu_id;
+	u32 renderbuffer;
+} Framebuffer;
+
 typedef struct Pointlight {
 	glm::vec3 position;
 	glm::vec3 diffuse;
@@ -89,6 +99,7 @@ typedef struct Pointlight {
 } Pointlight;
 
 typedef struct Spotlight {
+	Framebuffer shadow_map;
 	glm::vec3 position;
 	glm::vec3 rotation;
 	glm::vec3 diffuse;

@@ -46,8 +46,7 @@ static unsigned int g_shadow_map_vbo;
 static const unsigned int SHADOW_WIDTH = 1024 * 2;
 static const unsigned int SHADOW_HEIGHT = 1024 * 2;
 
-unsigned int g_shadow_map_framebuffer;
-static unsigned int g_shadow_map_texture;
+static Framebuffer spotlight_shadow_map;
 
 static constexpr const char* g_materials_dir_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
 
@@ -510,37 +509,36 @@ void draw_mesh(Mesh* mesh)
 	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
 	glUniform3f(camera_view_loc, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 
-	unsigned int use_shadow_loc = glGetUniformLocation(g_mesh_shader, "use_shadow_map");
-
-	// Shadow map for dev
-	if (0 < g_scene_spotlights.items_count)
+	// Shadow maps
 	{
-		glUniform1i(use_shadow_loc, 1);
+		unsigned int use_shadow_loc = glGetUniformLocation(g_mesh_shader, "use_shadow_map");
 
-		Spotlight* first_spot = j_array_get(&g_scene_spotlights, 0);
-		vec3 light_pos = first_spot->position;
-		vec3 spot_dir = get_spotlight_dir(*first_spot);
-		vec3 spot_look_at = first_spot->position + spot_dir;
+		if (0 < g_scene_spotlights.items_count) glUniform1i(use_shadow_loc, 1);
+		else glUniform1i(use_shadow_loc, 0);
 
-		glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, first_spot->range * 10);
-		glm::mat4 lightView = glm::lookAt(light_pos, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
-		glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+		for (int i = 0; i < g_scene_spotlights.items_count; i++)
+		{
+			Spotlight* spotlight= j_array_get(&g_scene_spotlights, 0);
+			vec3 light_pos = spotlight->position;
+			vec3 spot_dir = get_spotlight_dir(*spotlight);
+			vec3 spot_look_at = spotlight->position + spot_dir;
 
-		unsigned int light_matrix_loc = glGetUniformLocation(g_mesh_shader, "lightSpaceMatrix");
-		glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, spotlight->range * 10);
+			glm::mat4 lightView = glm::lookAt(light_pos, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
+			glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
-		unsigned int shadow_texture_loc = glGetUniformLocation(g_mesh_shader, "shadowMap");
-		glUniform1i(shadow_texture_loc, 2);
+			unsigned int light_matrix_loc = glGetUniformLocation(g_mesh_shader, "lightSpaceMatrix");
+			glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
 
-		unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, "shadow_map_light_pos");
-		glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z);
+			unsigned int shadow_texture_loc = glGetUniformLocation(g_mesh_shader, "shadowMap");
+			glUniform1i(shadow_texture_loc, 2);
 
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
-	}
-	else
-	{
-		glUniform1i(use_shadow_loc, 0);
+			unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, "shadow_map_light_pos");
+			glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z);
+
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, spotlight_shadow_map.texture_gpu_id);
+		}
 	}
 
 	// Lights
@@ -931,7 +929,7 @@ vec3 get_selected_object_translation()
 	if (g_selected_object.type == ObjectType::Primitive)
 	{
 		Mesh* mesh = j_array_get(&g_scene_meshes, g_selected_object.selection_index);
-		return mesh->translation;
+		return mesh->transforms.translation;
 	}
 
 	if (g_selected_object.type == ObjectType::Pointlight)
@@ -977,7 +975,7 @@ void draw_selection_arrows(glm::vec3 position)
 		if (g_transform_mode.mode == TransformMode::Scale)
 		{
 			Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
-			glm::mat4 rotation_mat = get_rotation_matrix(mesh_ptr->rotation);
+			glm::mat4 rotation_mat = get_rotation_matrix(mesh_ptr->transforms.rotation);
 			vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
 			vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
 			vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
@@ -1432,7 +1430,7 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 		E_Axis_Z, E_Axis_Z
 	};
 
-	glm::mat4 rotation_matrix = get_rotation_matrix(cube->rotation);
+	glm::mat4 rotation_matrix = get_rotation_matrix(cube->transforms.rotation);
 
 	for (int j = 0; j < CUBE_PLANES_COUNT; j++)
 	{
@@ -1444,8 +1442,8 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 
 		glm::vec3 intersection_point = glm::vec3(0);
 
-		float plane_scale = get_vec3_val_by_axis(cube->scale, current_axis);
-		vec3 plane_middle_point = cube->translation + plane_normal * plane_scale * 0.5f;
+		float plane_scale = get_vec3_val_by_axis(cube->transforms.scale, current_axis);
+		vec3 plane_middle_point = cube->transforms.translation + plane_normal * plane_scale * 0.5f;
 
 		bool intersection = calculate_plane_ray_intersection(
 			plane_normal, plane_middle_point, ray_o, ray_dir, intersection_point);
@@ -1463,8 +1461,8 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 		float abs1 = std::abs(get_vec3_val_by_axis(local_intersection_point, xor_axises[0]));
 		float abs2 = std::abs(get_vec3_val_by_axis(local_intersection_point, xor_axises[1]));
 
-		bool intersect_1 = abs1 <= get_vec3_val_by_axis(cube->scale, xor_axises[0]) * 0.5f;
-		bool intersect_2 = abs2 <= get_vec3_val_by_axis(cube->scale, xor_axises[1]) * 0.5f;
+		bool intersect_1 = abs1 <= get_vec3_val_by_axis(cube->transforms.scale, xor_axises[0]) * 0.5f;
+		bool intersect_2 = abs2 <= get_vec3_val_by_axis(cube->transforms.scale, xor_axises[1]) * 0.5f;
 
 		if (intersect_1 && intersect_2)
 		{
@@ -1495,8 +1493,8 @@ s64 get_pointlight_selection_index(JArray<Pointlight>& lights, f32* select_dist,
 		as_light = j_array_get(&lights, i);
 		as_cube = {};
 		as_cube.mesh_type = E_Primitive_Cube;
-		as_cube.translation = as_light->position;
-		as_cube.scale = vec3(0.35f);
+		as_cube.transforms.translation = as_light->position;
+		as_cube.transforms.scale = vec3(0.35f);
 
 		f32 new_select_dist;
 		bool selected_light = get_cube_selection(&as_cube, &new_select_dist, ray_origin, ray_direction);
@@ -1523,8 +1521,8 @@ s64 get_spotlight_selection_index(JArray<Spotlight>& lights, f32* select_dist, g
 		as_light = j_array_get(&lights, i);
 		as_cube = {};
 		as_cube.mesh_type = E_Primitive_Cube;
-		as_cube.translation = as_light->position;
-		as_cube.scale = vec3(0.35f);
+		as_cube.transforms.translation = as_light->position;
+		as_cube.transforms.scale = vec3(0.35f);
 
 		f32 new_select_dist;
 		bool selected_light = get_cube_selection(&as_cube, &new_select_dist, ray_origin, ray_direction);
@@ -1551,7 +1549,7 @@ s64 get_mesh_selection_index(JArray<Mesh>& meshes, f32* select_dist, glm::vec3 r
 		if (mesh->mesh_type == E_Primitive_Plane)
 		{
 			auto plane_up = glm::vec3(0.0f, 1.0f, 0.0f);
-			glm::mat4 rotationMatrix = get_rotation_matrix(mesh->rotation);
+			glm::mat4 rotationMatrix = get_rotation_matrix(mesh->transforms.rotation);
 
 			auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up, 1.0f));
 			planeNormal = glm::normalize(planeNormal);
@@ -1559,11 +1557,11 @@ s64 get_mesh_selection_index(JArray<Mesh>& meshes, f32* select_dist, glm::vec3 r
 			glm::vec3 intersection_point = glm::vec3(0);
 
 			bool intersection = calculate_plane_ray_intersection(
-				planeNormal, mesh->translation, ray_origin, ray_direction, intersection_point);
+				planeNormal, mesh->transforms.translation, ray_origin, ray_direction, intersection_point);
 
 			if (!intersection) continue;
 
-			glm::vec3 intersection_vec3 = intersection_point - mesh->translation;
+			glm::vec3 intersection_vec3 = intersection_point - mesh->transforms.translation;
 
 			// Calculate the relative position of the intersection point with respect to the plane's origin
 			glm::vec3 relative_position = intersection_vec3 - glm::vec3(rotationMatrix[3]);
@@ -1574,8 +1572,8 @@ s64 get_mesh_selection_index(JArray<Mesh>& meshes, f32* select_dist, glm::vec3 r
 			// Apply the inverse rotation matrix to convert the point from world space to local space
 			glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
 
-			bool intersect_x = 0.0f <= local_intersection_point.x && local_intersection_point.x <= mesh->scale.x;
-			bool intersect_z = 0.0f <= local_intersection_point.z && local_intersection_point.z <= mesh->scale.z;
+			bool intersect_x = 0.0f <= local_intersection_point.x && local_intersection_point.x <= mesh->transforms.scale.x;
+			bool intersect_z = 0.0f <= local_intersection_point.z && local_intersection_point.z <= mesh->transforms.scale.z;
 
 			if (intersect_x && intersect_z)
 			{
@@ -1633,6 +1631,40 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
+Transforms get_selected_object_transforms()
+{
+	switch (g_selected_object.type)
+	{
+		case ObjectType::Primitive:
+		{
+			Mesh* as_mesh = (Mesh*)get_selected_object_ptr();
+			return as_mesh->transforms;
+		}
+		case ObjectType::Pointlight:
+		{
+			Pointlight* as_pl = (Pointlight*)get_selected_object_ptr();
+			Transforms res1 = {
+				.translation = as_pl->position,
+				.rotation = vec3(0),
+				.scale = vec3(1)
+			};
+			return res1;
+		}
+		case ObjectType::Spotlight:
+		{
+			Spotlight* as_sl = (Spotlight*)get_selected_object_ptr();
+			Transforms res2 = {
+				.translation = as_sl->position,
+				.rotation = as_sl->rotation,
+				.scale = vec3(1)
+			};
+			return res2;
+		}
+	}
+
+	ASSERT_TRUE(false, "Selected object tranform is of known type");
+}
+
 bool try_init_transform_mode()
 {
 	bool has_valid_mode = g_transform_mode.mode == TransformMode::Translate
@@ -1652,7 +1684,7 @@ bool try_init_transform_mode()
 	std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
 	g_used_transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
-	Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
+	Transforms selected_obj_transf = get_selected_object_transforms();
 
 	if (g_transform_mode.mode == TransformMode::Translate)
 	{
@@ -1660,7 +1692,7 @@ bool try_init_transform_mode()
 
 		bool intersection = calculate_plane_ray_intersection(
 			g_normal_for_ray_intersect,
-			selected_mesh_ptr->translation,
+			selected_obj_transf.translation,
 			g_scene_camera.position,
 			g_used_transform_ray,
 			intersection_point);
@@ -1668,11 +1700,11 @@ bool try_init_transform_mode()
 		if (!intersection) return false;
 
 		g_prev_intersection = intersection_point;
-		g_new_translation = selected_mesh_ptr->translation;
+		g_new_translation = selected_obj_transf.translation;
 	}
 	else if (g_transform_mode.mode == TransformMode::Scale)
 	{
-		glm::mat4 model = get_rotation_matrix(selected_mesh_ptr->rotation);
+		glm::mat4 model = get_rotation_matrix(selected_obj_transf.rotation);
 
 		use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
 		use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
@@ -1681,7 +1713,7 @@ bool try_init_transform_mode()
 
 		bool intersection = calculate_plane_ray_intersection(
 			g_normal_for_ray_intersect,
-			selected_mesh_ptr->translation,
+			selected_obj_transf.translation,
 			g_scene_camera.position,
 			g_used_transform_ray,
 			intersection_point);
@@ -1691,9 +1723,9 @@ bool try_init_transform_mode()
 		glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
 		used_normal = model * glm::vec4(used_normal, 1.0f);
 
-		glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, selected_mesh_ptr->translation, used_normal);
+		glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, selected_obj_transf.translation, used_normal);
 		g_prev_point_on_scale_plane = point_on_scale_plane;
-		g_new_scale = selected_mesh_ptr->scale;
+		g_new_scale = selected_obj_transf.scale;
 	}
 	else if (g_transform_mode.mode == TransformMode::Rotate)
 	{
@@ -1701,7 +1733,7 @@ bool try_init_transform_mode()
 
 		bool intersection = calculate_plane_ray_intersection(
 			g_normal_for_ray_intersect,
-			selected_mesh_ptr->translation,
+			selected_obj_transf.translation,
 			g_scene_camera.position,
 			g_used_transform_ray,
 			intersection_point);
@@ -1709,7 +1741,7 @@ bool try_init_transform_mode()
 		if (!intersection) return false;
 
 		g_prev_intersection = intersection_point;
-		g_new_rotation = selected_mesh_ptr->rotation;
+		g_new_rotation = selected_obj_transf.rotation;
 	}
 
 	return true;
@@ -1720,9 +1752,9 @@ inline MeshData mesh_serialize(Mesh* mesh)
 	s64 material_id = g_mat_data_map[mesh->material->color_texture->file_name];
 
 	MeshData data = {
-		.translation = mesh->translation,
-		.rotation = mesh->rotation,
-		.scale = mesh->scale,
+		.translation = mesh->transforms.translation,
+		.rotation = mesh->transforms.rotation,
+		.scale = mesh->transforms.scale,
 		.mesh_type = mesh->mesh_type,
 		.material_id = material_id,
 		.uv_multiplier = mesh->uv_multiplier,
@@ -1736,10 +1768,12 @@ inline Mesh mesh_deserialize(MeshData data)
 	s64 material_index = g_materials_index_map[material_name];
 	Material* material_ptr = j_array_get(&g_materials, material_index);
 
+	Transforms tranforms = {
+
+	};
+
 	Mesh mesh = {
-		.translation = data.translation,
-		.rotation = data.rotation,
-		.scale = data.scale,
+		.transforms = tranforms,
 		.material = material_ptr,
 		.mesh_type = data.mesh_type,
 		.uv_multiplier = data.uv_multiplier,
@@ -2385,9 +2419,11 @@ int main(int argc, char* argv[])
 
 		// Shadow map
 		{
-			glGenFramebuffers(1, &g_shadow_map_framebuffer);
-			glGenTextures(1, &g_shadow_map_texture);
-			glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
+			spotlight_shadow_map = framebuffer_init();
+
+			glGenFramebuffers(1, &spotlight_shadow_map.id);
+			glGenTextures(1, &spotlight_shadow_map.texture_gpu_id);
+			glBindTexture(GL_TEXTURE_2D, spotlight_shadow_map.texture_gpu_id);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -2398,11 +2434,15 @@ int main(int argc, char* argv[])
 			float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 			glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-			glBindFramebuffer(GL_FRAMEBUFFER, g_shadow_map_framebuffer);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, g_shadow_map_texture, 0);
+			glBindFramebuffer(GL_FRAMEBUFFER, spotlight_shadow_map.id);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, spotlight_shadow_map.texture_gpu_id, 0);
 			glDrawBuffer(GL_NONE);
 			glReadBuffer(GL_NONE);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+			ASSERT_TRUE(
+				spotlight_shadow_map.id != 0 && spotlight_shadow_map.texture_gpu_id != 0,
+				"Shadow map creation");
 		}
 	}
 
@@ -2446,9 +2486,7 @@ int main(int argc, char* argv[])
 					if (ImGui::Button("Add plane"))
 					{
 						Mesh new_plane = {
-							.translation = vec3(0),
-							.rotation = vec3(0),
-							.scale = vec3(1.0f),
+							.transforms = transforms_init(),
 							.material = j_array_get(&g_materials, 0),
 							.mesh_type = E_Primitive_Plane,
 							.uv_multiplier = 1.0f,
@@ -2459,9 +2497,7 @@ int main(int argc, char* argv[])
 					if (ImGui::Button("Add Cube"))
 					{
 						Mesh new_cube = {
-							.translation = vec3(0),
-							.rotation = vec3(0),
-							.scale = vec3(1.0f),
+							.transforms = transforms_init(),
 							.material = j_array_get(&g_materials, 0),
 							.mesh_type = E_Primitive_Cube,
 							.uv_multiplier = 1.0f,
@@ -2494,9 +2530,9 @@ int main(int argc, char* argv[])
 						Mesh* selected_mesh_ptr = (Mesh*)get_selected_object_ptr();
 
 						ImGui::Text("Mesh properties");
-						ImGui::InputFloat3("Translation", &selected_mesh_ptr->translation[0], "%.2f");
-						ImGui::InputFloat3("Rotation", &selected_mesh_ptr->rotation[0], "%.2f");
-						ImGui::InputFloat3("Scale", &selected_mesh_ptr->scale[0], "%.2f");
+						ImGui::InputFloat3("Translation", &selected_mesh_ptr->transforms.translation[0], "%.2f");
+						ImGui::InputFloat3("Rotation", &selected_mesh_ptr->transforms.rotation[0], "%.2f");
+						ImGui::InputFloat3("Scale", &selected_mesh_ptr->transforms.scale[0], "%.2f");
 
 						ImGui::Text("Select material");
 						ImGui::Image((ImTextureID)selected_mesh_ptr->material->color_texture->gpu_id, ImVec2(128, 128));
@@ -2764,7 +2800,7 @@ int main(int argc, char* argv[])
 
 			bool intersection = calculate_plane_ray_intersection(
 				g_normal_for_ray_intersect,
-				selected_mesh_ptr->translation,
+				selected_mesh_ptr->transforms.translation,
 				g_scene_camera.position,
 				g_used_transform_ray,
 				intersection_point);
@@ -2777,16 +2813,16 @@ int main(int argc, char* argv[])
 				vec3_add_for_axis(g_new_translation, travel_dist, g_transform_mode.axis);
 				g_prev_intersection = intersection_point;
 
-				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
-				else selected_mesh_ptr->translation = g_new_translation;
+				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->transforms.translation = clip_vec3(g_new_translation, g_user_settings.transform_clip);
+				else selected_mesh_ptr->transforms.translation = g_new_translation;
 			}
 			else if (intersection && g_transform_mode.mode == TransformMode::Scale)
 			{
-				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr->rotation);
+				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_mesh_ptr->transforms.rotation);
 				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
 
 				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
-				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, selected_mesh_ptr->translation, used_normal);
+				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_debug_plane_intersection, selected_mesh_ptr->transforms.translation, used_normal);
 				g_point_on_scale_plane = point_on_scale_plane;
 
 				// Reverse the rotation by applying the inverse rotation matrix to the vector
@@ -2798,20 +2834,20 @@ int main(int argc, char* argv[])
 
 				vec3_add_for_axis(g_new_scale, travel_dist, g_transform_mode.axis);
 
-				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
-				else selected_mesh_ptr->scale = g_new_scale;
+				if (0.0f < g_user_settings.transform_clip) selected_mesh_ptr->transforms.scale = clip_vec3(g_new_scale, g_user_settings.transform_clip);
+				else selected_mesh_ptr->transforms.scale = g_new_scale;
 
-				if (selected_mesh_ptr->scale.x < 0.01f) selected_mesh_ptr->scale.x = 0.01f;
-				if (selected_mesh_ptr->scale.y < 0.01f) selected_mesh_ptr->scale.y = 0.01f;
-				if (selected_mesh_ptr->scale.z < 0.01f) selected_mesh_ptr->scale.z = 0.01f;
+				if (selected_mesh_ptr->transforms.scale.x < 0.01f) selected_mesh_ptr->transforms.scale.x = 0.01f;
+				if (selected_mesh_ptr->transforms.scale.y < 0.01f) selected_mesh_ptr->transforms.scale.y = 0.01f;
+				if (selected_mesh_ptr->transforms.scale.z < 0.01f) selected_mesh_ptr->transforms.scale.z = 0.01f;
 			}
 			else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
 			{
-				auto new_line = g_debug_plane_intersection - selected_mesh_ptr->translation;
+				auto new_line = g_debug_plane_intersection - selected_mesh_ptr->transforms.translation;
 
 				if (0.15f < glm::length(new_line))
 				{
-					glm::vec3 prev_vec = glm::normalize(g_prev_intersection - selected_mesh_ptr->translation);
+					glm::vec3 prev_vec = glm::normalize(g_prev_intersection - selected_mesh_ptr->transforms.translation);
 					glm::vec3 current_vec = glm::normalize(new_line);
 
 					g_prev_intersection = g_debug_plane_intersection;
@@ -2841,16 +2877,16 @@ int main(int argc, char* argv[])
 
 							if (0.0f < g_user_settings.transform_rotation_clip)
 							{
-								selected_mesh_ptr->rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
+								selected_mesh_ptr->transforms.rotation = clip_vec3(g_new_rotation, g_user_settings.transform_rotation_clip);
 							}
 							else
 							{
-								selected_mesh_ptr->rotation = g_new_rotation;
+								selected_mesh_ptr->transforms.rotation = g_new_rotation;
 							}
 
-							selected_mesh_ptr->rotation.x = float_modulus_operation(selected_mesh_ptr->rotation.x, 360.0f);
-							selected_mesh_ptr->rotation.y = float_modulus_operation(selected_mesh_ptr->rotation.y, 360.0f);
-							selected_mesh_ptr->rotation.z = float_modulus_operation(selected_mesh_ptr->rotation.z, 360.0f);
+							selected_mesh_ptr->transforms.rotation.x = float_modulus_operation(selected_mesh_ptr->transforms.rotation.x, 360.0f);
+							selected_mesh_ptr->transforms.rotation.y = float_modulus_operation(selected_mesh_ptr->transforms.rotation.y, 360.0f);
+							selected_mesh_ptr->transforms.rotation.z = float_modulus_operation(selected_mesh_ptr->transforms.rotation.z, 360.0f);
 						}
 					}
 				}
@@ -2861,34 +2897,36 @@ int main(int argc, char* argv[])
 		// Draw OpenGL
 
 		// Shadow map framebuffer
-		if (0 < g_scene_spotlights.items_count)
 		{
-			Spotlight* first_spot = j_array_get(&g_scene_spotlights, 0);
-			vec3 spot_dir = get_spotlight_dir(*first_spot);
-			vec3 spot_look_at = first_spot->position + spot_dir;
-
-			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, first_spot->range * 10);
-			glm::mat4 lightView = glm::lookAt(first_spot->position, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
-			glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
 			glFrontFace(GL_CW);
 			glCullFace(GL_FRONT);
-
 			glUseProgram(g_shadow_map_shader);
-			unsigned int light_matrix_loc = glGetUniformLocation(g_shadow_map_shader, "lightSpaceMatrix");
-			glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
-
 			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-			glBindFramebuffer(GL_FRAMEBUFFER, g_shadow_map_framebuffer);
-			glClear(GL_DEPTH_BUFFER_BIT);
 
-			glUseProgram(g_shadow_map_shader);
-			glBindVertexArray(g_shadow_map_vao);
-
-			for (int i = 0; i < g_scene_meshes.items_count; i++)
+			for (int i = 0; i < g_scene_spotlights.items_count; i++)
 			{
-				Mesh mesh = *j_array_get(&g_scene_meshes, i);
-				draw_mesh_shadow_map(&mesh);
+				Spotlight* first_spot = j_array_get(&g_scene_spotlights, i);
+				vec3 spot_dir = get_spotlight_dir(*first_spot);
+				vec3 spot_look_at = first_spot->position + spot_dir;
+
+				glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, first_spot->range * 10);
+				glm::mat4 lightView = glm::lookAt(first_spot->position, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
+				glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
+				unsigned int light_matrix_loc = glGetUniformLocation(g_shadow_map_shader, "lightSpaceMatrix");
+				glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+
+				glBindFramebuffer(GL_FRAMEBUFFER, spotlight_shadow_map.id);
+				glClear(GL_DEPTH_BUFFER_BIT);
+
+				glUseProgram(g_shadow_map_shader);
+				glBindVertexArray(g_shadow_map_vao);
+
+				for (int i = 0; i < g_scene_meshes.items_count; i++)
+				{
+					Mesh mesh = *j_array_get(&g_scene_meshes, i);
+					draw_mesh_shadow_map(&mesh);
+				}
 			}
 
 			glUseProgram(0);
@@ -2896,7 +2934,6 @@ int main(int argc, char* argv[])
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 			glFrontFace(GL_CCW);
 			glCullFace(GL_BACK);
 		}
@@ -2966,15 +3003,15 @@ int main(int argc, char* argv[])
 				{
 					Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
 					draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
-					draw_selection_arrows(selected_mesh->translation);
+					draw_selection_arrows(selected_mesh->transforms.translation);
 				}
 				else if (g_selected_object.type == ObjectType::Pointlight)
 				{
 					Pointlight* selected_light = (Pointlight*)get_selected_object_ptr();
 					Mesh as_cube = {};
 					as_cube.mesh_type = E_Primitive_Cube;
-					as_cube.scale = vec3(0.35f);
-					as_cube.translation = selected_light->position;
+					as_cube.transforms.scale = vec3(0.35f);
+					as_cube.transforms.translation = selected_light->position;
 					draw_mesh_wireframe(&as_cube, selected_light->diffuse);
 					draw_selection_arrows(selected_light->position);
 				}
@@ -2983,8 +3020,8 @@ int main(int argc, char* argv[])
 					Spotlight* selected_light = (Spotlight*)get_selected_object_ptr();
 					Mesh as_cube = {};
 					as_cube.mesh_type = E_Primitive_Cube;
-					as_cube.scale = vec3(0.35f);
-					as_cube.translation = selected_light->position;
+					as_cube.transforms.scale = vec3(0.35f);
+					as_cube.transforms.translation = selected_light->position;
 					draw_mesh_wireframe(&as_cube, selected_light->diffuse);
 					draw_selection_arrows(selected_light->position);
 				}
@@ -3106,7 +3143,7 @@ int main(int argc, char* argv[])
 			glUniform1f(far_loc, far_plane);
 
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, g_shadow_map_texture);
+			glBindTexture(GL_TEXTURE_2D, spotlight_shadow_map.texture_gpu_id);
 
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 			g_frame_data.draw_calls++;

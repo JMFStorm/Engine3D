@@ -75,9 +75,9 @@ std::array<float, 2> get_plane_axis_xor_rotations(s64 axis, Mesh* mesh)
 {
 	std::array<float, 2> result{};
 
-	auto rotation_x = mesh->rotation.x;
-	auto rotation_y = mesh->rotation.y;
-	auto rotation_z = mesh->rotation.z;
+	auto rotation_x = mesh->transforms.rotation.x;
+	auto rotation_y = mesh->transforms.rotation.y;
+	auto rotation_z = mesh->transforms.rotation.z;
 
 	if (axis == E_Axis_X)
 	{
@@ -166,11 +166,11 @@ void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, s64 axis)
 
 glm::vec3 get_plane_middle_point(Mesh mesh)
 {
-	glm::mat4 rotation = get_rotation_matrix(mesh.rotation);
-	glm::vec3 scale_rotated = rotation * glm::vec4(mesh.scale, 1.0f);
+	glm::mat4 rotation = get_rotation_matrix(mesh.transforms.rotation);
+	glm::vec3 scale_rotated = rotation * glm::vec4(mesh.transforms.scale.x, mesh.transforms.scale.y, mesh.transforms.scale.z, 1.0f);
 	scale_rotated = scale_rotated / 2.0f;
 	scale_rotated.y = 0.0f;
-	glm::vec3 result = mesh.translation + scale_rotated;
+	glm::vec3 result = mesh.transforms.translation + scale_rotated;
 	return result;
 }
 
@@ -217,6 +217,16 @@ bool calculate_plane_ray_intersection(
 	return true;
 }
 
+Transforms transforms_init()
+{
+	Transforms t = {
+		.translation = vec3(0),
+		.rotation = vec3(0),
+		.scale = vec3(1)
+	};
+	return t;
+}
+
 vec3 get_spotlight_dir(Spotlight spotlight)
 {
 	vec3 spot_dir = vec3(0, -1.0f, 0);
@@ -236,9 +246,20 @@ Material material_init(Texture* color_ptr, Texture* specular_ptr)
 	return material;
 }
 
+Framebuffer framebuffer_init()
+{
+	Framebuffer buffer = {
+		.id = 0,
+		.texture_gpu_id = 0,
+		.renderbuffer = 0,
+	};
+	return buffer;
+}
+
 Spotlight spotlight_init()
 {
 	Spotlight sp = {
+		.shadow_map = framebuffer_init(),
 		.position = vec3(0, 2, 0),
 		.rotation = vec3(0, -1, 0),
 		.diffuse = vec3(1),

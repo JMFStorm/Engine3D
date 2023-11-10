@@ -52,7 +52,7 @@ uniform Spotlight spotlights[20];
 
 out vec4 FragColor;
 
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm)
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm, vec3 light_pos)
 {
     // perform perspective divide
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -68,7 +68,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm)
     // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
 
-    vec3 light_dir = normalize(shadow_map_light_pos - fs_in.fragPos);
+    vec3 light_dir = normalize(light_pos - fs_in.fragPos);
     float fragment_dot = (1.0 - dot(frag_norm, light_dir));
 
     float bias_max = 0.0005;
@@ -147,7 +147,7 @@ vec3 spotlight_color(Spotlight light, vec3 frag_normal, vec3 frag_pos, vec3 view
     vec3 result = vec3(diffuse + specular) * intensity;
 
     float shadow = use_shadow_map
-        ? ShadowCalculation(fs_in.FragPosLightSpace, fs_in.fragNormal)
+        ? ShadowCalculation(fs_in.FragPosLightSpace, fs_in.fragNormal, light.position)
         : 0.0;
 
     result = result * (1.0 - shadow);
