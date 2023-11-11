@@ -189,6 +189,11 @@ typedef struct FrameData {
 } FrameData;
 
 typedef struct TransformationMode {
+	glm::vec3 new_tranformation;
+	glm::vec3 transform_plane_normal;
+	glm::vec3 transform_ray;
+	glm::vec3 new_intersection_point;
+	glm::vec3 prev_intersection_point;
 	Axis axis;
 	TransformMode mode;
 	bool is_active;
