@@ -19,6 +19,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/euler_angles.hpp>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
@@ -935,6 +936,30 @@ vec3 get_selected_object_translation()
 	return vec3(0);
 }
 
+Transforms* get_selected_object_transforms()
+{
+	switch (g_selected_object.type)
+	{
+	case ObjectType::Primitive:
+	{
+		Mesh* as_mesh = (Mesh*)get_selected_object_ptr();
+		return &as_mesh->transforms;
+	}
+	case ObjectType::Pointlight:
+	{
+		Pointlight* as_pl = (Pointlight*)get_selected_object_ptr();
+		return &as_pl->transforms;
+	}
+	case ObjectType::Spotlight:
+	{
+		Spotlight* as_sl = (Spotlight*)get_selected_object_ptr();
+		return &as_sl->transforms;
+	}
+	}
+
+	ASSERT_TRUE(false, "Selected object tranform is of known type");
+}
+
 void draw_selection_arrows(glm::vec3 position)
 {
 	auto vec_x = glm::vec3(1.0f, 0, 0);
@@ -950,6 +975,9 @@ void draw_selection_arrows(glm::vec3 position)
 		auto end_x = position + vec_x * 0.5f;
 		auto end_y = position + vec_y * 0.5f;
 		auto end_z = position + vec_z * 0.5f;
+
+		auto transforms = get_selected_object_transforms();
+		auto rotation_m = get_rotation_matrix(transforms->rotation);
 
 		append_line(start_y, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
 		append_line(start_x, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -1615,30 +1643,6 @@ inline void set_button_state(GLFWwindow* window, ButtonState* button)
 	int key_state = glfwGetKey(window, button->key);
 	button->pressed = !button->is_down && key_state == GLFW_PRESS;
 	button->is_down = key_state == GLFW_PRESS;
-}
-
-Transforms* get_selected_object_transforms()
-{
-	switch (g_selected_object.type)
-	{
-	case ObjectType::Primitive:
-	{
-		Mesh* as_mesh = (Mesh*)get_selected_object_ptr();
-		return &as_mesh->transforms;
-	}
-	case ObjectType::Pointlight:
-	{
-		Pointlight* as_pl = (Pointlight*)get_selected_object_ptr();
-		return &as_pl->transforms;
-	}
-	case ObjectType::Spotlight:
-	{
-		Spotlight* as_sl = (Spotlight*)get_selected_object_ptr();
-		return &as_sl->transforms;
-	}
-	}
-
-	ASSERT_TRUE(false, "Selected object tranform is of known type");
 }
 
 bool try_init_transform_mode()
@@ -2807,28 +2811,24 @@ int main(int argc, char* argv[])
 
 				if (0.15f < glm::length(new_line))
 				{
-					glm::vec3 prev_vec = glm::normalize(g_transform_mode.prev_intersection_point - selected_t_ptr->translation);
-					glm::vec3 current_vec = glm::normalize(new_line);
+					glm::vec3 prev_rotation_dir = glm::normalize(g_transform_mode.prev_intersection_point - selected_t_ptr->translation);
+					glm::vec3 new_rotation_dir = glm::normalize(new_line);
 
 					g_transform_mode.prev_intersection_point = g_transform_mode.new_intersection_point;
 
-					bool equal = glm::all(glm::equal(prev_vec, current_vec));
+					bool equal = glm::all(glm::equal(prev_rotation_dir, new_rotation_dir));
 
 					if (!equal)
 					{
 						// Calculate the rotation axis using the cross product of the unit vectors
-						glm::vec3 rotation_axis_cross = glm::normalize(glm::cross(prev_vec, current_vec));
+						glm::vec3 rotation_axis = glm::normalize(glm::cross(prev_rotation_dir, new_rotation_dir));
 
 						// Calculate the rotation angle in radians
-						float angle = glm::acos(glm::dot(glm::normalize(prev_vec), glm::normalize(current_vec)));
+						float angle = glm::acos(glm::dot(glm::normalize(prev_rotation_dir), glm::normalize(new_rotation_dir)));
 
-						// Create the rotation matrix
-						glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis_cross);
-
-						// Extract the rotation as a quaternion
+						glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis);
 						glm::quat rotation_quaternion = rotation_matrix;
 
-						// Convert the quaternion to Euler angles
 						glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
 
 						if (!(glm::isnan(eulerAngles.x) || glm::isnan(eulerAngles.y) || glm::isnan(eulerAngles.z)))
