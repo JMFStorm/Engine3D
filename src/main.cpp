@@ -941,8 +941,6 @@ void draw_selection_arrows(glm::vec3 position)
 	auto vec_y = glm::vec3(0, 1.0f, 0);
 	auto vec_z = glm::vec3(0, 0, 1.0f);
 
-	constexpr float line_width = 14.0f;
-
 	if (g_transform_mode.mode == TransformMode::Rotate)
 	{
 		auto start_x = position - vec_x * 0.5f;
@@ -956,7 +954,7 @@ void draw_selection_arrows(glm::vec3 position)
 		append_line(start_y, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
 		append_line(start_x, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
 		append_line(start_z, end_z, glm::vec3(0.0f, 0.0f, 1.0f));
-		draw_lines_ontop(line_width);
+		draw_lines_ontop(7.0f);
 	}
 	else
 	{
@@ -976,7 +974,7 @@ void draw_selection_arrows(glm::vec3 position)
 		append_line(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
 		append_line(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
 		append_line(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f));
-		draw_lines_ontop(line_width);
+		draw_lines_ontop(14.0f);
 	}
 }
 
@@ -2940,14 +2938,14 @@ int main(int argc, char* argv[])
 				}
 				else if (g_transform_mode.mode == TransformMode::Rotate)
 				{
-					vec3 selected_obj_origin = get_selected_object_translation();
-					append_line(g_transform_mode.new_intersection_point, selected_obj_origin, line_color);
+					auto transforms = get_selected_object_transforms();
+					append_line(g_transform_mode.new_intersection_point, transforms->translation, line_color);
 					draw_lines(1.0f);
 				}
 				else if (g_transform_mode.mode == TransformMode::Scale)
 				{
-					vec3 selected_obj_origin = get_selected_object_translation();
-					append_line(g_transform_mode.new_intersection_point, selected_obj_origin, line_color);
+					auto transforms = get_selected_object_transforms();
+					append_line(g_transform_mode.new_intersection_point, transforms->translation, line_color);
 					draw_lines(1.0f);
 				}
 			}
