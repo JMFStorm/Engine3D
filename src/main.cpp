@@ -968,6 +968,12 @@ void draw_selection_arrows(glm::vec3 position)
 
 	if (g_transform_mode.mode == TransformMode::Rotate)
 	{
+		auto transforms = get_selected_object_transforms();
+		auto rotation_m = mat3(get_rotation_matrix(transforms->rotation));
+
+		vec_x = rotation_m * vec_x;
+		vec_z = rotation_m * vec_z;
+
 		auto start_x = position - vec_x * 0.5f;
 		auto start_y = position - vec_y * 0.5f;
 		auto start_z = position - vec_z * 0.5f;
@@ -975,9 +981,6 @@ void draw_selection_arrows(glm::vec3 position)
 		auto end_x = position + vec_x * 0.5f;
 		auto end_y = position + vec_y * 0.5f;
 		auto end_z = position + vec_z * 0.5f;
-
-		auto transforms = get_selected_object_transforms();
-		auto rotation_m = get_rotation_matrix(transforms->rotation);
 
 		append_line(start_y, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
 		append_line(start_x, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
