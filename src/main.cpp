@@ -2828,7 +2828,6 @@ int main(int argc, char* argv[])
 
 						glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis);
 						glm::quat rotation_quaternion = rotation_matrix;
-
 						glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
 
 						if (!(glm::isnan(eulerAngles.x) || glm::isnan(eulerAngles.y) || glm::isnan(eulerAngles.z)))
