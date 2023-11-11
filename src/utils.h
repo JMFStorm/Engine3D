@@ -83,29 +83,31 @@ inline glm::mat4 get_rotation_matrix(glm::vec3 rotation)
 	return rotation_matrix;
 }
 
-inline float get_vec3_val_by_axis(glm::vec3 vec, s64 axis)
+inline float get_vec3_val_by_axis(glm::vec3 vec, Axis axis)
 {
-	if (axis == E_Axis_X) return vec.x;
-	if (axis == E_Axis_Y) return vec.y;
-	if (axis == E_Axis_Z) return vec.z;
+	if (axis == Axis::X) return vec.x;
+	if (axis == Axis::Y) return vec.y;
+	if (axis == Axis::Z) return vec.z;
 	return 0.0f;
 }
 
-void get_axis_xor(s64 axis, s64 xor_axises[]);
+void get_axis_xor(Axis axis, Axis xor_axises[]);
 
 glm::vec3 closest_point_on_plane(const glm::vec3& point1, const glm::vec3& pointOnPlane, const glm::vec3& planeNormal);
 
-std::array<glm::vec3, 2> get_axis_xor_normals(s64 axis);
+std::array<glm::vec3, 2> get_axis_xor_normals(Axis axis);
 
-std::array<float, 2> get_plane_axis_xor_rotations(s64 axis, Mesh* mesh);
+std::array<float, 2> get_plane_axis_xor_rotations(Axis axis, Mesh* mesh);
 
-glm::vec3 get_normal_for_axis(s64 axis);
+glm::vec3 get_normal_for_axis(Axis axis);
 
 glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
 
 glm::vec3 get_vec_for_largest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
 
-void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, s64 axis);
+glm::vec3 get_vec_for_largest_abs_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements);
+
+void vec3_add_for_axis(glm::vec3& for_addition, glm::vec3 to_add, Axis axis);
 
 glm::vec3 get_plane_middle_point(Mesh mesh);
 

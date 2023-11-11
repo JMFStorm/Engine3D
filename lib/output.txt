@@ -1,0 +1,191 @@
+Microsoft (R) COFF/PE Dumper Version 14.37.32824.0
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+Dump of file freetype.lib
+
+File Type: LIBRARY
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+   /DEFAULTLIB:OLDNAMES
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+   /DEFAULTLIB:OLDNAMES
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+   Linker Directives
+   -----------------
+   /DEFAULTLIB:LIBCMT
+
+  Summary
+
+       102C0 .chks64
+      1E57A8 .debug$S
+        1068 .debug$T
+         41E .drectve
+        6EAC .pdata
+       1C55D .rdata
+          58 .rsrc$01
+         348 .rsrc$02
+       7574F .text$mn
+          C6 .voltbl
+        AF6C .xdata

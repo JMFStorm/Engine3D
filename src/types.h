@@ -14,9 +14,11 @@ typedef long long			s64;
 typedef float				f32;
 typedef double				f64;
 
-constexpr const s64 E_Axis_X = 0;
-constexpr const s64 E_Axis_Y = 1;
-constexpr const s64 E_Axis_Z = 2;
+enum class Axis {
+	X,
+	Y,
+	Z
+};
 
 enum class TransformMode {
 	Translate,
@@ -187,7 +189,7 @@ typedef struct FrameData {
 } FrameData;
 
 typedef struct TransformationMode {
-	s64 axis;
+	Axis axis;
 	TransformMode mode;
 	bool is_active;
 } TransformationMode;

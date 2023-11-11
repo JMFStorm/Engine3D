@@ -1424,10 +1424,10 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 		glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f,  0.0f, -1.0f)
 	};
 
-	s64 plane_axises[CUBE_PLANES_COUNT] = {
-		E_Axis_Y, E_Axis_Y,
-		E_Axis_X, E_Axis_X,
-		E_Axis_Z, E_Axis_Z
+	Axis plane_axises[CUBE_PLANES_COUNT] = {
+		Axis::Y, Axis::Y,
+		Axis::X, Axis::X,
+		Axis::Z, Axis::Z
 	};
 
 	glm::mat4 rotation_matrix = get_rotation_matrix(cube->transforms.rotation);
@@ -1455,7 +1455,7 @@ bool get_cube_selection(Mesh* cube, float* select_dist, vec3 ray_o, vec3 ray_dir
 		glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotation_matrix);
 		glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
 
-		s64 xor_axises[2] = {};
+		Axis xor_axises[2] = {};
 		get_axis_xor(current_axis, xor_axises);
 
 		float abs1 = std::abs(get_vec3_val_by_axis(local_intersection_point, xor_axises[0]));
@@ -1635,21 +1635,21 @@ Transforms* get_selected_object_transforms()
 {
 	switch (g_selected_object.type)
 	{
-		case ObjectType::Primitive:
-		{
-			Mesh* as_mesh = (Mesh*)get_selected_object_ptr();
-			return &as_mesh->transforms;
-		}
-		case ObjectType::Pointlight:
-		{
-			Pointlight* as_pl = (Pointlight*)get_selected_object_ptr();
-			return &as_pl->transforms;
-		}
-		case ObjectType::Spotlight:
-		{
-			Spotlight* as_sl = (Spotlight*)get_selected_object_ptr();
-			return &as_sl->transforms;
-		}
+	case ObjectType::Primitive:
+	{
+		Mesh* as_mesh = (Mesh*)get_selected_object_ptr();
+		return &as_mesh->transforms;
+	}
+	case ObjectType::Pointlight:
+	{
+		Pointlight* as_pl = (Pointlight*)get_selected_object_ptr();
+		return &as_pl->transforms;
+	}
+	case ObjectType::Spotlight:
+	{
+		Spotlight* as_sl = (Spotlight*)get_selected_object_ptr();
+		return &as_sl->transforms;
+	}
 	}
 
 	ASSERT_TRUE(false, "Selected object tranform is of known type");
@@ -1663,9 +1663,9 @@ bool try_init_transform_mode()
 
 	if (!has_valid_mode) return false;
 
-	if (g_inputs.as_struct.x.is_down) g_transform_mode.axis = E_Axis_X;
-	else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = E_Axis_Y;
-	else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = E_Axis_Z;
+	if (g_inputs.as_struct.x.is_down) g_transform_mode.axis = Axis::X;
+	else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = Axis::Y;
+	else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = Axis::Z;
 
 	double xpos, ypos;
 	glfwGetCursorPos(g_window, &xpos, &ypos);
@@ -1678,7 +1678,7 @@ bool try_init_transform_mode()
 
 	if (g_transform_mode.mode == TransformMode::Translate)
 	{
-		g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
+		g_normal_for_ray_intersect = get_vec_for_largest_abs_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
 		bool intersection = calculate_plane_ray_intersection(
 			g_normal_for_ray_intersect,
@@ -1699,7 +1699,7 @@ bool try_init_transform_mode()
 		use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
 		use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
 
-		g_normal_for_ray_intersect = get_vec_for_smallest_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
+		g_normal_for_ray_intersect = get_vec_for_largest_abs_dot_product(g_used_transform_ray, use_normals.data(), use_normals.size());
 
 		bool intersection = calculate_plane_ray_intersection(
 			g_normal_for_ray_intersect,
@@ -2184,7 +2184,7 @@ int main(int argc, char* argv[])
 
 	// Init framebuffer shaders
 	{
-		
+
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
 
@@ -2716,7 +2716,7 @@ int main(int argc, char* argv[])
 			g_frame_data.mouse_move_x *= g_scene_camera.look_sensitivity;
 			g_frame_data.mouse_move_y *= g_scene_camera.look_sensitivity;
 
-			g_scene_camera.yaw   += g_frame_data.mouse_move_x;
+			g_scene_camera.yaw += g_frame_data.mouse_move_x;
 			g_scene_camera.pitch += g_frame_data.mouse_move_y;
 
 			if (g_scene_camera.pitch > 89.0f)
@@ -2956,20 +2956,20 @@ int main(int argc, char* argv[])
 			{
 				vec3 line_color;
 
-				if (g_transform_mode.axis == E_Axis_X) line_color = glm::vec3(1.0f, 0.2f, 0.2f);
-				if (g_transform_mode.axis == E_Axis_Y) line_color = glm::vec3(0.2f, 1.0f, 0.2f);
-				if (g_transform_mode.axis == E_Axis_Z) line_color = glm::vec3(0.2f, 0.2f, 1.0f);
+				if (g_transform_mode.axis == Axis::X) line_color = glm::vec3(1.0f, 0.2f, 0.2f);
+				if (g_transform_mode.axis == Axis::Y) line_color = glm::vec3(0.2f, 1.0f, 0.2f);
+				if (g_transform_mode.axis == Axis::Z) line_color = glm::vec3(0.2f, 0.2f, 1.0f);
 
 				if (g_transform_mode.mode == TransformMode::Translate)
 				{
 					append_line(g_debug_plane_intersection, g_new_translation, line_color);
-					draw_lines(3.0f);
+					draw_lines(1.0f);
 				}
 				else if (g_transform_mode.mode == TransformMode::Rotate)
 				{
 					vec3 selected_obj_origin = get_selected_object_translation();
 					append_line(g_debug_plane_intersection, selected_obj_origin, line_color);
-					draw_lines(3.0f);
+					draw_lines(1.0f);
 				}
 				else if (g_transform_mode.mode == TransformMode::Scale)
 				{
@@ -3071,47 +3071,47 @@ int main(int argc, char* argv[])
 
 		// Print debug info
 		{
-				char debug_str[256];
+			char debug_str[256];
 
-				sprintf_s(debug_str, "FPS: %d", g_game_metrics.fps);
-				append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
+			sprintf_s(debug_str, "FPS SSS: %d", g_game_metrics.fps);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
 
-				float display_deltatime = g_frame_data.deltatime * 1000;
-				sprintf_s(debug_str, "Delta: %.2fms", display_deltatime);
-				append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
+			float display_deltatime = g_frame_data.deltatime * 1000;
+			sprintf_s(debug_str, "Delta: %.2fms", display_deltatime);
+			append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
 
-				sprintf_s(debug_str, "Frames: %lu", g_game_metrics.frames);
-				append_ui_text(&g_debug_font, debug_str, 10.5f, 100.0f);
+			sprintf_s(debug_str, "Frames: %lu", g_game_metrics.frames);
+			append_ui_text(&g_debug_font, debug_str, 10.5f, 100.0f);
 
-				sprintf_s(debug_str, "Draw calls: %d", ++g_frame_data.draw_calls);
-				append_ui_text(&g_debug_font, debug_str, 17.0f, 100.0f);
+			sprintf_s(debug_str, "Draw calls: %lld", ++g_frame_data.draw_calls);
+			append_ui_text(&g_debug_font, debug_str, 17.0f, 100.0f);
 
-				sprintf_s(debug_str, "Camera X=%.2f Y=%.2f Z=%.2f", g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
-				append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
+			sprintf_s(debug_str, "Camera X=%.2f Y=%.2f Z=%.2f", g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
 
-				sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
-				append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
+			sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
 
-				sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
-				append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
+			sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
 
-				sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene_spotlights.items_count, g_scene_spotlights.max_items);
-				append_ui_text(&g_debug_font, debug_str, 0.5f, 96.0f);
+			sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene_spotlights.items_count, g_scene_spotlights.max_items);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 96.0f);
 
-				char* t_mode = nullptr;
-				const char* tt = "Translate";
-				const char* tr = "Rotate";
-				const char* ts = "Scale";
-				const char* transform_mode_debug_str_format = "Transform mode: %s";
+			char* t_mode = nullptr;
+			const char* tt = "Translate";
+			const char* tr = "Rotate";
+			const char* ts = "Scale";
+			const char* transform_mode_debug_str_format = "Transform mode: %s";
 
-				if (g_transform_mode.mode == TransformMode::Translate) t_mode = const_cast<char*>(tt);
-				if (g_transform_mode.mode == TransformMode::Rotate)	t_mode = const_cast<char*>(tr);
-				if (g_transform_mode.mode == TransformMode::Scale)		t_mode = const_cast<char*>(ts);
+			if (g_transform_mode.mode == TransformMode::Translate) t_mode = const_cast<char*>(tt);
+			if (g_transform_mode.mode == TransformMode::Rotate)	t_mode = const_cast<char*>(tr);
+			if (g_transform_mode.mode == TransformMode::Scale)		t_mode = const_cast<char*>(ts);
 
-				sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
-				append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
-				draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
-			}
+			sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
+			append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
+			draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
+		}
 
 		if (DEBUG_SHADOWMAP)
 		{

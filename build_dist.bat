@@ -10,17 +10,16 @@ setlocal
 set SOURCE_DIR=src
 set INCLUDE_DIR=include
 set LIB_DIR=lib
-set OUTPUT_DIR=debug_build
-set OUTPUT_FILE=Engine3D.exe
 
-set SOURCE_FILES=src\main.cpp %SOURCE_DIR%\*.cpp
+set SOURCE_FILES=%SOURCE_DIR%\*.cpp
 set IMGUI_FILES=imgui\*.cpp
 
-set NODEFAULTS=/NODEFAULTLIB:MSVCRT /NODEFAULTLIB:LIBCMT
+set NODEFAULTS=/NODEFAULTLIB:MSVCRT
+set LINK_FLAGS=/LTCG /OPT:REF /OPT:ICF /INCREMENTAL:NO
 set LINKED_LIBRARIES=glfw3.lib libglew32.lib glew32.lib opengl32.lib freetype.lib kernel32.lib gdi32.lib shell32.lib
 
 REM NEEDED(?) => winspool.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib user32.lib
 
-cl /Fo.\build\obj\ /Febuild\Engine3D.exe /std:c++20 /EHsc /MTd %SOURCE_FILES% %IMGUI_FILES% /I%INCLUDE_DIR% /link %NODEFAULTS% /LIBPATH:%LIB_DIR% %LINKED_LIBRARIES%
+cl /O2 /GL /Fo.\dist\obj\ /std:c++20 /EHsc /MT /MP %SOURCE_FILES% %IMGUI_FILES% /I%INCLUDE_DIR% /link %LINK_FLAGS% /OUT:dist/Engine3D.exe %NODEFAULTS% /LIBPATH:%LIB_DIR% %LINKED_LIBRARIES%
 
 endlocal
