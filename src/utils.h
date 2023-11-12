@@ -7,8 +7,6 @@
 #include "globals.h"
 #include "types.h"
 
-using namespace glm;
-
 inline float vw_into_screen_px(float value, float screen_width_px)
 {
 	return (float)screen_width_px * value * 0.01f;
@@ -122,7 +120,7 @@ bool calculate_plane_ray_intersection(
 
 Transforms transforms_init();
 
-vec3 get_spotlight_dir(Spotlight spotlight);
+glm::vec3 get_spotlight_dir(Spotlight spotlight);
 
 Material material_init(Texture* color_ptr, Texture* specular_ptr);
 

@@ -6,8 +6,6 @@
 #include <glm/glm.hpp>
 #include <GL/glew.h>
 
-using namespace glm;
-
 bool str_trim_file_ext(char* str)
 {
 	char* last_dot = strrchr(str, '.');
@@ -243,18 +241,18 @@ bool calculate_plane_ray_intersection(
 Transforms transforms_init()
 {
 	Transforms t = {
-		.translation = vec3(0),
-		.rotation = vec3(0),
-		.scale = vec3(1)
+		.translation = glm::vec3(0),
+		.rotation = glm::vec3(0),
+		.scale = glm::vec3(1)
 	};
 	return t;
 }
 
-vec3 get_spotlight_dir(Spotlight spotlight)
+glm::vec3 get_spotlight_dir(Spotlight spotlight)
 {
-	vec3 spot_dir = vec3(0, -1.0f, 0);
+	glm::vec3 spot_dir = glm::vec3(0, -1.0f, 0);
 	glm::mat4 rotation_mat = get_rotation_matrix(spotlight.transforms.rotation);
-	spot_dir = rotation_mat * vec4(spot_dir, 1.0f);
+	spot_dir = rotation_mat * glm::vec4(spot_dir, 1.0f);
 	return glm::normalize(spot_dir);
 }
 
@@ -336,9 +334,9 @@ Pointlight pointlight_init()
 GameCamera scene_camera_init(float horizontal_fov)
 {
 	GameCamera cam = {
-		.position = vec3(0),
-		.front_vec = vec3(1,0,0),
-		.up_vec = vec3(0,1,0),
+		.position = glm::vec3(0),
+		.front_vec = glm::vec3(1,0,0),
+		.up_vec = glm::vec3(0,1,0),
 		.yaw = 0.0f,
 		.pitch = 0.0f,
 		.fov = 60.0f,

@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 
+#include "j_array.h"
 #include "types.h"
 #include "j_buffers.h"
 
