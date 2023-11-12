@@ -27,11 +27,34 @@
 
 #include "j_buffers.h"
 #include "j_assert.h"
+#include "j_files.h"
+#include "globals.h"
 #include "utils.h"
 
 using namespace glm;
 
-static bool DEBUG_SHADOWMAP = false;
+JArray<Material> g_materials = {};
+MemoryBuffer g_materials_memory = {};
+
+MemoryBuffer g_scene_meshes_memory = {};
+JArray<Mesh> g_scene_meshes = {};
+
+MemoryBuffer g_scene_pointlights_memory = {};
+JArray<Pointlight> g_scene_pointlights = {};
+
+MemoryBuffer g_scene_spotlights_memory = {};
+JArray<Spotlight> g_scene_spotlights = {};
+
+SceneSelection g_selected_object = {
+	.selection_index = -1,
+	.type = ObjectType::None,
+};
+
+std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_mat_data_map = {};
+std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map = {};
+std::unordered_map<s64, char*> g_mat_data_map_inverse = {};
+
+TransformationMode g_transform_mode = {};
 
 static unsigned int g_shadow_map_debug_shader;
 static unsigned int g_shadow_map_debug_vao;
@@ -43,8 +66,6 @@ static f32 g_shadow_map_far_plane = 15.0f;
 static unsigned int g_shadow_map_shader;
 static unsigned int g_shadow_map_vao;
 static unsigned int g_shadow_map_vbo;
-
-static constexpr const char* g_materials_dir_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
 
 static bool g_inverse_color = false;
 static bool g_blur_effect = false;
@@ -95,24 +116,15 @@ unsigned int g_mesh_vbo;
 s64 g_text_buffer_size = 0;
 s64 g_text_indicies = 0;
 
-GameInputsU g_inputs = {};
-
-GameMetrics g_game_metrics = { 0 };
-
 float debug_font_vh = 1.0f;
 const char* g_debug_font_path = "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf";
 
 constexpr const s64 g_max_UI_chars = 1000;
 FontData g_debug_font;
 
-FrameData g_frame_data = {};
-
 constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
 MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
-
-GameCamera g_scene_camera;
-bool g_camera_move_mode = false;
 
 const char* pointlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\pointlight_billboard.png";
 const char* spotlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\spotlight_billboard.png";
@@ -125,46 +137,55 @@ int g_selected_texture_item = 0;
 MemoryBuffer g_texture_memory = { 0 };
 JArray<Texture> g_textures;
 
-MemoryBuffer g_materials_memory = { 0 };
-JArray<Material> g_materials;
-
 Texture pointlight_texture;
 Texture spotlight_texture;
 
-// Custom hash function for char*
-struct CharPtrHash {
-	std::size_t operator()(const char* str) const {
-		return std::hash<std::string_view>{}(str);
-	}
-};
-// Custom equality operator for char*
-struct CharPtrEqual {
-	bool operator()(const char* a, const char* b) const {
-		return std::strcmp(a, b) == 0;
-	}
-};
+MeshData mesh_serialize(Mesh* mesh)
+{
+	s64 material_id = g_mat_data_map[mesh->material->color_texture->file_name];
 
-static std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map = {};
-static std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_mat_data_map;
-static std::unordered_map<s64, char*> g_mat_data_map_inverse;
+	MeshData data = {
+		.transforms = mesh->transforms,
+		.mesh_type = mesh->mesh_type,
+		.material_id = material_id,
+		.uv_multiplier = mesh->uv_multiplier,
+	};
+	return data;
+}
 
-MemoryBuffer g_scene_meshes_memory = { 0 };
-JArray<Mesh> g_scene_meshes;
+Mesh mesh_deserialize(MeshData data)
+{
+	char* material_name = g_mat_data_map_inverse[data.material_id];
+	s64 material_index = g_materials_index_map[material_name];
+	Material* material_ptr = j_array_get(&g_materials, material_index);
 
-constexpr const s64 SCENE_POINTLIGHTS_MAX_COUNT = 20;
-MemoryBuffer g_scene_pointlights_memory = { 0 };
-JArray<Pointlight> g_scene_pointlights;
+	Mesh mesh = {
+		.transforms = data.transforms,
+		.material = material_ptr,
+		.mesh_type = data.mesh_type,
+		.uv_multiplier = data.uv_multiplier,
+	};
+	return mesh;
+}
 
-constexpr const s64 SCENE_SPOTLIGHTS_MAX_COUNT = 20;
-MemoryBuffer g_scene_spotlights_memory = { 0 };
-JArray<Spotlight> g_scene_spotlights;
+glm::mat4 get_projection_matrix()
+{
+	glm::mat4 projection = glm::perspective(
+		glm::radians(g_scene_camera.fov),
+		g_scene_camera.aspect_ratio_horizontal,
+		g_scene_camera.near_clip,
+		g_scene_camera.far_clip);
+	return projection;
+}
 
-SceneSelection g_selected_object = {
-	.selection_index = -1,
-	.type = ObjectType::None,
-};
-
-TransformationMode g_transform_mode = {};
+glm::mat4 get_view_matrix()
+{
+	glm::mat4 view = glm::lookAt(
+		g_scene_camera.position,
+		g_scene_camera.position + g_scene_camera.front_vec,
+		g_scene_camera.up_vec);
+	return view;
+}
 
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 {
@@ -183,24 +204,175 @@ void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 	null_terminate_string(read_pointer, file_size);
 }
 
-inline glm::mat4 get_projection_matrix()
+
+MaterialData material_serialize(Material material)
 {
-	glm::mat4 projection = glm::perspective(
-		glm::radians(g_scene_camera.fov),
-		g_scene_camera.aspect_ratio_horizontal,
-		g_scene_camera.near_clip,
-		g_scene_camera.far_clip);
-	return projection;
+	s64 material_id = g_mat_data_map[material.color_texture->file_name];
+
+	MaterialData m_data = {
+		.material_id = material_id,
+		.specular_mult = material.specular_mult,
+		.shininess = material.shininess
+	};
+	return m_data;
 }
 
-inline glm::mat4 get_view_matrix()
+void save_material(Material material)
 {
-	glm::mat4 view = glm::lookAt(
-		g_scene_camera.position,
-		g_scene_camera.position + g_scene_camera.front_vec,
-		g_scene_camera.up_vec);
-	return view;
+	MaterialData m_data = material_serialize(material);
+
+	char filename[FILENAME_LEN] = { 0 };
+	strcpy_s(filename, material.color_texture->file_name);
+	str_trim_file_ext(filename);
+
+	char filepath[FILE_PATH_LEN] = { 0 };
+	sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename);
+
+	std::ofstream output_mat_file(filepath, std::ios::binary | std::ios::trunc);
+	ASSERT_TRUE(output_mat_file.is_open(), ".jmat file opened");
+
+	output_mat_file.write(".jmat", 5);
+	output_mat_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
+	output_mat_file.close();
 }
+
+void save_scene()
+{
+	std::ofstream output_file("scene_01.jmap", std::ios::binary);
+	ASSERT_TRUE(output_file.is_open(), ".jmap file opened for save");
+
+	GameCamera data = g_scene_camera;
+
+	// Header
+	output_file.write(".jmap", 5);
+
+	// Scene camera
+	output_file.write(reinterpret_cast<char*>(&data), sizeof(data));
+
+	// Mesh count
+	output_file.write(reinterpret_cast<char*>(&g_scene_meshes.items_count), sizeof(s64));
+
+	// Mesh data
+	for (int i = 0; i < g_scene_meshes.items_count; i++)
+	{
+		Mesh* mesh_ptr = j_array_get(&g_scene_meshes, i);
+		MeshData m_data = mesh_serialize(mesh_ptr);
+		output_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
+	}
+
+	// Pointlight count
+	output_file.write(reinterpret_cast<char*>(&g_scene_pointlights.items_count), sizeof(s64));
+
+	// Pointlight data
+	for (int i = 0; i < g_scene_pointlights.items_count; i++)
+	{
+		Pointlight light = *j_array_get(&g_scene_pointlights, i);
+		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
+	}
+
+	// Spotlight count
+	output_file.write(reinterpret_cast<char*>(&g_scene_spotlights.items_count), sizeof(s64));
+
+	// Spotlight data
+	for (int i = 0; i < g_scene_spotlights.items_count; i++)
+	{
+		Spotlight light = *j_array_get(&g_scene_spotlights, i);
+		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
+	}
+
+	output_file.close();
+}
+
+void load_scene()
+{
+	const char* filename = "scene_01.jmap";
+	float h_aspect = (float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
+
+	if (!std::filesystem::exists(filename))
+	{
+		printf(".jmap file not found.\n");
+		g_scene_camera = scene_camera_init(h_aspect);
+		return;
+	}
+
+	std::ifstream input_file(filename, std::ios::binary);
+	ASSERT_TRUE(input_file.is_open(), ".jmap file opened for load");
+
+	// Header
+	char header[6] = { 0 };
+	input_file.read(header, 5);
+	ASSERT_TRUE(strcmp(header, ".jmap") == 0, ".jmap file has valid header");
+
+	// Scene camera
+	GameCamera cam_data = {};
+	input_file.read(reinterpret_cast<char*>(&cam_data), sizeof(cam_data));
+	g_scene_camera = cam_data;
+	g_scene_camera.aspect_ratio_horizontal = h_aspect;
+
+	// Mesh count
+	s64 mesh_count = 0;
+	input_file.read(reinterpret_cast<char*>(&mesh_count), sizeof(s64));
+
+	// Mesh data
+	for (int i = 0; i < mesh_count; i++)
+	{
+		MeshData m_data;
+		input_file.read(reinterpret_cast<char*>(&m_data), sizeof(m_data));
+		Mesh mesh = mesh_deserialize(m_data);
+		j_array_add(&g_scene_meshes, mesh);
+	}
+
+	// Pointlight count
+	s64 pointlight_count = 0;
+	input_file.read(reinterpret_cast<char*>(&pointlight_count), sizeof(s64));
+
+	// Pointlight data
+	for (int i = 0; i < pointlight_count; i++)
+	{
+		Pointlight light;
+		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
+		j_array_add(&g_scene_pointlights, light);
+	}
+
+	// Spotlight count
+	s64 spotlight_count = 0;
+	input_file.read(reinterpret_cast<char*>(&spotlight_count), sizeof(s64));
+
+
+	// Spotlight data
+	for (int i = 0; i < spotlight_count; i++)
+	{
+		Spotlight light;
+		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
+		j_array_add(&g_scene_spotlights, light);
+	}
+
+	input_file.close();
+}
+
+Material material_deserialize(MaterialData mat_data)
+{
+	Material mat = {
+		.color_texture = nullptr,
+		.specular_texture = nullptr,
+		.specular_mult = mat_data.specular_mult,
+		.shininess = mat_data.shininess,
+	};
+	return mat;
+}
+
+void save_all()
+{
+	for (int i = 0; i < g_materials.items_count; i++)
+	{
+		Material to_save = *j_array_get(&g_materials, i);
+		save_material(to_save);
+		printf("Mat saved.\n");
+	}
+
+	save_scene();
+}
+
 
 bool check_shader_compile_error(GLuint shader)
 {
@@ -359,6 +531,15 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 	glUseProgram(0);
 	glBindVertexArray(0);
 }
+
+TransformMode get_curr_transformation_mode()
+{
+	if (g_inputs.as_struct.q.pressed) return TransformMode::Translate;
+	if (g_inputs.as_struct.w.pressed && g_selected_object.type != ObjectType::Pointlight) return TransformMode::Rotate;
+	if (g_inputs.as_struct.e.pressed && g_selected_object.type == ObjectType::Primitive) return TransformMode::Scale;
+	return g_transform_mode.mode;
+}
+
 
 void draw_mesh_shadow_map(Mesh* mesh)
 {
@@ -1713,183 +1894,6 @@ bool try_init_transform_mode()
 	return true;
 }
 
-inline MeshData mesh_serialize(Mesh* mesh)
-{
-	s64 material_id = g_mat_data_map[mesh->material->color_texture->file_name];
-
-	MeshData data = {
-		.transforms = mesh->transforms,
-		.mesh_type = mesh->mesh_type,
-		.material_id = material_id,
-		.uv_multiplier = mesh->uv_multiplier,
-	};
-	return data;
-}
-
-inline Mesh mesh_deserialize(MeshData data)
-{
-	char* material_name = g_mat_data_map_inverse[data.material_id];
-	s64 material_index = g_materials_index_map[material_name];
-	Material* material_ptr = j_array_get(&g_materials, material_index);
-
-	Mesh mesh = {
-		.transforms = data.transforms,
-		.material = material_ptr,
-		.mesh_type = data.mesh_type,
-		.uv_multiplier = data.uv_multiplier,
-	};
-	return mesh;
-}
-
-inline MaterialData material_serialize(Material material)
-{
-	s64 material_id = g_mat_data_map[material.color_texture->file_name];
-
-	MaterialData m_data = {
-		.material_id = material_id,
-		.specular_mult = material.specular_mult,
-		.shininess = material.shininess
-	};
-	return m_data;
-}
-
-void save_material(Material material)
-{
-	MaterialData m_data = material_serialize(material);
-
-	char filename[FILENAME_LEN] = { 0 };
-	strcpy_s(filename, material.color_texture->file_name);
-	str_trim_file_ext(filename);
-
-	char filepath[FILE_PATH_LEN] = { 0 };
-	sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename);
-
-	std::ofstream output_mat_file(filepath, std::ios::binary | std::ios::trunc);
-	ASSERT_TRUE(output_mat_file.is_open(), ".jmat file opened");
-
-	output_mat_file.write(".jmat", 5);
-	output_mat_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
-	output_mat_file.close();
-}
-
-inline void save_scene()
-{
-	std::ofstream output_file("scene_01.jmap", std::ios::binary);
-	ASSERT_TRUE(output_file.is_open(), ".jmap file opened for save");
-
-	GameCamera data = g_scene_camera;
-
-	// Header
-	output_file.write(".jmap", 5);
-
-	// Scene camera
-	output_file.write(reinterpret_cast<char*>(&data), sizeof(data));
-
-	// Mesh count
-	output_file.write(reinterpret_cast<char*>(&g_scene_meshes.items_count), sizeof(s64));
-
-	// Mesh data
-	for (int i = 0; i < g_scene_meshes.items_count; i++)
-	{
-		Mesh* mesh_ptr = j_array_get(&g_scene_meshes, i);
-		MeshData m_data = mesh_serialize(mesh_ptr);
-		output_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
-	}
-
-	// Pointlight count
-	output_file.write(reinterpret_cast<char*>(&g_scene_pointlights.items_count), sizeof(s64));
-
-	// Pointlight data
-	for (int i = 0; i < g_scene_pointlights.items_count; i++)
-	{
-		Pointlight light = *j_array_get(&g_scene_pointlights, i);
-		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
-	}
-
-	// Spotlight count
-	output_file.write(reinterpret_cast<char*>(&g_scene_spotlights.items_count), sizeof(s64));
-
-	// Spotlight data
-	for (int i = 0; i < g_scene_spotlights.items_count; i++)
-	{
-		Spotlight light = *j_array_get(&g_scene_spotlights, i);
-		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
-	}
-
-	output_file.close();
-
-	printf("Scene saved.\n");
-}
-
-inline void load_scene()
-{
-	const char* filename = "scene_01.jmap";
-	float h_aspect = (float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
-
-	if (!std::filesystem::exists(filename))
-	{
-		printf(".jmap file not found.\n");
-		g_scene_camera = scene_camera_init(h_aspect);
-		return;
-	}
-
-	std::ifstream input_file(filename, std::ios::binary);
-	ASSERT_TRUE(input_file.is_open(), ".jmap file opened for load");
-
-	// Header
-	char header[6] = { 0 };
-	input_file.read(header, 5);
-	ASSERT_TRUE(strcmp(header, ".jmap") == 0, ".jmap file has valid header");
-
-	// Scene camera
-	GameCamera cam_data = {};
-	input_file.read(reinterpret_cast<char*>(&cam_data), sizeof(cam_data));
-	g_scene_camera = cam_data;
-	g_scene_camera.aspect_ratio_horizontal = h_aspect;
-
-	// Mesh count
-	s64 mesh_count = 0;
-	input_file.read(reinterpret_cast<char*>(&mesh_count), sizeof(s64));
-
-	// Mesh data
-	for (int i = 0; i < mesh_count; i++)
-	{
-		MeshData m_data;
-		input_file.read(reinterpret_cast<char*>(&m_data), sizeof(m_data));
-		Mesh mesh = mesh_deserialize(m_data);
-		j_array_add(&g_scene_meshes, mesh);
-	}
-
-	// Pointlight count
-	s64 pointlight_count = 0;
-	input_file.read(reinterpret_cast<char*>(&pointlight_count), sizeof(s64));
-
-	// Pointlight data
-	for (int i = 0; i < pointlight_count; i++)
-	{
-		Pointlight light;
-		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
-		j_array_add(&g_scene_pointlights, light);
-	}
-
-	// Spotlight count
-	s64 spotlight_count = 0;
-	input_file.read(reinterpret_cast<char*>(&spotlight_count), sizeof(s64));
-
-
-	// Spotlight data
-	for (int i = 0; i < spotlight_count; i++)
-	{
-		Spotlight light;
-		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
-		j_array_add(&g_scene_spotlights, light);
-	}
-
-	input_file.close();
-
-	printf("Scene loaded.\n");
-}
-
 inline bool has_object_selection()
 {
 	return g_selected_object.type != ObjectType::None;
@@ -1909,36 +1913,6 @@ Texture texture_load_from_filepath(char* path)
 	};
 	memcpy(texture.file_name, file_name, name_len);
 	return texture;
-}
-
-TransformMode get_curr_transformation_mode()
-{
-	if (g_inputs.as_struct.q.pressed) return TransformMode::Translate;
-	if (g_inputs.as_struct.w.pressed && g_selected_object.type != ObjectType::Pointlight) return TransformMode::Rotate;
-	if (g_inputs.as_struct.e.pressed && g_selected_object.type == ObjectType::Primitive) return TransformMode::Scale;
-	return g_transform_mode.mode;
-}
-
-inline Material material_deserialize(MaterialData mat_data)
-{
-	Material mat = {
-		.color_texture = nullptr,
-		.specular_texture = nullptr,
-		.specular_mult = mat_data.specular_mult,
-		.shininess = mat_data.shininess,
-	};
-	return mat;
-}
-
-void save_all()
-{
-	for (int i = 0; i < g_materials.items_count; i++)
-	{
-		Material to_save = *j_array_get(&g_materials, i);
-		save_material(to_save);
-		printf("Mat saved.\n");
-	}
-	save_scene();
 }
 
 int main(int argc, char* argv[])
@@ -2160,7 +2134,6 @@ int main(int argc, char* argv[])
 
 	// Init framebuffer shaders
 	{
-
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
 

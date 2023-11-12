@@ -4,15 +4,10 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "j_buffers.h"
+#include "globals.h"
 #include "types.h"
 
 using namespace glm;
-
-bool str_trim_file_ext(char* str);
-
-float normalize_screen_px_to_ndc(int value, int max);
-
-float normalize_value(float value, float src_max, float dest_max);
 
 inline float vw_into_screen_px(float value, float screen_width_px)
 {
@@ -91,6 +86,12 @@ inline float get_vec3_val_by_axis(glm::vec3 vec, Axis axis)
 	if (axis == Axis::Z) return vec.z;
 	return 0.0f;
 }
+
+bool str_trim_file_ext(char* str);
+
+float normalize_screen_px_to_ndc(int value, int max);
+
+float normalize_value(float value, float src_max, float dest_max);
 
 void get_axis_xor(Axis axis, Axis xor_axises[]);
 

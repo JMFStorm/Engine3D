@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <string_view>
 #include <glm/glm.hpp>
 
 static const unsigned int SHADOW_WIDTH = 1024 * 2;
@@ -16,6 +17,16 @@ typedef unsigned long long  u64;
 typedef long long			s64;
 typedef float				f32;
 typedef double				f64;
+
+// Custom hash function for char*
+struct CharPtrHash {
+	std::size_t operator()(const char* str) const { return std::hash<std::string_view>{}(str); }
+};
+
+// Custom equality operator for char*
+struct CharPtrEqual {
+	bool operator()(const char* a, const char* b) const { return std::strcmp(a, b) == 0; }
+};
 
 enum class Axis {
 	X,

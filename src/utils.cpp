@@ -3,7 +3,7 @@
 #include <array>
 #include <iostream>
 #include <fstream>
-#include <glm/gtc/matrix_inverse.hpp>
+#include <glm/glm.hpp>
 #include <GL/glew.h>
 
 using namespace glm;
