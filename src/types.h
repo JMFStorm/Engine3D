@@ -3,6 +3,9 @@
 #include <array>
 #include <glm/glm.hpp>
 
+static const unsigned int SHADOW_WIDTH = 1024 * 2;
+static const unsigned int SHADOW_HEIGHT = 1024 * 2;
+
 #define KILOBYTES(x) (x * 1024)
 #define MEGABYTES(x) (KILOBYTES(x) * 1024)
 

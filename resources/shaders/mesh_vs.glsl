@@ -7,14 +7,12 @@ layout (location = 2) in vec3 aNormal;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
-uniform mat4 lightSpaceMatrix;
 uniform float uv_multiplier;
 
 out VS_OUT {
     vec3 fragPos;
     vec3 fragNormal;
     vec2 TexCoord;
-    vec4 FragPosLightSpace;
 } vs_out;
 
 void main()
@@ -31,6 +29,4 @@ void main()
 	// Calculate the position and normal in world space
     vs_out.fragPos = vec3(model * vec4(aPos, 1.0));
     vs_out.fragNormal = mat3(transpose(inverse(model))) * aNormal;
-
-    vs_out.FragPosLightSpace = lightSpaceMatrix * vec4(vs_out.fragPos, 1.0);
 }

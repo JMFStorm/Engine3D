@@ -9,6 +9,8 @@ struct Pointlight {
 };
 
 struct Spotlight {
+    mat4 light_space_matrix;
+    sampler2D shadow_map;
     vec3 position;
     vec3 direction;
     vec3 diffuse;
@@ -29,18 +31,12 @@ in VS_OUT {
     vec3 fragPos;
     vec3 fragNormal;
     vec2 TexCoord;
-    vec4 FragPosLightSpace;
 } fs_in;
-
-uniform bool use_shadow_map;
-uniform sampler2D shadowMap;
 
 uniform Material material;
 uniform bool use_texture;
 uniform bool use_specular_texture;
 uniform vec3 view_coords;
-
-uniform vec3 shadow_map_light_pos;
 
 uniform vec3 global_ambient_light;
 
@@ -52,7 +48,7 @@ uniform Spotlight spotlights[20];
 
 out vec4 FragColor;
 
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm, vec3 light_pos)
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm, vec3 light_pos, sampler2D shadow_map)
 {
     // perform perspective divide
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -63,7 +59,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm, vec3 light_pos)
     if(projCoords.z > 1.0) return 0.0;
 
     // get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
-    float closestDepth = texture(shadowMap, projCoords.xy).r; 
+    float closestDepth = texture(shadow_map, projCoords.xy).r; 
 
     // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
@@ -77,11 +73,11 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm, vec3 light_pos)
     if (currentDepth - bias < closestDepth) return 0.0;
 
     float shadow = 0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    vec2 texelSize = 1.0 / textureSize(shadow_map, 0);
 
     for(int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
-            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+            float pcfDepth = texture(shadow_map, projCoords.xy + vec2(x, y) * texelSize).r; 
             shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
         }    
     }
@@ -146,10 +142,8 @@ vec3 spotlight_color(Spotlight light, vec3 frag_normal, vec3 frag_pos, vec3 view
 
     vec3 result = vec3(diffuse + specular) * intensity;
 
-    float shadow = use_shadow_map
-        ? ShadowCalculation(fs_in.FragPosLightSpace, fs_in.fragNormal, light.position)
-        : 0.0;
-
+    vec4 fragPosLightSpace = light.light_space_matrix * vec4(fs_in.fragPos, 1.0);
+    float shadow = ShadowCalculation(fragPosLightSpace, fs_in.fragNormal, light.position, light.shadow_map);
     result = result * (1.0 - shadow);
 
     return result;

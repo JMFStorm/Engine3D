@@ -44,16 +44,11 @@ static unsigned int g_shadow_map_shader;
 static unsigned int g_shadow_map_vao;
 static unsigned int g_shadow_map_vbo;
 
-static const unsigned int SHADOW_WIDTH = 1024 * 2;
-static const unsigned int SHADOW_HEIGHT = 1024 * 2;
-
-static Framebuffer spotlight_shadow_map;
-
 static constexpr const char* g_materials_dir_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
 
 static bool g_inverse_color = false;
 static bool g_blur_effect = false;
-static float g_blur_effect_amount = 0.0f;
+static float g_blur_effect_amount = 8.0f;
 static float g_gamma_amount = 1.6f;
 
 static bool g_use_linear_texture_filtering = false;
@@ -498,38 +493,6 @@ void draw_mesh(Mesh* mesh)
 	glUniform3f(ambient_loc, g_user_settings.world_ambient[0], g_user_settings.world_ambient[1], g_user_settings.world_ambient[2]);
 	glUniform3f(camera_view_loc, g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 
-	// Shadow maps
-	{
-		unsigned int use_shadow_loc = glGetUniformLocation(g_mesh_shader, "use_shadow_map");
-
-		if (0 < g_scene_spotlights.items_count) glUniform1i(use_shadow_loc, 1);
-		else glUniform1i(use_shadow_loc, 0);
-
-		for (int i = 0; i < g_scene_spotlights.items_count; i++)
-		{
-			Spotlight* spotlight= j_array_get(&g_scene_spotlights, 0);
-			vec3 light_pos = spotlight->transforms.translation;
-			vec3 spot_dir = get_spotlight_dir(*spotlight);
-			vec3 spot_look_at = spotlight->transforms.translation + spot_dir;
-
-			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, spotlight->range * 10);
-			glm::mat4 lightView = glm::lookAt(light_pos, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
-			glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-			unsigned int light_matrix_loc = glGetUniformLocation(g_mesh_shader, "lightSpaceMatrix");
-			glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
-
-			unsigned int shadow_texture_loc = glGetUniformLocation(g_mesh_shader, "shadowMap");
-			glUniform1i(shadow_texture_loc, 2);
-
-			unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, "shadow_map_light_pos");
-			glUniform3f(light_pos_loc, light_pos.x, light_pos.y, light_pos.z);
-
-			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_2D, spotlight_shadow_map.texture_gpu_id);
-		}
-	}
-
 	// Lights
 	{
 		char str_value[64] = { 0 };
@@ -568,9 +531,20 @@ void draw_mesh(Mesh* mesh)
 		unsigned int spotlights_count_loc = glGetUniformLocation(g_mesh_shader, "spotlights_count");
 		glUniform1i(spotlights_count_loc, g_scene_spotlights.items_count);
 
+		int shadow_map_tex_id = GL_TEXTURE2;
+		int shadow_loc_i = 2;
+
 		for (int i = 0; i < g_scene_spotlights.items_count; i++)
 		{
 			auto spotlight = *j_array_get(&g_scene_spotlights, i);
+
+			vec3 spot_dir = get_spotlight_dir(spotlight);
+			vec3 light_pos = spotlight.transforms.translation;
+			vec3 spot_look_at = spotlight.transforms.translation + spot_dir;
+
+			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, spotlight.range * 10);
+			glm::mat4 lightView = glm::lookAt(light_pos, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
+			glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 			sprintf_s(str_value, "spotlights[%d].diffuse", i);
 			unsigned int sp_diff_loc = glGetUniformLocation(g_mesh_shader, str_value);
@@ -593,7 +567,11 @@ void draw_mesh(Mesh* mesh)
 			sprintf_s(str_value, "spotlights[%d].outer_cutoff", i);
 			unsigned int sp_outer_cutoff_loc = glGetUniformLocation(g_mesh_shader, str_value);
 
-			vec3 spot_dir = get_spotlight_dir(spotlight);
+			sprintf_s(str_value, "spotlights[%d].light_space_matrix", i);
+			unsigned int sp_light_matrix = glGetUniformLocation(g_mesh_shader, str_value);
+
+			sprintf_s(str_value, "spotlights[%d].shadow_map", i);
+			unsigned int sp_shadow_map = glGetUniformLocation(g_mesh_shader, str_value);
 
 			glUniform3f(sp_diff_loc, spotlight.diffuse.x, spotlight.diffuse.y, spotlight.diffuse.z);
 			glUniform3f(sp_pos_loc, spotlight.transforms.translation.x, spotlight.transforms.translation.y, spotlight.transforms.translation.z);
@@ -602,6 +580,11 @@ void draw_mesh(Mesh* mesh)
 			glUniform1f(sp_rng_loc, spotlight.range);
 			glUniform1f(sp_cutoff_loc, spotlight.cutoff);
 			glUniform1f(sp_outer_cutoff_loc, spotlight.outer_cutoff);
+			glUniformMatrix4fv(sp_light_matrix, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+			glUniform1i(sp_shadow_map, shadow_loc_i++);
+
+			glActiveTexture(shadow_map_tex_id++);
+			glBindTexture(GL_TEXTURE_2D, spotlight.shadow_map.texture_gpu_id);
 		}
 	}
 
@@ -1758,6 +1741,37 @@ inline Mesh mesh_deserialize(MeshData data)
 	return mesh;
 }
 
+inline MaterialData material_serialize(Material material)
+{
+	s64 material_id = g_mat_data_map[material.color_texture->file_name];
+
+	MaterialData m_data = {
+		.material_id = material_id,
+		.specular_mult = material.specular_mult,
+		.shininess = material.shininess
+	};
+	return m_data;
+}
+
+void save_material(Material material)
+{
+	MaterialData m_data = material_serialize(material);
+
+	char filename[FILENAME_LEN] = { 0 };
+	strcpy_s(filename, material.color_texture->file_name);
+	str_trim_file_ext(filename);
+
+	char filepath[FILE_PATH_LEN] = { 0 };
+	sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename);
+
+	std::ofstream output_mat_file(filepath, std::ios::binary | std::ios::trunc);
+	ASSERT_TRUE(output_mat_file.is_open(), ".jmat file opened");
+
+	output_mat_file.write(".jmat", 5);
+	output_mat_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
+	output_mat_file.close();
+}
+
 inline void save_scene()
 {
 	std::ofstream output_file("scene_01.jmap", std::ios::binary);
@@ -1905,18 +1919,6 @@ TransformMode get_curr_transformation_mode()
 	return g_transform_mode.mode;
 }
 
-inline MaterialData material_serialize(Material material)
-{
-	s64 material_id = g_mat_data_map[material.color_texture->file_name];
-
-	MaterialData m_data = {
-		.material_id = material_id,
-		.specular_mult = material.specular_mult,
-		.shininess = material.shininess
-	};
-	return m_data;
-}
-
 inline Material material_deserialize(MaterialData mat_data)
 {
 	Material mat = {
@@ -1926,25 +1928,6 @@ inline Material material_deserialize(MaterialData mat_data)
 		.shininess = mat_data.shininess,
 	};
 	return mat;
-}
-
-void save_material(Material material)
-{
-	MaterialData m_data = material_serialize(material);
-
-	char filename[FILENAME_LEN] = { 0 };
-	strcpy_s(filename, material.color_texture->file_name);
-	str_trim_file_ext(filename);
-
-	char filepath[FILE_PATH_LEN] = { 0 };
-	sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename);
-
-	std::ofstream output_mat_file(filepath, std::ios::binary | std::ios::trunc);
-	ASSERT_TRUE(output_mat_file.is_open(), ".jmat file opened");
-
-	output_mat_file.write(".jmat", 5);
-	output_mat_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
-	output_mat_file.close();
 }
 
 void save_all()
@@ -2393,34 +2376,6 @@ int main(int argc, char* argv[])
 		glGenFramebuffers(1, &g_editor_framebuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
 		init_framebuffer_resize(&g_editor_framebuffer_texture, &g_editor_framebuffer_renderbuffer);
-
-		// Shadow map
-		{
-			spotlight_shadow_map = framebuffer_init();
-
-			glGenFramebuffers(1, &spotlight_shadow_map.id);
-			glGenTextures(1, &spotlight_shadow_map.texture_gpu_id);
-			glBindTexture(GL_TEXTURE_2D, spotlight_shadow_map.texture_gpu_id);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-
-			float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-			glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-			glBindFramebuffer(GL_FRAMEBUFFER, spotlight_shadow_map.id);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, spotlight_shadow_map.texture_gpu_id, 0);
-			glDrawBuffer(GL_NONE);
-			glReadBuffer(GL_NONE);
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-			ASSERT_TRUE(
-				spotlight_shadow_map.id != 0 && spotlight_shadow_map.texture_gpu_id != 0,
-				"Shadow map creation");
-		}
 	}
 
 	g_use_linear_texture_filtering = false;
@@ -2554,6 +2509,8 @@ int main(int argc, char* argv[])
 						ImGui::InputFloat("Range", &selected_spotlight_ptr->range, 0, 0, "%.2f");
 						ImGui::InputFloat("Cutoff", &selected_spotlight_ptr->cutoff, 0, 0, "%.2f");
 						ImGui::InputFloat("Outer cutoff", &selected_spotlight_ptr->outer_cutoff, 0, 0, "%.2f");
+
+						ImGui::Checkbox("DEBUG_SHADOWMAP", &DEBUG_SHADOWMAP);
 					}
 				}
 
@@ -2577,13 +2534,6 @@ int main(int argc, char* argv[])
 				ImGui::Checkbox("Blur", &g_blur_effect);
 				ImGui::InputFloat("Blur amount", &g_blur_effect_amount, 0, 0, "%.1f");
 				ImGui::InputFloat("Gamma", &g_gamma_amount, 0, 0, "%.1f");
-
-				if (0 < g_scene_spotlights.items_count)
-				{
-					Spotlight* first_spot = j_array_get(&g_scene_spotlights, 0);
-					ImGui::Checkbox("DEBUG_SHADOWMAP", &DEBUG_SHADOWMAP);
-					ImGui::InputFloat3("Shadow light position", &first_spot->transforms.translation[0], "%.2f");
-				}
 
 				ImGui::End();
 			}
@@ -2853,7 +2803,7 @@ int main(int argc, char* argv[])
 		// -------------
 		// Draw OpenGL
 
-		// Shadow map framebuffer
+		// Shadow map framebuffers
 		{
 			glFrontFace(GL_CW);
 			glCullFace(GL_FRONT);
@@ -2862,18 +2812,18 @@ int main(int argc, char* argv[])
 
 			for (int i = 0; i < g_scene_spotlights.items_count; i++)
 			{
-				Spotlight* first_spot = j_array_get(&g_scene_spotlights, i);
-				vec3 spot_dir = get_spotlight_dir(*first_spot);
-				vec3 spot_look_at = first_spot->transforms.translation + spot_dir;
+				Spotlight* spotlight = j_array_get(&g_scene_spotlights, i);
+				vec3 spot_dir = get_spotlight_dir(*spotlight);
+				vec3 spot_look_at = spotlight->transforms.translation + spot_dir;
 
-				glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, first_spot->range * 10);
-				glm::mat4 lightView = glm::lookAt(first_spot->transforms.translation, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
+				glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, spotlight->range * 10);
+				glm::mat4 lightView = glm::lookAt(spotlight->transforms.translation, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
 				glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 				unsigned int light_matrix_loc = glGetUniformLocation(g_shadow_map_shader, "lightSpaceMatrix");
 				glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
 
-				glBindFramebuffer(GL_FRAMEBUFFER, spotlight_shadow_map.id);
+				glBindFramebuffer(GL_FRAMEBUFFER, spotlight->shadow_map.id);
 				glClear(GL_DEPTH_BUFFER_BIT);
 
 				glUseProgram(g_shadow_map_shader);
@@ -2912,6 +2862,27 @@ int main(int argc, char* argv[])
 			{
 				Mesh mesh = *j_array_get(&g_scene_meshes, i);
 				draw_mesh(&mesh);
+			}
+
+			// Draw billboards
+			{
+				// Pointlights
+				for (int i = 0; i < g_scene_pointlights.items_count; i++)
+				{
+					auto light = *j_array_get(&g_scene_pointlights, i);
+					draw_billboard(light.transforms.translation, pointlight_texture, 0.5f);
+				}
+
+				// Spotlights
+				for (int i = 0; i < g_scene_spotlights.items_count; i++)
+				{
+					auto spotlight = *j_array_get(&g_scene_spotlights, i);
+					draw_billboard(spotlight.transforms.translation, spotlight_texture, 0.5f);
+					vec3 sp_dir = get_spotlight_dir(spotlight);
+					append_line(spotlight.transforms.translation, spotlight.transforms.translation + sp_dir, spotlight.diffuse);
+				}
+
+				draw_lines(2.0f);
 			}
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2983,27 +2954,6 @@ int main(int argc, char* argv[])
 				}
 			}
 
-			// Draw billboards
-			{
-				// Pointlights
-				for (int i = 0; i < g_scene_pointlights.items_count; i++)
-				{
-					auto light = *j_array_get(&g_scene_pointlights, i);
-					draw_billboard(light.transforms.translation, pointlight_texture, 0.5f);
-				}
-
-				// Spotlights
-				for (int i = 0; i < g_scene_spotlights.items_count; i++)
-				{
-					auto spotlight = *j_array_get(&g_scene_spotlights, i);
-					draw_billboard(spotlight.transforms.translation, spotlight_texture, 0.5f);
-					vec3 sp_dir = get_spotlight_dir(spotlight);
-					append_line(spotlight.transforms.translation, spotlight.transforms.translation + sp_dir, spotlight.diffuse);
-				}
-
-				draw_lines(2.0f);
-			}
-
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
@@ -3035,6 +2985,33 @@ int main(int argc, char* argv[])
 			glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer_texture);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 			glEnable(GL_DEPTH_TEST);
+		}
+
+		if (DEBUG_SHADOWMAP && g_selected_object.type == ObjectType::Spotlight)
+		{
+			glEnable(GL_DEPTH_TEST);
+			glViewport(0, 0, 500, 500);
+			glUseProgram(g_shadow_map_debug_shader);
+			glBindVertexArray(g_shadow_map_debug_vao);
+
+			float near_plane = 0.25f, far_plane = 15.0f;
+			unsigned int near_loc = glGetUniformLocation(g_shadow_map_debug_shader, "near_plane");
+			glUniform1f(near_loc, near_plane);
+			unsigned int far_loc = glGetUniformLocation(g_shadow_map_debug_shader, "far_plane");
+			glUniform1f(far_loc, far_plane);
+
+			Spotlight* sp = (Spotlight*)get_selected_object_ptr();
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, sp->shadow_map.texture_gpu_id);
+
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			g_frame_data.draw_calls++;
+
+			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+			glUseProgram(0);
+			glBindVertexArray(0);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
 		// Print debug info
@@ -3079,31 +3056,6 @@ int main(int argc, char* argv[])
 			sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
 			append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
 			draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
-		}
-
-		if (DEBUG_SHADOWMAP)
-		{
-			glEnable(GL_DEPTH_TEST);
-			glViewport(0, 0, 500, 500);
-			glUseProgram(g_shadow_map_debug_shader);
-			glBindVertexArray(g_shadow_map_debug_vao);
-
-			float near_plane = 0.25f, far_plane = 15.0f;
-			unsigned int near_loc = glGetUniformLocation(g_shadow_map_debug_shader, "near_plane");
-			glUniform1f(near_loc, near_plane);
-			unsigned int far_loc = glGetUniformLocation(g_shadow_map_debug_shader, "far_plane");
-			glUniform1f(far_loc, far_plane);
-
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, spotlight_shadow_map.texture_gpu_id);
-
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-			g_frame_data.draw_calls++;
-
-			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
-			glUseProgram(0);
-			glBindVertexArray(0);
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
 		ImGui::Render();
