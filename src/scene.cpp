@@ -36,6 +36,33 @@ Mesh mesh_deserialize(MeshData data)
 	return mesh;
 }
 
+Spotlight spotlight_deserialize(SpotlightSerialized serialized)
+{
+	Spotlight spotlight = {
+		.shadow_map = init_spotlight_shadow_map(),
+		.transforms = serialized.transforms,
+		.diffuse = serialized.diffuse,
+		.specular = serialized.specular,
+		.range = serialized.range,
+		.cutoff = serialized.cutoff,
+		.outer_cutoff = serialized.outer_cutoff
+	};
+	return spotlight;
+}
+
+SpotlightSerialized spotlight_serialize(Spotlight spotlight)
+{
+	SpotlightSerialized serialized = {
+		.transforms = spotlight.transforms,
+		.diffuse = spotlight.diffuse,
+		.specular = spotlight.specular,
+		.range = spotlight.range,
+		.cutoff = spotlight.cutoff,
+		.outer_cutoff = spotlight.outer_cutoff
+	};
+	return serialized;
+}
+
 MaterialData material_serialize(Material material)
 {
 	s64 material_id = g_mat_data_map[material.color_texture->file_name];
@@ -119,7 +146,8 @@ void save_scene()
 	for (int i = 0; i < g_scene_spotlights.items_count; i++)
 	{
 		Spotlight light = *(Spotlight*)j_array_get(&g_scene_spotlights, i);
-		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
+		SpotlightSerialized sp_data = spotlight_serialize(light);
+		output_file.write(reinterpret_cast<char*>(&sp_data), sizeof(sp_data));
 	}
 
 	output_file.close();
@@ -184,9 +212,10 @@ void load_scene()
 	// Spotlight data
 	for (int i = 0; i < spotlight_count; i++)
 	{
-		Spotlight light;
-		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
-		j_array_add(&g_scene_spotlights, (byte*)&light);
+		SpotlightSerialized sp_data;
+		input_file.read(reinterpret_cast<char*>(&sp_data), sizeof(sp_data));
+		Spotlight sp = spotlight_deserialize(sp_data);
+		j_array_add(&g_scene_spotlights, (byte*)&sp);
 	}
 
 	input_file.close();

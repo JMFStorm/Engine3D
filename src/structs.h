@@ -66,6 +66,15 @@ typedef struct Spotlight {
 	f32 outer_cutoff;
 } Spotlight;
 
+typedef struct SpotlightSerialized {
+	Transforms transforms;
+	glm::vec3 diffuse;
+	f32 specular;
+	f32 range;
+	f32 cutoff;
+	f32 outer_cutoff;
+} SpotlightSerialized;
+
 typedef struct SceneSelection {
 	s64 selection_index;
 	ObjectType type;

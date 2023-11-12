@@ -259,6 +259,19 @@ bool calculate_plane_ray_intersection(
 	return true;
 }
 
+glm::mat4 get_spotlight_light_space_matrix(Spotlight spotlight)
+{
+	glm::vec3 spot_dir = get_spotlight_dir(spotlight);
+	spot_dir += glm::vec3(0.0001f, 0.001f, 0.0001f); // WTF, why?
+	glm::vec3 light_pos = spotlight.transforms.translation;
+	glm::vec3 spot_look_at = spotlight.transforms.translation + spot_dir;
+
+	float spotlight_degrees = 120.0f;
+	glm::mat4 light_projection = glm::perspective(glm::radians(spotlight_degrees), 1.0f, SHADOW_MAP_NEAR_PLANE, spotlight.range * 10);
+	glm::mat4 light_view = glm::lookAt(light_pos, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
+	return light_projection * light_view;
+}
+
 Transforms transforms_init()
 {
 	Transforms t = {

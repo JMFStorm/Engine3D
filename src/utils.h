@@ -12,6 +12,10 @@ glm::mat4 get_projection_matrix();
 
 glm::mat4 get_view_matrix();
 
+Framebuffer init_spotlight_shadow_map();
+
+glm::mat4 get_spotlight_light_space_matrix(Spotlight spotlight);
+
 inline float vw_into_screen_px(float value, float screen_width_px)
 {
 	return (float)screen_width_px * value * 0.01f;

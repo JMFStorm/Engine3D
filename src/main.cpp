@@ -1735,15 +1735,10 @@ int main(int argc, char* argv[])
 			for (int i = 0; i < g_scene_spotlights.items_count; i++)
 			{
 				Spotlight* spotlight = (Spotlight*)j_array_get(&g_scene_spotlights, i);
-				glm::vec3 spot_dir = get_spotlight_dir(*spotlight);
-				glm::vec3 spot_look_at = spotlight->transforms.translation + spot_dir;
-
-				glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, SHADOW_MAP_NEAR_PLANE, spotlight->range * 10);
-				glm::mat4 lightView = glm::lookAt(spotlight->transforms.translation, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
-				glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+				glm::mat4 light_space_matrix = get_spotlight_light_space_matrix(*spotlight);
 
 				unsigned int light_matrix_loc = glGetUniformLocation(g_shdow_map_shader.id, "lightSpaceMatrix");
-				glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+				glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(light_space_matrix));
 
 				glBindFramebuffer(GL_FRAMEBUFFER, spotlight->shadow_map.id);
 				glClear(GL_DEPTH_BUFFER_BIT);

@@ -303,12 +303,7 @@ void draw_mesh(Mesh* mesh)
 			auto spotlight = *(Spotlight*)j_array_get(&g_scene_spotlights, i);
 
 			glm::vec3 spot_dir = get_spotlight_dir(spotlight);
-			glm::vec3 light_pos = spotlight.transforms.translation;
-			glm::vec3 spot_look_at = spotlight.transforms.translation + spot_dir;
-
-			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, SHADOW_MAP_NEAR_PLANE, spotlight.range * 10);
-			glm::mat4 lightView = glm::lookAt(light_pos, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
-			glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+			glm::mat4 light_space_matrix = get_spotlight_light_space_matrix(spotlight);
 
 			sprintf_s(str_value, "spotlights[%d].diffuse", i);
 			unsigned int sp_diff_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
@@ -344,7 +339,7 @@ void draw_mesh(Mesh* mesh)
 			glUniform1f(sp_rng_loc, spotlight.range);
 			glUniform1f(sp_cutoff_loc, spotlight.cutoff);
 			glUniform1f(sp_outer_cutoff_loc, spotlight.outer_cutoff);
-			glUniformMatrix4fv(sp_light_matrix, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+			glUniformMatrix4fv(sp_light_matrix, 1, GL_FALSE, glm::value_ptr(light_space_matrix));
 			glUniform1i(sp_shadow_map, shadow_loc_i++);
 
 			glActiveTexture(shadow_map_tex_id++);
