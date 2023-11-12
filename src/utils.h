@@ -5,6 +5,7 @@
 
 #include "j_buffers.h"
 #include "globals.h"
+#include "structs.h"
 #include "types.h"
 
 inline float vw_into_screen_px(float value, float screen_width_px)

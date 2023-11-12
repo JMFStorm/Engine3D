@@ -5,11 +5,7 @@
 #include "j_array.h"
 #include "types.h"
 #include "j_buffers.h"
-
-constexpr const char* g_materials_dir_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
-
-constexpr const s64 SCENE_POINTLIGHTS_MAX_COUNT = 20;
-constexpr const s64 SCENE_SPOTLIGHTS_MAX_COUNT = 20;
+#include "structs.h"
 
 extern bool DEBUG_SHADOWMAP;
 

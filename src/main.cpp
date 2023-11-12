@@ -27,10 +27,11 @@
 
 #include "j_buffers.h"
 #include "j_assert.h"
-#include "j_files.h"
 #include "globals.h"
 #include "utils.h"
+#include "structs.h"
 #include "j_array.h"
+#include "j_strings.h"
 
 JArray g_materials = {};
 MemoryBuffer g_materials_memory = {};
