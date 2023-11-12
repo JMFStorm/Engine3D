@@ -6,6 +6,8 @@
 #include <glm/glm.hpp>
 #include <GL/glew.h>
 
+#include "j_assert.h"
+
 bool str_trim_file_ext(char* str)
 {
 	char* last_dot = strrchr(str, '.');

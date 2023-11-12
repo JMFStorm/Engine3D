@@ -33,28 +33,10 @@
 #include "j_array.h"
 #include "j_strings.h"
 
-JArray g_materials = {};
-MemoryBuffer g_materials_memory = {};
-
-MemoryBuffer g_scene_meshes_memory = {};
-JArray g_scene_meshes = {};
-
-MemoryBuffer g_scene_pointlights_memory = {};
-JArray g_scene_pointlights = {};
-
-MemoryBuffer g_scene_spotlights_memory = {};
-JArray g_scene_spotlights = {};
-
 SceneSelection g_selected_object = {
 	.selection_index = -1,
 	.type = ObjectType::None,
 };
-
-std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_mat_data_map = {};
-std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map = {};
-std::unordered_map<s64, char*> g_mat_data_map_inverse = {};
-
-TransformationMode g_transform_mode = {};
 
 static unsigned int g_shadow_map_debug_shader;
 static unsigned int g_shadow_map_debug_vao;
@@ -76,10 +58,19 @@ static bool g_use_linear_texture_filtering = false;
 static bool g_generate_texture_mipmaps = false;
 static bool g_load_texture_sRGB = false;
 
-GLFWwindow* g_window;
-glm::vec3 lastMousePos(0.0f);
+JArray g_materials = {};
+MemoryBuffer g_materials_memory = {};
 
-constexpr int right_hand_panel_width = 400;
+MemoryBuffer g_scene_meshes_memory = {};
+JArray g_scene_meshes = {};
+
+MemoryBuffer g_scene_pointlights_memory = {};
+JArray g_scene_pointlights = {};
+
+MemoryBuffer g_scene_spotlights_memory = {};
+JArray g_scene_spotlights = {};
+
+GLFWwindow* g_window;
 
 UserSettings g_user_settings = { 
 	.window_size_px = { 1900, 1200 },
@@ -1468,7 +1459,7 @@ inline void ResizeWindowAreaData(s64 width_px, s64 height_px)
 	g_game_metrics.game_width_px = width_px;
 	g_game_metrics.game_height_px = height_px;
 
-	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - right_hand_panel_width;
+	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - PROPERTIES_PANEL_WIDTH;
 	g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
 
 	g_scene_camera.aspect_ratio_horizontal =
@@ -2379,8 +2370,8 @@ int main(int argc, char* argv[])
 
 			// Right hand panel
 			{
-				ImGui::SetNextWindowPos(ImVec2(static_cast<float>(g_game_metrics.game_width_px - right_hand_panel_width), 0), ImGuiCond_Always);
-				ImGui::SetNextWindowSize(ImVec2(right_hand_panel_width, g_game_metrics.game_height_px), ImGuiCond_Always);
+				ImGui::SetNextWindowPos(ImVec2(static_cast<float>(g_game_metrics.game_width_px - PROPERTIES_PANEL_WIDTH), 0), ImGuiCond_Always);
+				ImGui::SetNextWindowSize(ImVec2(PROPERTIES_PANEL_WIDTH, g_game_metrics.game_height_px), ImGuiCond_Always);
 
 				ImGui::Begin("Properties", nullptr, 0);
 

@@ -1,7 +1,14 @@
 #pragma once
 
+#include <glm/glm.hpp>
 #include "types.h"
 #include "constants.h"
+
+typedef struct Transforms {
+	glm::vec3 translation;
+	glm::vec3 rotation;
+	glm::vec3 scale;
+} Transforms;
 
 typedef struct Texture {
 	char file_name[FILENAME_LEN];
@@ -181,3 +188,9 @@ typedef struct MaterialIdData {
 	char material_name[FILENAME_LEN];
 	s64 material_id;
 } MaterialIdData;
+
+typedef struct SimpleShader {
+	u32 id;
+	u32 vao;
+	u32 vbo;
+} SimpleShader;

@@ -4,9 +4,6 @@
 #include <string_view>
 #include <glm/glm.hpp>
 
-static const unsigned int SHADOW_WIDTH = 1024 * 2;
-static const unsigned int SHADOW_HEIGHT = 1024 * 2;
-
 #define KILOBYTES(x) (x * 1024)
 #define MEGABYTES(x) (KILOBYTES(x) * 1024)
 
@@ -47,19 +44,6 @@ enum class ObjectType {
 	Spotlight
 };
 
-typedef struct SimpleShader {
-	u32 id;
-	u32 vao;
-	u32 vbo;
-} SimpleShader;
-
-typedef struct Transforms {
-	glm::vec3 translation;
-	glm::vec3 rotation;
-	glm::vec3 scale;
-} Transforms;
-
 constexpr const s64 E_Primitive_Plane = 0;
 constexpr const s64 E_Primitive_Cube = 1;
 constexpr const s64 E_Primitive_Sphere = 2;
-

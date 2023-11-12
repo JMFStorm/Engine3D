@@ -15,3 +15,9 @@ extern bool g_camera_move_mode;
 extern GameMetrics g_game_metrics;
 extern GameInputsU g_inputs;
 extern FrameData g_frame_data;
+
+extern std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_mat_data_map;
+extern std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map;
+extern std::unordered_map<s64, char*> g_mat_data_map_inverse;
+
+extern TransformationMode g_transform_mode;

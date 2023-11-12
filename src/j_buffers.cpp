@@ -1,5 +1,7 @@
 #include "j_buffers.h"
 
+#include "j_assert.h"
+
 void memory_buffer_mallocate(MemoryBuffer* buffer, s64 size_in_bytes, char* name)
 {
 	ASSERT_TRUE(buffer->size == 0, "Arena is not already allocated");
