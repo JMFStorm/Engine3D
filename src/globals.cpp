@@ -16,3 +16,8 @@ std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map 
 std::unordered_map<s64, char*> g_mat_data_map_inverse = {};
 
 TransformationMode g_transform_mode = {};
+
+JArray g_materials = {};
+JArray g_scene_spotlights = {};
+JArray g_scene_pointlights = {};
+JArray g_scene_meshes = {};

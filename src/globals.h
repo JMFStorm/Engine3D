@@ -21,3 +21,8 @@ extern std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_ind
 extern std::unordered_map<s64, char*> g_mat_data_map_inverse;
 
 extern TransformationMode g_transform_mode;
+
+extern JArray g_materials;
+extern JArray g_scene_spotlights;
+extern JArray g_scene_pointlights;
+extern JArray g_scene_meshes;

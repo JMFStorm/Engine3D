@@ -156,6 +156,7 @@
     <ClCompile Include="src\j_buffers.cpp" />
     <ClCompile Include="src\j_strings.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\scene.cpp" />
     <ClCompile Include="src\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -309,6 +310,7 @@
     <ClInclude Include="src\j_buffers.h" />
     <ClInclude Include="include\stb_image.h" />
     <ClInclude Include="src\j_strings.h" />
+    <ClInclude Include="src\scene.h" />
     <ClInclude Include="src\structs.h" />
     <ClInclude Include="src\utils.h" />
     <ClInclude Include="src\j_assert.h" />
