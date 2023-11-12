@@ -34,14 +34,6 @@
 #include "j_strings.h"
 #include "scene.h"
 
-static unsigned int g_shadow_map_debug_shader;
-static unsigned int g_shadow_map_debug_vao;
-static unsigned int g_shadow_map_debug_vbo;
-
-static unsigned int g_shadow_map_shader;
-static unsigned int g_shadow_map_vao;
-static unsigned int g_shadow_map_vbo;
-
 static bool g_inverse_color = false;
 static bool g_blur_effect = false;
 static float g_blur_effect_amount = 8.0f;
@@ -68,9 +60,7 @@ UserSettings g_user_settings = {
 static int g_scene_framebuffer_shader;
 static unsigned int g_scene_framebuffer_vao;
 
-static unsigned int g_scene_framebuffer;
-static unsigned int g_scene_framebuffer_texture;
-static unsigned int g_scene_framebuffer_renderbuffer;
+static Framebuffer g_scene_framebuffer = {};
 
 static unsigned int g_editor_framebuffer;
 static unsigned int g_editor_framebuffer_texture;
@@ -81,6 +71,8 @@ MemoryBuffer g_line_vertex_buffer = {};
 s64 g_line_buffer_size = 0;
 s64 g_line_indicies = 0;
 
+static SimpleShader g_shdow_map_debug_shader;
+static SimpleShader g_shdow_map_shader;
 static SimpleShader g_mesh_shader;
 static SimpleShader g_billboard_shader;
 static SimpleShader g_ui_text_shader;
@@ -148,7 +140,6 @@ void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
 
 	null_terminate_string(read_pointer, file_size);
 }
-
 
 bool check_shader_compile_error(GLuint shader)
 {
@@ -320,7 +311,7 @@ TransformMode get_curr_transformation_mode()
 void draw_mesh_shadow_map(Mesh* mesh)
 {
 	glm::mat4 model = get_model_matrix(mesh);
-	unsigned int model_loc = glGetUniformLocation(g_shadow_map_shader, "model");
+	unsigned int model_loc = glGetUniformLocation(g_shdow_map_shader.id, "model");
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 
 	s64 draw_indicies = 0;
@@ -340,7 +331,7 @@ void draw_mesh_shadow_map(Mesh* mesh)
 		};
 
 		draw_indicies = 6;
-		glBindBuffer(GL_ARRAY_BUFFER, g_shadow_map_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_shdow_map_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
 	else if (mesh->mesh_type == E_Primitive_Cube)
@@ -404,7 +395,7 @@ void draw_mesh_shadow_map(Mesh* mesh)
 		};
 
 		draw_indicies = 36;
-		glBindBuffer(GL_ARRAY_BUFFER, g_shadow_map_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_shdow_map_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
 
@@ -1257,9 +1248,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	ResizeWindowAreaData(width, height);
 	glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
 
-	glGenFramebuffers(1, &g_scene_framebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer);
-	init_framebuffer_resize(&g_scene_framebuffer_texture, &g_scene_framebuffer_renderbuffer);
+	glGenFramebuffers(1, &g_scene_framebuffer.id);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
+	init_framebuffer_resize(&g_scene_framebuffer.texture_gpu_id, &g_scene_framebuffer.renderbuffer);
 
 	glGenFramebuffers(1, &g_editor_framebuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
@@ -1943,12 +1934,12 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_fs.glsl";
 
-		g_shadow_map_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_shdow_map_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 
-		glGenVertexArrays(1, &g_shadow_map_vao);
-		glGenBuffers(1, &g_shadow_map_vbo);
-		glBindVertexArray(g_shadow_map_vao);
-		glBindBuffer(GL_ARRAY_BUFFER, g_shadow_map_vbo);
+		glGenVertexArrays(1, &g_shdow_map_shader.vao);
+		glGenBuffers(1, &g_shdow_map_shader.vbo);
+		glBindVertexArray(g_shdow_map_shader.vao);
+		glBindBuffer(GL_ARRAY_BUFFER, g_shdow_map_shader.vbo);
 
 		// Position attribute
 		glEnableVertexAttribArray(0);
@@ -1960,12 +1951,12 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_fs.glsl";
 
-		g_shadow_map_debug_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_shdow_map_debug_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 
 		unsigned int vbo;
-		glGenVertexArrays(1, &g_shadow_map_debug_vao);
+		glGenVertexArrays(1, &g_shdow_map_debug_shader.vao);
 		glGenBuffers(1, &vbo);
-		glBindVertexArray(g_shadow_map_debug_vao);
+		glBindVertexArray(g_shdow_map_debug_shader.vao);
 
 		float quadVertices[] = {
 			// Coords	   // Uv
@@ -2117,9 +2108,9 @@ int main(int argc, char* argv[])
 
 	// Init framebuffers
 	{
-		glGenFramebuffers(1, &g_scene_framebuffer);
-		glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer);
-		init_framebuffer_resize(&g_scene_framebuffer_texture, &g_scene_framebuffer_renderbuffer);
+		glGenFramebuffers(1, &g_scene_framebuffer.id);
+		glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
+		init_framebuffer_resize(&g_scene_framebuffer.texture_gpu_id, &g_scene_framebuffer.renderbuffer);
 
 		glGenFramebuffers(1, &g_editor_framebuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
@@ -2555,7 +2546,7 @@ int main(int argc, char* argv[])
 		{
 			glFrontFace(GL_CW);
 			glCullFace(GL_FRONT);
-			glUseProgram(g_shadow_map_shader);
+			glUseProgram(g_shdow_map_shader.id);
 			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 
 			for (int i = 0; i < g_scene_spotlights.items_count; i++)
@@ -2568,14 +2559,14 @@ int main(int argc, char* argv[])
 				glm::mat4 lightView = glm::lookAt(spotlight->transforms.translation, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
 				glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
-				unsigned int light_matrix_loc = glGetUniformLocation(g_shadow_map_shader, "lightSpaceMatrix");
+				unsigned int light_matrix_loc = glGetUniformLocation(g_shdow_map_shader.id, "lightSpaceMatrix");
 				glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
 
 				glBindFramebuffer(GL_FRAMEBUFFER, spotlight->shadow_map.id);
 				glClear(GL_DEPTH_BUFFER_BIT);
 
-				glUseProgram(g_shadow_map_shader);
-				glBindVertexArray(g_shadow_map_vao);
+				glUseProgram(g_shdow_map_shader.id);
+				glBindVertexArray(g_shdow_map_shader.vao);
 
 				for (int i = 0; i < g_scene_meshes.items_count; i++)
 				{
@@ -2595,7 +2586,7 @@ int main(int argc, char* argv[])
 
 		// Scene framebuffer
 		{
-			glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
 			glEnable(GL_DEPTH_TEST);
 			glClearColor(0.34f, 0.44f, 0.42f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -2722,7 +2713,7 @@ int main(int argc, char* argv[])
 			glUniform1f(blur_amount_loc, g_blur_effect_amount);
 			glUniform1f(gamma_amount_loc, g_gamma_amount);
 
-			glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer_texture);
+			glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer.texture_gpu_id);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 
 			glUniform1i(inversion_loc, false);
@@ -2736,13 +2727,13 @@ int main(int argc, char* argv[])
 		{
 			glEnable(GL_DEPTH_TEST);
 			glViewport(0, 0, 500, 500);
-			glUseProgram(g_shadow_map_debug_shader);
-			glBindVertexArray(g_shadow_map_debug_vao);
+			glUseProgram(g_shdow_map_debug_shader.id);
+			glBindVertexArray(g_shdow_map_debug_shader.vao);
 
 			float near_plane = 0.25f, far_plane = 15.0f;
-			unsigned int near_loc = glGetUniformLocation(g_shadow_map_debug_shader, "near_plane");
+			unsigned int near_loc = glGetUniformLocation(g_shdow_map_debug_shader.id, "near_plane");
 			glUniform1f(near_loc, near_plane);
-			unsigned int far_loc = glGetUniformLocation(g_shadow_map_debug_shader, "far_plane");
+			unsigned int far_loc = glGetUniformLocation(g_shdow_map_debug_shader.id, "far_plane");
 			glUniform1f(far_loc, far_plane);
 
 			Spotlight* sp = (Spotlight*)get_selected_object_ptr();
