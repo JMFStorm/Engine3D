@@ -34,17 +34,9 @@
 #include "j_strings.h"
 #include "scene.h"
 
-SceneSelection g_selected_object = {
-	.selection_index = -1,
-	.type = ObjectType::None,
-};
-
 static unsigned int g_shadow_map_debug_shader;
 static unsigned int g_shadow_map_debug_vao;
 static unsigned int g_shadow_map_debug_vbo;
-
-static f32 g_shadow_map_near_plane = 0.25f;
-static f32 g_shadow_map_far_plane = 15.0f;
 
 static unsigned int g_shadow_map_shader;
 static unsigned int g_shadow_map_vao;
@@ -85,18 +77,15 @@ static unsigned int g_editor_framebuffer_texture;
 static unsigned int g_editor_framebuffer_renderbuffer;
 
 MemoryBuffer g_line_vertex_buffer = {};
-constexpr const s64 MAX_LINES_BUFFER = 200;
+
 s64 g_line_buffer_size = 0;
 s64 g_line_indicies = 0;
 
+static SimpleShader g_mesh_shader;
 static SimpleShader g_billboard_shader;
 static SimpleShader g_ui_text_shader;
 static SimpleShader g_line_shader;
 static SimpleShader g_wireframe_shader;
-
-int g_mesh_shader;
-unsigned int g_mesh_vao;
-unsigned int g_mesh_vbo;
 
 s64 g_text_buffer_size = 0;
 s64 g_text_indicies = 0;
@@ -120,7 +109,6 @@ JStringArray g_material_names;
 int g_selected_texture_item = 0;
 
 MemoryBuffer g_texture_memory = { 0 };
-JArray g_textures;
 
 Texture pointlight_texture;
 Texture spotlight_texture;
@@ -428,28 +416,28 @@ void draw_mesh_shadow_map(Mesh* mesh)
 
 void draw_mesh(Mesh* mesh)
 {
-	glUseProgram(g_mesh_shader);
-	glBindVertexArray(g_mesh_vao);
+	glUseProgram(g_mesh_shader.id);
+	glBindVertexArray(g_mesh_shader.vao);
 
 	glm::mat4 model = get_model_matrix(mesh);
 	glm::mat4 projection = get_projection_matrix();
 	glm::mat4 view = get_view_matrix();
 
-	unsigned int model_loc = glGetUniformLocation(g_mesh_shader, "model");
-	unsigned int view_loc = glGetUniformLocation(g_mesh_shader, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader, "projection");
-	unsigned int camera_view_loc = glGetUniformLocation(g_mesh_shader, "view_coords");
+	unsigned int model_loc = glGetUniformLocation(g_mesh_shader.id, "model");
+	unsigned int view_loc = glGetUniformLocation(g_mesh_shader.id, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader.id, "projection");
+	unsigned int camera_view_loc = glGetUniformLocation(g_mesh_shader.id, "view_coords");
 
-	unsigned int ambient_loc = glGetUniformLocation(g_mesh_shader, "global_ambient_light");
+	unsigned int ambient_loc = glGetUniformLocation(g_mesh_shader.id, "global_ambient_light");
 
-	unsigned int use_texture_loc = glGetUniformLocation(g_mesh_shader, "use_texture");
-	unsigned int use_gloss_texture_loc = glGetUniformLocation(g_mesh_shader, "use_specular_texture");
-	unsigned int uv_loc = glGetUniformLocation(g_mesh_shader, "uv_multiplier");
+	unsigned int use_texture_loc = glGetUniformLocation(g_mesh_shader.id, "use_texture");
+	unsigned int use_gloss_texture_loc = glGetUniformLocation(g_mesh_shader.id, "use_specular_texture");
+	unsigned int uv_loc = glGetUniformLocation(g_mesh_shader.id, "uv_multiplier");
 
-	unsigned int color_texture_loc = glGetUniformLocation(g_mesh_shader, "material.color_texture");
-	unsigned int specular_texture_loc = glGetUniformLocation(g_mesh_shader, "material.specular_texture");
-	unsigned int specular_multiplier_loc = glGetUniformLocation(g_mesh_shader, "material.specular_mult");
-	unsigned int material_shine_loc = glGetUniformLocation(g_mesh_shader, "material.shininess");
+	unsigned int color_texture_loc = glGetUniformLocation(g_mesh_shader.id, "material.color_texture");
+	unsigned int specular_texture_loc = glGetUniformLocation(g_mesh_shader.id, "material.specular_texture");
+	unsigned int specular_multiplier_loc = glGetUniformLocation(g_mesh_shader.id, "material.specular_mult");
+	unsigned int material_shine_loc = glGetUniformLocation(g_mesh_shader.id, "material.shininess");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
@@ -467,7 +455,7 @@ void draw_mesh(Mesh* mesh)
 		char str_value[64] = { 0 };
 
 		// Pointlights
-		unsigned int pointlights_count_loc = glGetUniformLocation(g_mesh_shader, "pointlights_count");
+		unsigned int pointlights_count_loc = glGetUniformLocation(g_mesh_shader.id, "pointlights_count");
 		glUniform1i(pointlights_count_loc, g_scene_pointlights.items_count);
 
 		for (int i = 0; i < g_scene_pointlights.items_count; i++)
@@ -475,19 +463,19 @@ void draw_mesh(Mesh* mesh)
 			auto pointlight = *(Pointlight*)j_array_get(&g_scene_pointlights, i);
 
 			sprintf_s(str_value, "pointlights[%d].position", i);
-			unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "pointlights[%d].diffuse", i);
-			unsigned int light_diff_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int light_diff_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "pointlights[%d].specular", i);
-			unsigned int light_spec_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int light_spec_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "pointlights[%d].intensity", i);
-			unsigned int light_intens_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int light_intens_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "pointlights[%d].range", i);
-			unsigned int light_range_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int light_range_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			glUniform3f(light_pos_loc, pointlight.transforms.translation.x, pointlight.transforms.translation.y, pointlight.transforms.translation.z);
 			glUniform3f(light_diff_loc, pointlight.diffuse.x, pointlight.diffuse.y, pointlight.diffuse.z);
@@ -497,7 +485,7 @@ void draw_mesh(Mesh* mesh)
 		}
 
 		// Spotlights
-		unsigned int spotlights_count_loc = glGetUniformLocation(g_mesh_shader, "spotlights_count");
+		unsigned int spotlights_count_loc = glGetUniformLocation(g_mesh_shader.id, "spotlights_count");
 		glUniform1i(spotlights_count_loc, g_scene_spotlights.items_count);
 
 		int shadow_map_tex_id = GL_TEXTURE2;
@@ -511,36 +499,36 @@ void draw_mesh(Mesh* mesh)
 			glm::vec3 light_pos = spotlight.transforms.translation;
 			glm::vec3 spot_look_at = spotlight.transforms.translation + spot_dir;
 
-			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, spotlight.range * 10);
+			glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, SHADOW_MAP_NEAR_PLANE, spotlight.range * 10);
 			glm::mat4 lightView = glm::lookAt(light_pos, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
 			glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 			sprintf_s(str_value, "spotlights[%d].diffuse", i);
-			unsigned int sp_diff_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int sp_diff_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].position", i);
-			unsigned int sp_pos_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int sp_pos_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].specular", i);
-			unsigned int sp_spec_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int sp_spec_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].range", i);
-			unsigned int sp_rng_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int sp_rng_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].direction", i);
-			unsigned int sp_dir_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int sp_dir_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].cutoff", i);
-			unsigned int sp_cutoff_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int sp_cutoff_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].outer_cutoff", i);
-			unsigned int sp_outer_cutoff_loc = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int sp_outer_cutoff_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].light_space_matrix", i);
-			unsigned int sp_light_matrix = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int sp_light_matrix = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].shadow_map", i);
-			unsigned int sp_shadow_map = glGetUniformLocation(g_mesh_shader, str_value);
+			unsigned int sp_shadow_map = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			glUniform3f(sp_diff_loc, spotlight.diffuse.x, spotlight.diffuse.y, spotlight.diffuse.z);
 			glUniform3f(sp_pos_loc, spotlight.transforms.translation.x, spotlight.transforms.translation.y, spotlight.transforms.translation.z);
@@ -578,7 +566,7 @@ void draw_mesh(Mesh* mesh)
 		};
 
 		draw_indicies = 6;
-		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
 	else if (mesh->mesh_type == E_Primitive_Cube)
@@ -642,7 +630,7 @@ void draw_mesh(Mesh* mesh)
 		};
 
 		draw_indicies = 36;
-		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
 
@@ -1858,13 +1846,13 @@ int main(int argc, char* argv[])
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_fs.glsl";
 
-		g_mesh_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_mesh_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
 		{
-			glGenVertexArrays(1, &g_mesh_vao);
-			glBindVertexArray(g_mesh_vao);
+			glGenVertexArrays(1, &g_mesh_shader.vao);
+			glBindVertexArray(g_mesh_shader.vao);
 
-			glGenBuffers(1, &g_mesh_vbo);
-			glBindBuffer(GL_ARRAY_BUFFER, g_mesh_vbo);
+			glGenBuffers(1, &g_mesh_shader.vbo);
+			glBindBuffer(GL_ARRAY_BUFFER, g_mesh_shader.vbo);
 
 			// Coord attribute
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
@@ -2576,7 +2564,7 @@ int main(int argc, char* argv[])
 				glm::vec3 spot_dir = get_spotlight_dir(*spotlight);
 				glm::vec3 spot_look_at = spotlight->transforms.translation + spot_dir;
 
-				glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, g_shadow_map_near_plane, spotlight->range * 10);
+				glm::mat4 lightProjection = glm::perspective(glm::radians(120.0f), 1.0f, SHADOW_MAP_NEAR_PLANE, spotlight->range * 10);
 				glm::mat4 lightView = glm::lookAt(spotlight->transforms.translation, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
 				glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 

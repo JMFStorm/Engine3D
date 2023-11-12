@@ -26,3 +26,7 @@ extern JArray g_materials;
 extern JArray g_scene_spotlights;
 extern JArray g_scene_pointlights;
 extern JArray g_scene_meshes;
+extern JArray g_textures;
+
+extern SceneSelection g_selected_object;
+

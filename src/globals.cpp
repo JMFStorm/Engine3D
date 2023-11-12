@@ -21,3 +21,10 @@ JArray g_materials = {};
 JArray g_scene_spotlights = {};
 JArray g_scene_pointlights = {};
 JArray g_scene_meshes = {};
+JArray g_textures = {};
+
+SceneSelection g_selected_object = {
+	.selection_index = -1,
+	.type = ObjectType::None,
+};
+
