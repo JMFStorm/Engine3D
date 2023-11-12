@@ -28,3 +28,21 @@ SceneSelection g_selected_object = {
 	.type = ObjectType::None,
 };
 
+SimpleShader g_shdow_map_debug_shader = {};
+SimpleShader g_shdow_map_shader = {};
+SimpleShader g_mesh_shader = {};
+SimpleShader g_billboard_shader = {};
+SimpleShader g_ui_text_shader = {};
+SimpleShader g_line_shader = {};
+SimpleShader g_wireframe_shader = {};
+
+UserSettings g_user_settings = {
+	.window_size_px = { 1900, 1200 },
+	.transform_clip = 0.25f,
+	.transform_rotation_clip = 15.0f,
+	.world_ambient = glm::vec3(0.075f),
+};
+
+MemoryBuffer g_line_vertex_buffer = {};
+s64 g_line_buffer_size = 0;
+s64 g_line_indicies = 0;

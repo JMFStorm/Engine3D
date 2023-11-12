@@ -8,6 +8,10 @@
 #include "structs.h"
 #include "types.h"
 
+glm::mat4 get_projection_matrix();
+
+glm::mat4 get_view_matrix();
+
 inline float vw_into_screen_px(float value, float screen_width_px)
 {
 	return (float)screen_width_px * value * 0.01f;

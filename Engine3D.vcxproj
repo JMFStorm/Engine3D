@@ -150,10 +150,13 @@
     <ClCompile Include="include\imgui\imgui_impl_opengl3.cpp" />
     <ClCompile Include="include\imgui\imgui_tables.cpp" />
     <ClCompile Include="include\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="src\editor.cpp" />
     <ClCompile Include="src\globals.cpp" />
     <ClCompile Include="src\j_array.cpp" />
     <ClCompile Include="src\j_assert.cpp" />
     <ClCompile Include="src\j_buffers.cpp" />
+    <ClCompile Include="src\j_files.cpp" />
+    <ClCompile Include="src\j_render.cpp" />
     <ClCompile Include="src\j_strings.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\scene.cpp" />
@@ -305,10 +308,13 @@
     <ClInclude Include="include\imgui\imstb_textedit.h" />
     <ClInclude Include="include\imgui\imstb_truetype.h" />
     <ClInclude Include="src\constants.h" />
+    <ClInclude Include="src\editor.h" />
     <ClInclude Include="src\globals.h" />
     <ClInclude Include="src\j_array.h" />
     <ClInclude Include="src\j_buffers.h" />
     <ClInclude Include="include\stb_image.h" />
+    <ClInclude Include="src\j_files.h" />
+    <ClInclude Include="src\j_render.h" />
     <ClInclude Include="src\j_strings.h" />
     <ClInclude Include="src\scene.h" />
     <ClInclude Include="src\structs.h" />

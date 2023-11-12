@@ -8,6 +8,25 @@
 
 #include "j_assert.h"
 
+glm::mat4 get_projection_matrix()
+{
+	glm::mat4 projection = glm::perspective(
+		glm::radians(g_scene_camera.fov),
+		g_scene_camera.aspect_ratio_horizontal,
+		g_scene_camera.near_clip,
+		g_scene_camera.far_clip);
+	return projection;
+}
+
+glm::mat4 get_view_matrix()
+{
+	glm::mat4 view = glm::lookAt(
+		g_scene_camera.position,
+		g_scene_camera.position + g_scene_camera.front_vec,
+		g_scene_camera.up_vec);
+	return view;
+}
+
 bool str_trim_file_ext(char* str)
 {
 	char* last_dot = strrchr(str, '.');

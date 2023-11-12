@@ -30,3 +30,16 @@ extern JArray g_textures;
 
 extern SceneSelection g_selected_object;
 
+extern SimpleShader g_shdow_map_debug_shader;
+extern SimpleShader g_shdow_map_shader;
+extern SimpleShader g_mesh_shader;
+extern SimpleShader g_billboard_shader;
+extern SimpleShader g_ui_text_shader;
+extern SimpleShader g_line_shader;
+extern SimpleShader g_wireframe_shader;
+
+extern UserSettings g_user_settings;
+
+extern MemoryBuffer g_line_vertex_buffer;
+extern s64 g_line_buffer_size;
+extern s64 g_line_indicies;
