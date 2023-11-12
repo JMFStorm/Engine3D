@@ -2864,26 +2864,23 @@ int main(int argc, char* argv[])
 				draw_mesh(&mesh);
 			}
 
-			// Draw billboards
+			// Pointlights
+			for (int i = 0; i < g_scene_pointlights.items_count; i++)
 			{
-				// Pointlights
-				for (int i = 0; i < g_scene_pointlights.items_count; i++)
-				{
-					auto light = *j_array_get(&g_scene_pointlights, i);
-					draw_billboard(light.transforms.translation, pointlight_texture, 0.5f);
-				}
-
-				// Spotlights
-				for (int i = 0; i < g_scene_spotlights.items_count; i++)
-				{
-					auto spotlight = *j_array_get(&g_scene_spotlights, i);
-					draw_billboard(spotlight.transforms.translation, spotlight_texture, 0.5f);
-					vec3 sp_dir = get_spotlight_dir(spotlight);
-					append_line(spotlight.transforms.translation, spotlight.transforms.translation + sp_dir, spotlight.diffuse);
-				}
-
-				draw_lines(2.0f);
+				auto light = *j_array_get(&g_scene_pointlights, i);
+				draw_billboard(light.transforms.translation, pointlight_texture, 0.5f);
 			}
+
+			// Spotlights
+			for (int i = 0; i < g_scene_spotlights.items_count; i++)
+			{
+				auto spotlight = *j_array_get(&g_scene_spotlights, i);
+				draw_billboard(spotlight.transforms.translation, spotlight_texture, 0.5f);
+				vec3 sp_dir = get_spotlight_dir(spotlight);
+				append_line(spotlight.transforms.translation, spotlight.transforms.translation + sp_dir, spotlight.diffuse);
+			}
+
+			draw_lines(2.0f);
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
