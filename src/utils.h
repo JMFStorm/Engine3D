@@ -59,32 +59,9 @@ inline glm::vec3 clip_vec3(glm::vec3 vec3, float clip_amount)
 	return glm::vec3(rounded_x, rounded_y, rounded_z);
 }
 
-inline glm::mat4 get_model_matrix(Mesh* mesh)
-{
-	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::translate(model, mesh->transforms.translation);
+glm::mat4 get_model_matrix(Mesh* mesh);
 
-	glm::quat quaternionX = glm::angleAxis(glm::radians(mesh->transforms.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::quat quaternionY = glm::angleAxis(glm::radians(mesh->transforms.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::quat quaternionZ = glm::angleAxis(glm::radians(mesh->transforms.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
-
-	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
-	model = model * rotation_matrix;
-	model = glm::scale(model, mesh->transforms.scale);
-	return model;
-}
-
-inline glm::mat4 get_rotation_matrix(glm::vec3 rotation)
-{
-	glm::quat quaternionX = glm::angleAxis(glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::quat quaternionY = glm::angleAxis(glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::quat quaternionZ = glm::angleAxis(glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
-
-	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
-	return rotation_matrix;
-}
+glm::mat4 get_rotation_matrix(glm::vec3 rotation);
 
 inline float get_vec3_val_by_axis(glm::vec3 vec, Axis axis)
 {
@@ -146,3 +123,11 @@ SimpleShader simple_shader_init();
 Framebuffer framebuffer_init();
 
 void print_debug_texts();
+
+void resize_windows_area_settings(s64 width_px, s64 height_px);
+
+void init_framebuffer_resize(unsigned int* framebuffer_texture_id, unsigned int* renderbuffer_id);
+
+void init_memory_buffers();
+
+glm::vec3 get_camera_ray_from_scene_px(int x, int y);

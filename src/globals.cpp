@@ -1,14 +1,13 @@
 #include "globals.h"
 
 bool DEBUG_SHADOWMAP = false;
-
-GameCamera g_scene_camera = {};
 bool g_camera_move_mode = false;
 
+int g_selected_texture_item = 0;
+
+GameCamera g_scene_camera = {};
 GameMetrics g_game_metrics = {};
-
 GameInputsU g_inputs = {};
-
 FrameData g_frame_data = {};
 
 std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_mat_data_map = {};
@@ -17,7 +16,14 @@ std::unordered_map<s64, char*> g_mat_data_map_inverse = {};
 
 MemoryBuffer g_temp_memory = {};
 MemoryBuffer g_ui_text_vertex_buffer = {};
+MemoryBuffer g_materials_memory = {};
+MemoryBuffer g_scene_meshes_memory = {};
+MemoryBuffer g_scene_pointlights_memory = {};
+MemoryBuffer g_scene_spotlights_memory = {};
+MemoryBuffer g_texture_memory = {};
+MemoryBuffer g_material_names_memory = {};
 
+JStringArray g_material_names = {};
 TransformationMode g_transform_mode = {};
 
 JArray g_materials = {};

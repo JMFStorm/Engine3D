@@ -45,28 +45,8 @@ static bool g_use_linear_texture_filtering = false;
 static bool g_generate_texture_mipmaps = false;
 static bool g_load_texture_sRGB = false;
 
-MemoryBuffer g_materials_memory = {};
-MemoryBuffer g_scene_meshes_memory = {};
-MemoryBuffer g_scene_pointlights_memory = {};
-MemoryBuffer g_scene_spotlights_memory = {};
-
 GLFWwindow* g_window;
-
-static unsigned int g_editor_framebuffer;
-static unsigned int g_editor_framebuffer_texture;
-static unsigned int g_editor_framebuffer_renderbuffer;
-
-constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
-
-const char* pointlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\pointlight_billboard.png";
-const char* spotlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\spotlight_billboard.png";
-
-constexpr const s64 SCENE_TEXTURES_MAX_COUNT = 100;
-MemoryBuffer g_material_names_memory = { 0 };
-JStringArray g_material_names;
-int g_selected_texture_item = 0;
-
-MemoryBuffer g_texture_memory = { 0 };
+Framebuffer g_editor_framebuffer;
 
 Texture pointlight_texture;
 Texture spotlight_texture;
@@ -105,46 +85,6 @@ int load_image_into_texture_id(const char* image_path)
 
 	stbi_image_free(data);
 	return texture;
-}
-
-void draw_ui_character(FontData* font_data, const char character, int x, int y)
-{
-	int char_as_int = static_cast<int>(character);
-	int char_index = char_as_int - 32;
-
-	CharData current = font_data->char_data.data()[char_index];
-
-	float x0 = normalize_screen_px_to_ndc(x, g_game_metrics.game_width_px);
-	float y0 = normalize_screen_px_to_ndc(y, g_game_metrics.game_height_px);
-
-	float x1 = normalize_screen_px_to_ndc(x + current.width, g_game_metrics.game_width_px);
-	float y1 = normalize_screen_px_to_ndc(y + current.height, g_game_metrics.game_height_px);
-
-	float vertices[] =
-	{
-		// Coords		// UV
-		x0, y0, 0.0f,	current.UV_x0, current.UV_y0, // bottom left
-		x1, y0, 0.0f,	current.UV_x1, current.UV_y0, // bottom right
-		x0, y1, 0.0f,	current.UV_x0, current.UV_y1, // top left
-
-		x0, y1, 0.0f,	current.UV_x0, current.UV_y1, // top left 
-		x1, y1, 0.0f,	current.UV_x1, current.UV_y1, // top right
-		x1, y0, 0.0f,	current.UV_x1, current.UV_y0  // bottom right
-	};
-
-	glUseProgram(g_ui_text_shader.id);
-	glBindVertexArray(g_ui_text_shader.vao);
-
-	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-
-	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-
-	g_frame_data.draw_calls++;
-
-	glUseProgram(0);
-	glBindVertexArray(0);
 }
 
 void load_font(FontData* font_data, int font_height_px, const char* font_path)
@@ -290,51 +230,18 @@ void load_font(FontData* font_data, int font_height_px, const char* font_path)
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 }
 
-void init_framebuffer_resize(unsigned int* framebuffer_texture_id, unsigned int* renderbuffer_id)
-{
-	glDeleteTextures(1, framebuffer_texture_id);
-	glDeleteRenderbuffers(1, renderbuffer_id);
-
-	glGenTextures(1, framebuffer_texture_id);
-	glBindTexture(GL_TEXTURE_2D, *framebuffer_texture_id);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *framebuffer_texture_id, 0);
-
-	glGenRenderbuffers(1, renderbuffer_id);
-	glBindRenderbuffer(GL_RENDERBUFFER, *renderbuffer_id);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, *renderbuffer_id);
-
-	ASSERT_TRUE(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer successfull");
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-inline void ResizeWindowAreaData(s64 width_px, s64 height_px)
-{
-	g_game_metrics.game_width_px = width_px;
-	g_game_metrics.game_height_px = height_px;
-
-	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - PROPERTIES_PANEL_WIDTH;
-	g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
-
-	g_scene_camera.aspect_ratio_horizontal =
-		(float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
-}
-
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-	ResizeWindowAreaData(width, height);
+	resize_windows_area_settings(width, height);
 	glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
 
 	glGenFramebuffers(1, &g_scene_framebuffer.id);
 	glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
 	init_framebuffer_resize(&g_scene_framebuffer.texture_gpu_id, &g_scene_framebuffer.renderbuffer);
 
-	glGenFramebuffers(1, &g_editor_framebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
-	init_framebuffer_resize(&g_editor_framebuffer_texture, &g_editor_framebuffer_renderbuffer);
+	glGenFramebuffers(1, &g_editor_framebuffer.id);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer.id);
+	init_framebuffer_resize(&g_editor_framebuffer.texture_gpu_id, &g_editor_framebuffer.renderbuffer);
 
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, (float)height);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
@@ -352,307 +259,7 @@ void mouse_move_callback(GLFWwindow* window, double xposIn, double yposIn)
 	g_frame_data.prev_mouse_y = ypos;
 }
 
-bool clicked_scene_space(int x, int y)
-{
-	return x < g_game_metrics.scene_width_px && y < g_game_metrics.scene_height_px;
-}
-
-void delete_on_object_index(JArray* jarray_ptr, s64 jarray_index)
-{
-	j_array_unordered_delete(jarray_ptr, jarray_index);
-	g_selected_object.selection_index = -1;
-	g_selected_object.type = ObjectType::None;
-}
-
-void delete_selected_object()
-{
-	if (g_selected_object.type == ObjectType::Primitive) delete_on_object_index(&g_scene_meshes, g_selected_object.selection_index);
-	else if (g_selected_object.type == ObjectType::Pointlight) delete_on_object_index(&g_scene_pointlights, g_selected_object.selection_index);
-	else if (g_selected_object.type == ObjectType::Spotlight) delete_on_object_index(&g_scene_spotlights, g_selected_object.selection_index);
-}
-
-s64 add_new_mesh(Mesh new_mesh)
-{
-	s64 material_index = g_materials_index_map[new_mesh.material->color_texture->file_name];
-	g_selected_texture_item = material_index;
-	j_array_add(&g_scene_meshes, (byte*)&new_mesh);
-	s64 new_index = g_scene_meshes.items_count - 1;
-	return new_index;
-}
-
-s64 add_new_pointlight(Pointlight new_light)
-{
-	j_array_add(&g_scene_pointlights, (byte*)&new_light);
-	s64 new_index = g_scene_pointlights.items_count - 1;
-	return new_index;
-}
-
-s64 add_new_spotlight(Spotlight new_light)
-{
-	j_array_add(&g_scene_spotlights, (byte*)&new_light);
-	s64 new_index = g_scene_spotlights.items_count - 1;
-	return new_index;
-}
-
-void duplicate_selected_object()
-{
-	if (g_selected_object.type == ObjectType::Primitive)
-	{
-		Mesh mesh_copy = *(Mesh*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
-		s64 index = add_new_mesh(mesh_copy);
-		g_selected_object.type = ObjectType::Primitive;
-		g_selected_object.selection_index = index;
-	}
-	else if (g_selected_object.type == ObjectType::Pointlight)
-	{
-		Pointlight light_copy = *(Pointlight*)j_array_get(&g_scene_pointlights, g_selected_object.selection_index);
-		s64 index = add_new_pointlight(light_copy);
-		g_selected_object.type = ObjectType::Pointlight;
-		g_selected_object.selection_index = index;
-	}
-	else if (g_selected_object.type == ObjectType::Spotlight)
-	{
-		Spotlight light_copy = *(Spotlight*)j_array_get(&g_scene_spotlights, g_selected_object.selection_index);
-		light_copy.shadow_map = init_spotlight_shadow_map();
-		s64 index = add_new_spotlight(light_copy);
-		g_selected_object.type = ObjectType::Spotlight;
-		g_selected_object.selection_index = index;
-	}
-}
-
-void select_object_index(ObjectType type, s64 index)
-{
-	g_selected_object.type = type;
-	g_selected_object.selection_index = index;
-
-	if (type == ObjectType::Primitive)
-	{
-		Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
-		auto selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
-		g_selected_texture_item = selected_texture_name;
-	}
-	else if (type == ObjectType::Pointlight) g_transform_mode.mode = TransformMode::Translate;
-}
-
-void deselect_selection()
-{
-	g_selected_object.selection_index = -1;
-	g_selected_object.type = ObjectType::None;
-}
-
-bool get_cube_selection(Mesh* cube, float* select_dist, glm::vec3 ray_o, glm::vec3 ray_dir)
-{
-	constexpr const s64 CUBE_PLANES_COUNT = 6;
-	bool got_selected = false;
-	float closest_select = std::numeric_limits<float>::max();
-
-	glm::vec3 cube_normals[CUBE_PLANES_COUNT] = {
-		glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f),
-		glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f),
-		glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f,  0.0f, -1.0f)
-	};
-
-	Axis plane_axises[CUBE_PLANES_COUNT] = {
-		Axis::Y, Axis::Y,
-		Axis::X, Axis::X,
-		Axis::Z, Axis::Z
-	};
-
-	glm::mat4 rotation_matrix = get_rotation_matrix(cube->transforms.rotation);
-
-	for (int j = 0; j < CUBE_PLANES_COUNT; j++)
-	{
-		auto current_normal = cube_normals[j];
-		auto current_axis = plane_axises[j];
-
-		auto plane_normal = glm::vec3(rotation_matrix * glm::vec4(current_normal, 1.0f));
-		plane_normal = glm::normalize(plane_normal);
-
-		glm::vec3 intersection_point = glm::vec3(0);
-
-		float plane_scale = get_vec3_val_by_axis(cube->transforms.scale, current_axis);
-		glm::vec3 plane_middle_point = cube->transforms.translation + plane_normal * plane_scale * 0.5f;
-
-		bool intersection = calculate_plane_ray_intersection(
-			plane_normal, plane_middle_point, ray_o, ray_dir, intersection_point);
-
-		if (!intersection) continue;
-
-		glm::vec3 intersection_vec3 = intersection_point - plane_middle_point;
-		glm::vec3 relative_position = intersection_vec3 - glm::vec3(rotation_matrix[3]);
-		glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotation_matrix);
-		glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
-
-		Axis xor_axises[2] = {};
-		get_axis_xor(current_axis, xor_axises);
-
-		float abs1 = std::abs(get_vec3_val_by_axis(local_intersection_point, xor_axises[0]));
-		float abs2 = std::abs(get_vec3_val_by_axis(local_intersection_point, xor_axises[1]));
-
-		bool intersect_1 = abs1 <= get_vec3_val_by_axis(cube->transforms.scale, xor_axises[0]) * 0.5f;
-		bool intersect_2 = abs2 <= get_vec3_val_by_axis(cube->transforms.scale, xor_axises[1]) * 0.5f;
-
-		if (intersect_1 && intersect_2)
-		{
-			float dist = glm::length(ray_o - intersection_point);
-
-			if (dist < closest_select)
-			{
-				*select_dist = dist;
-				closest_select = dist;
-			}
-
-			got_selected = true;
-		}
-	}
-
-	return got_selected;
-}
-
-s64 get_pointlight_selection_index(JArray* lights, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
-{
-	s64 index = -1;
-	Mesh as_cube;
-	Pointlight* as_light;
-	*select_dist = std::numeric_limits<float>::max();
-
-	for (int i = 0; i < lights->items_count; i++)
-	{
-		as_light = (Pointlight*)j_array_get(lights, i);
-		as_cube = {};
-		as_cube.mesh_type = E_Primitive_Cube;
-		as_cube.transforms.translation = as_light->transforms.translation;
-		as_cube.transforms.scale = glm::vec3(0.35f);
-
-		f32 new_select_dist;
-		bool selected_light = get_cube_selection(&as_cube, &new_select_dist, ray_origin, ray_direction);
-
-		if (selected_light && new_select_dist < *select_dist)
-		{
-			index = i;
-			*select_dist = new_select_dist;
-		}
-	}
-
-	return index;
-}
-
-s64 get_spotlight_selection_index(JArray* lights, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
-{
-	s64 index = -1;
-	Mesh as_cube;
-	Spotlight* as_light;
-	*select_dist = std::numeric_limits<float>::max();
-
-	for (int i = 0; i < lights->items_count; i++)
-	{
-		as_light = (Spotlight*)j_array_get(lights, i);
-		as_cube = {};
-		as_cube.mesh_type = E_Primitive_Cube;
-		as_cube.transforms.translation = as_light->transforms.translation;
-		as_cube.transforms.scale = glm::vec3(0.35f);
-
-		f32 new_select_dist;
-		bool selected_light = get_cube_selection(&as_cube, &new_select_dist, ray_origin, ray_direction);
-
-		if (selected_light && new_select_dist < *select_dist)
-		{
-			index = i;
-			*select_dist = new_select_dist;
-		}
-	}
-
-	return index;
-}
-
-s64 get_mesh_selection_index(JArray* meshes, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction)
-{
-	s64 index = -1;
-	*select_dist = std::numeric_limits<float>::max();
-
-	for (int i = 0; i < meshes->items_count; i++)
-	{
-		Mesh* mesh = (Mesh*)j_array_get(meshes, i);
-
-		if (mesh->mesh_type == E_Primitive_Plane)
-		{
-			auto plane_up = glm::vec3(0.0f, 1.0f, 0.0f);
-			glm::mat4 rotationMatrix = get_rotation_matrix(mesh->transforms.rotation);
-
-			auto planeNormal = glm::vec3(rotationMatrix * glm::vec4(plane_up, 1.0f));
-			planeNormal = glm::normalize(planeNormal);
-
-			glm::vec3 intersection_point = glm::vec3(0);
-
-			bool intersection = calculate_plane_ray_intersection(
-				planeNormal, mesh->transforms.translation, ray_origin, ray_direction, intersection_point);
-
-			if (!intersection) continue;
-
-			glm::vec3 intersection_vec3 = intersection_point - mesh->transforms.translation;
-
-			// Calculate the relative position of the intersection point with respect to the plane's origin
-			glm::vec3 relative_position = intersection_vec3 - glm::vec3(rotationMatrix[3]);
-
-			// Calculate the inverse of the plane's rotation matrix
-			glm::mat4 inverse_rotation_matrix = glm::affineInverse(rotationMatrix);
-
-			// Apply the inverse rotation matrix to convert the point from world space to local space
-			glm::vec3 local_intersection_point = glm::vec3(inverse_rotation_matrix * glm::vec4(relative_position, 1.0f));
-
-			bool intersect_x = 0.0f <= local_intersection_point.x && local_intersection_point.x <= mesh->transforms.scale.x;
-			bool intersect_z = 0.0f <= local_intersection_point.z && local_intersection_point.z <= mesh->transforms.scale.z;
-
-			if (intersect_x && intersect_z)
-			{
-				float dist = glm::length(ray_origin - intersection_point);
-
-				if (dist < *select_dist)
-				{
-					*select_dist = dist;
-					index = i;
-				}
-			}
-		}
-		else if (mesh->mesh_type == E_Primitive_Cube)
-		{
-			f32 new_select_dist;
-			bool selected_cube = get_cube_selection(mesh, &new_select_dist, ray_origin, ray_direction);
-
-			if (selected_cube && new_select_dist < *select_dist)
-			{
-				index = i;
-				*select_dist = new_select_dist;
-			}
-		}
-	}
-
-	return index;
-}
-
-inline glm::vec3 get_camera_ray_from_scene_px(int x, int y)
-{
-	float x_NDC = (2.0f * x) / g_game_metrics.scene_width_px - 1.0f;
-	float y_NDC = 1.0f - (2.0f * y) / g_game_metrics.scene_height_px;
-
-	glm::vec4 ray_clip(x_NDC, y_NDC, -1.0f, 1.0f);
-
-	glm::mat4 projection = get_projection_matrix();
-	glm::mat4 view = get_view_matrix();
-
-	glm::mat4 inverse_projection = glm::inverse(projection);
-	glm::mat4 inverse_view = glm::inverse(view);
-
-	glm::vec4 ray_eye = inverse_projection * ray_clip;
-	ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0, 0.0);
-
-	glm::vec4 ray_world = inverse_view * ray_eye;
-	ray_world = glm::normalize(ray_world);
-
-	return glm::vec3(ray_world);
-}
-
-inline void set_button_state(GLFWwindow* window, ButtonState* button)
+void set_button_state(GLFWwindow* window, ButtonState* button)
 {
 	int key_state = glfwGetKey(window, button->key);
 	button->pressed = !button->is_down && key_state == GLFW_PRESS;
@@ -764,37 +371,7 @@ Texture texture_load_from_filepath(char* path)
 
 int main(int argc, char* argv[])
 {
-	// Init buffers
-	{
-		memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
-
-		memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
-		g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), g_scene_meshes_memory.memory);
-
-		memory_buffer_mallocate(&g_scene_pointlights_memory, sizeof(Pointlight) * SCENE_POINTLIGHTS_MAX_COUNT, const_cast<char*>("Scene pointlights"));
-		g_scene_pointlights = j_array_init(SCENE_POINTLIGHTS_MAX_COUNT, sizeof(Pointlight), g_scene_pointlights_memory.memory);
-
-		memory_buffer_mallocate(&g_scene_spotlights_memory, sizeof(Spotlight) * SCENE_SPOTLIGHTS_MAX_COUNT, const_cast<char*>("Scene spotlights"));
-		g_scene_spotlights = j_array_init(SCENE_SPOTLIGHTS_MAX_COUNT, sizeof(Spotlight), g_scene_spotlights_memory.memory);
-
-		memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
-		g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), g_texture_memory.memory);
-
-		memory_buffer_mallocate(&g_materials_memory, sizeof(Material) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Materials"));
-		g_materials = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Material), g_materials_memory.memory);
-
-		constexpr const s64 material_names_arr_size = FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
-		memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material items"));
-		g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
-
-		int vertex_bytes_for_char = sizeof(float) * 30;
-		int text_buffer_size = vertex_bytes_for_char * g_max_UI_chars;
-		memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text draw verticies"));
-
-		int vertex_bytes_for_line = sizeof(float) * 12;
-		int line_buffer_size = vertex_bytes_for_line * MAX_LINES_BUFFER;
-		memory_buffer_mallocate(&g_line_vertex_buffer, text_buffer_size, const_cast<char*>("Line draw verticies"));
-	}
+	init_memory_buffers();
 
 	// Init window and context
 	{
@@ -986,9 +563,9 @@ int main(int argc, char* argv[])
 		glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
 		init_framebuffer_resize(&g_scene_framebuffer.texture_gpu_id, &g_scene_framebuffer.renderbuffer);
 
-		glGenFramebuffers(1, &g_editor_framebuffer);
-		glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
-		init_framebuffer_resize(&g_editor_framebuffer_texture, &g_editor_framebuffer_renderbuffer);
+		glGenFramebuffers(1, &g_editor_framebuffer.id);
+		glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer.id);
+		init_framebuffer_resize(&g_editor_framebuffer.texture_gpu_id, &g_editor_framebuffer.renderbuffer);
 	}
 
 	g_use_linear_texture_filtering = false;
@@ -1494,7 +1071,7 @@ int main(int argc, char* argv[])
 
 		// Editor framebuffer
 		{
-			glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer.id);
 			glEnable(GL_DEPTH_TEST);
 			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1586,7 +1163,7 @@ int main(int argc, char* argv[])
 
 			glUniform1i(inversion_loc, false);
 			glUniform1i(blur_loc, false);
-			glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer_texture);
+			glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer.texture_gpu_id);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 			glEnable(GL_DEPTH_TEST);
 		}

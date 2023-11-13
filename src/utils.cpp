@@ -8,6 +8,7 @@
 
 #include "j_assert.h"
 #include "j_render.h"
+#include "j_strings.h"
 
 glm::mat4 get_projection_matrix()
 {
@@ -449,4 +450,118 @@ void print_debug_texts()
 	sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
 	append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
 	draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
+}
+
+void resize_windows_area_settings(s64 width_px, s64 height_px)
+{
+	g_game_metrics.game_width_px = width_px;
+	g_game_metrics.game_height_px = height_px;
+
+	g_game_metrics.scene_width_px = g_game_metrics.game_width_px - PROPERTIES_PANEL_WIDTH;
+	g_game_metrics.scene_height_px = g_game_metrics.game_height_px;
+
+	g_scene_camera.aspect_ratio_horizontal =
+		(float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
+}
+
+void init_framebuffer_resize(unsigned int* framebuffer_texture_id, unsigned int* renderbuffer_id)
+{
+	glDeleteTextures(1, framebuffer_texture_id);
+	glDeleteRenderbuffers(1, renderbuffer_id);
+
+	glGenTextures(1, framebuffer_texture_id);
+	glBindTexture(GL_TEXTURE_2D, *framebuffer_texture_id);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *framebuffer_texture_id, 0);
+
+	glGenRenderbuffers(1, renderbuffer_id);
+	glBindRenderbuffer(GL_RENDERBUFFER, *renderbuffer_id);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, *renderbuffer_id);
+
+	ASSERT_TRUE(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer successfull");
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void init_memory_buffers()
+{
+	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
+
+	memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
+	g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), g_scene_meshes_memory.memory);
+
+	memory_buffer_mallocate(&g_scene_pointlights_memory, sizeof(Pointlight) * SCENE_POINTLIGHTS_MAX_COUNT, const_cast<char*>("Scene pointlights"));
+	g_scene_pointlights = j_array_init(SCENE_POINTLIGHTS_MAX_COUNT, sizeof(Pointlight), g_scene_pointlights_memory.memory);
+
+	memory_buffer_mallocate(&g_scene_spotlights_memory, sizeof(Spotlight) * SCENE_SPOTLIGHTS_MAX_COUNT, const_cast<char*>("Scene spotlights"));
+	g_scene_spotlights = j_array_init(SCENE_SPOTLIGHTS_MAX_COUNT, sizeof(Spotlight), g_scene_spotlights_memory.memory);
+
+	memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
+	g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), g_texture_memory.memory);
+
+	memory_buffer_mallocate(&g_materials_memory, sizeof(Material) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Materials"));
+	g_materials = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Material), g_materials_memory.memory);
+
+	constexpr const s64 material_names_arr_size = FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
+	memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material items"));
+	g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
+
+	int vertex_bytes_for_char = sizeof(float) * 30;
+	int text_buffer_size = vertex_bytes_for_char * g_max_UI_chars;
+	memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text draw verticies"));
+
+	int vertex_bytes_for_line = sizeof(float) * 12;
+	int line_buffer_size = vertex_bytes_for_line * MAX_LINES_BUFFER;
+	memory_buffer_mallocate(&g_line_vertex_buffer, text_buffer_size, const_cast<char*>("Line draw verticies"));
+}
+
+glm::vec3 get_camera_ray_from_scene_px(int x, int y)
+{
+	float x_NDC = (2.0f * x) / g_game_metrics.scene_width_px - 1.0f;
+	float y_NDC = 1.0f - (2.0f * y) / g_game_metrics.scene_height_px;
+
+	glm::vec4 ray_clip(x_NDC, y_NDC, -1.0f, 1.0f);
+
+	glm::mat4 projection = get_projection_matrix();
+	glm::mat4 view = get_view_matrix();
+
+	glm::mat4 inverse_projection = glm::inverse(projection);
+	glm::mat4 inverse_view = glm::inverse(view);
+
+	glm::vec4 ray_eye = inverse_projection * ray_clip;
+	ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0, 0.0);
+
+	glm::vec4 ray_world = inverse_view * ray_eye;
+	ray_world = glm::normalize(ray_world);
+
+	return glm::vec3(ray_world);
+}
+
+glm::mat4 get_model_matrix(Mesh* mesh)
+{
+	glm::mat4 model = glm::mat4(1.0f);
+	model = glm::translate(model, mesh->transforms.translation);
+
+	glm::quat quaternionX = glm::angleAxis(glm::radians(mesh->transforms.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat quaternionY = glm::angleAxis(glm::radians(mesh->transforms.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::quat quaternionZ = glm::angleAxis(glm::radians(mesh->transforms.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
+
+	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
+	model = model * rotation_matrix;
+	model = glm::scale(model, mesh->transforms.scale);
+	return model;
+}
+
+glm::mat4 get_rotation_matrix(glm::vec3 rotation)
+{
+	glm::quat quaternionX = glm::angleAxis(glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat quaternionY = glm::angleAxis(glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::quat quaternionZ = glm::angleAxis(glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::quat finalRotation = quaternionY * quaternionX * quaternionZ;
+
+	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
+	return rotation_matrix;
 }
