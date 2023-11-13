@@ -16,6 +16,7 @@ std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map 
 std::unordered_map<s64, char*> g_mat_data_map_inverse = {};
 
 MemoryBuffer g_temp_memory = {};
+MemoryBuffer g_ui_text_vertex_buffer = {};
 
 TransformationMode g_transform_mode = {};
 
@@ -51,3 +52,7 @@ UserSettings g_user_settings = {
 MemoryBuffer g_line_vertex_buffer = {};
 s64 g_line_buffer_size = 0;
 s64 g_line_indicies = 0;
+
+s64 g_text_buffer_size = 0;
+s64 g_text_indicies = 0;
+FontData g_debug_font = {};

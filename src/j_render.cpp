@@ -894,3 +894,117 @@ void init_all_shaders()
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 	}
 }
+
+void draw_shadow_map_debug_screen()
+{
+	glEnable(GL_DEPTH_TEST);
+	glViewport(0, 0, 500, 500);
+	glUseProgram(g_shdow_map_debug_shader.id);
+	glBindVertexArray(g_shdow_map_debug_shader.vao);
+
+	float near_plane = 0.25f, far_plane = 15.0f;
+	unsigned int near_loc = glGetUniformLocation(g_shdow_map_debug_shader.id, "near_plane");
+	glUniform1f(near_loc, near_plane);
+	unsigned int far_loc = glGetUniformLocation(g_shdow_map_debug_shader.id, "far_plane");
+	glUniform1f(far_loc, far_plane);
+
+	Spotlight* sp = (Spotlight*)get_selected_object_ptr();
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, sp->shadow_map.texture_gpu_id);
+
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	g_frame_data.draw_calls++;
+
+	glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+	glUseProgram(0);
+	glBindVertexArray(0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh)
+{
+	auto chars = font_data->char_data.data();
+	char* text_string = text;
+	int length = strlen(text);
+
+	int text_offset_x_px = 0;
+	int text_offset_y_px = 0;
+	int line_height_px = font_data->font_height_px;
+
+	float* memory_location = (float*)g_ui_text_vertex_buffer.memory;
+
+	// Assume font start position is top left corner
+
+	for (int i = 0; i < length; i++)
+	{
+		char current_char = *text_string++;
+
+		if (current_char == '\n')
+		{
+			text_offset_y_px -= line_height_px;
+			text_offset_x_px = 0;
+			continue;
+		}
+
+		int char_index = static_cast<int>(current_char) - 32;
+		CharData current = chars[char_index];
+
+		int char_height_px = current.height;
+		int char_width_px = current.width;
+
+		int x_start = vw_into_screen_px(pos_x_vw, g_game_metrics.scene_width_px) + current.x_offset + text_offset_x_px;
+		int char_y_offset = current.y_offset;
+		int y_start = vh_into_screen_px(pos_y_vh, g_game_metrics.scene_height_px) + text_offset_y_px - line_height_px + char_y_offset;
+
+		float x0 = normalize_screen_px_to_ndc(x_start, g_game_metrics.scene_width_px);
+		float y0 = normalize_screen_px_to_ndc(y_start, g_game_metrics.scene_height_px);
+
+		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px, g_game_metrics.scene_width_px);
+		float y1 = normalize_screen_px_to_ndc(y_start + char_height_px, g_game_metrics.scene_height_px);
+
+		float vertices[] =
+		{
+			// Coords			// UV
+			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left
+			x0, y0, 0.0f,		current.UV_x0, current.UV_y0, // bottom left
+			x1, y0, 0.0f,		current.UV_x1, current.UV_y0, // bottom right
+
+			x1, y1, 0.0f,		current.UV_x1, current.UV_y1, // top right
+			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left 
+			x1, y0, 0.0f,		current.UV_x1, current.UV_y0  // bottom right
+		};
+
+		s64 index = g_text_indicies * 5;
+		memcpy(&memory_location[index], vertices, sizeof(vertices));
+
+		g_text_buffer_size += sizeof(vertices);
+		g_text_indicies += 6;
+
+		text_offset_x_px += current.advance;
+		text++;
+	}
+}
+
+void draw_ui_text(FontData* font_data, float red, float green, float blue)
+{
+	glUseProgram(g_ui_text_shader.id);
+	glBindVertexArray(g_ui_text_shader.vao);
+
+	int color_uniform = glGetUniformLocation(g_ui_text_shader.id, "textColor");
+	glUniform3f(color_uniform, red, green, blue);
+
+	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
+	glBufferData(GL_ARRAY_BUFFER, g_text_buffer_size, g_ui_text_vertex_buffer.memory, GL_DYNAMIC_DRAW);
+
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
+	glDrawArrays(GL_TRIANGLES, 0, g_text_indicies);
+
+	glUseProgram(0);
+	glBindVertexArray(0);
+
+	g_text_buffer_size = 0;
+	g_text_indicies = 0;
+	g_frame_data.draw_calls++;
+}

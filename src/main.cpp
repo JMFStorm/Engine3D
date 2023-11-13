@@ -56,17 +56,7 @@ static unsigned int g_editor_framebuffer;
 static unsigned int g_editor_framebuffer_texture;
 static unsigned int g_editor_framebuffer_renderbuffer;
 
-s64 g_text_buffer_size = 0;
-s64 g_text_indicies = 0;
-
-float debug_font_vh = 1.0f;
-const char* g_debug_font_path = "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf";
-
-constexpr const s64 g_max_UI_chars = 1000;
-FontData g_debug_font;
-
 constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
-MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
 const char* pointlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\pointlight_billboard.png";
 const char* spotlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\spotlight_billboard.png";
@@ -115,93 +105,6 @@ int load_image_into_texture_id(const char* image_path)
 
 	stbi_image_free(data);
 	return texture;
-}
-
-void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh)
-{
-	auto chars = font_data->char_data.data();
-	char* text_string = text;
-	int length = strlen(text);
-
-	int text_offset_x_px = 0;
-	int text_offset_y_px = 0;
-	int line_height_px = font_data->font_height_px;
-
-	float* memory_location = (float*)g_ui_text_vertex_buffer.memory;
-
-	// Assume font start position is top left corner
-
-	for (int i = 0; i < length; i++)
-	{
-		char current_char = *text_string++;
-
-		if (current_char == '\n')
-		{
-			text_offset_y_px -= line_height_px;
-			text_offset_x_px = 0;
-			continue;
-		}
-
-		int char_index = static_cast<int>(current_char) - 32;
-		CharData current = chars[char_index];
-
-		int char_height_px = current.height;
-		int char_width_px = current.width;
-
-		int x_start = vw_into_screen_px(pos_x_vw, g_game_metrics.scene_width_px) + current.x_offset + text_offset_x_px;
-		int char_y_offset = current.y_offset;
-		int y_start = vh_into_screen_px(pos_y_vh, g_game_metrics.scene_height_px) + text_offset_y_px - line_height_px + char_y_offset;
-
-		float x0 = normalize_screen_px_to_ndc(x_start, g_game_metrics.scene_width_px);
-		float y0 = normalize_screen_px_to_ndc(y_start, g_game_metrics.scene_height_px);
-
-		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px, g_game_metrics.scene_width_px);
-		float y1 = normalize_screen_px_to_ndc(y_start + char_height_px, g_game_metrics.scene_height_px);
-
-		float vertices[] =
-		{
-			// Coords			// UV
-			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left
-			x0, y0, 0.0f,		current.UV_x0, current.UV_y0, // bottom left
-			x1, y0, 0.0f,		current.UV_x1, current.UV_y0, // bottom right
-
-			x1, y1, 0.0f,		current.UV_x1, current.UV_y1, // top right
-			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left 
-			x1, y0, 0.0f,		current.UV_x1, current.UV_y0  // bottom right
-		};
-
-		s64 index = g_text_indicies * 5;
-		memcpy(&memory_location[index], vertices, sizeof(vertices));
-
-		g_text_buffer_size += sizeof(vertices);
-		g_text_indicies += 6;
-
-		text_offset_x_px += current.advance;
-		text++;
-	}
-}
-
-void draw_ui_text(FontData* font_data, float red, float green, float blue)
-{
-	glUseProgram(g_ui_text_shader.id);
-	glBindVertexArray(g_ui_text_shader.vao);
-
-	int color_uniform = glGetUniformLocation(g_ui_text_shader.id, "textColor");
-	glUniform3f(color_uniform, red, green, blue);
-
-	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
-	glBufferData(GL_ARRAY_BUFFER, g_text_buffer_size, g_ui_text_vertex_buffer.memory, GL_DYNAMIC_DRAW);
-
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
-	glDrawArrays(GL_TRIANGLES, 0, g_text_indicies);
-
-	glUseProgram(0);
-	glBindVertexArray(0);
-
-	g_text_buffer_size = 0;
-	g_text_indicies = 0;
-	g_frame_data.draw_calls++;
 }
 
 void draw_ui_character(FontData* font_data, const char character, int x, int y)
@@ -1088,10 +991,6 @@ int main(int argc, char* argv[])
 		init_framebuffer_resize(&g_editor_framebuffer_texture, &g_editor_framebuffer_renderbuffer);
 	}
 
-	GLint maxTextureUnits;
-	glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
-	std::cout << "Max Texture Units: " << maxTextureUnits << std::endl;
-
 	g_use_linear_texture_filtering = false;
 	g_generate_texture_mipmaps = false;
 	g_load_texture_sRGB = false;
@@ -1255,7 +1154,6 @@ int main(int argc, char* argv[])
 
 		// Register inputs
 		{
-
 			int key_state;
 			int buttons_count = sizeof(g_inputs) / sizeof(ButtonState);
 			g_frame_data.mouse_clicked = false;
@@ -1693,76 +1591,9 @@ int main(int argc, char* argv[])
 			glEnable(GL_DEPTH_TEST);
 		}
 
-		if (DEBUG_SHADOWMAP && g_selected_object.type == ObjectType::Spotlight)
-		{
-			glEnable(GL_DEPTH_TEST);
-			glViewport(0, 0, 500, 500);
-			glUseProgram(g_shdow_map_debug_shader.id);
-			glBindVertexArray(g_shdow_map_debug_shader.vao);
+		if (DEBUG_SHADOWMAP && g_selected_object.type == ObjectType::Spotlight) draw_shadow_map_debug_screen();
 
-			float near_plane = 0.25f, far_plane = 15.0f;
-			unsigned int near_loc = glGetUniformLocation(g_shdow_map_debug_shader.id, "near_plane");
-			glUniform1f(near_loc, near_plane);
-			unsigned int far_loc = glGetUniformLocation(g_shdow_map_debug_shader.id, "far_plane");
-			glUniform1f(far_loc, far_plane);
-
-			Spotlight* sp = (Spotlight*)get_selected_object_ptr();
-
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, sp->shadow_map.texture_gpu_id);
-
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-			g_frame_data.draw_calls++;
-
-			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
-			glUseProgram(0);
-			glBindVertexArray(0);
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		}
-
-		// Print debug info
-		{
-			char debug_str[256];
-
-			sprintf_s(debug_str, "FPS: %d", g_game_metrics.fps);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
-
-			float display_deltatime = g_frame_data.deltatime * 1000;
-			sprintf_s(debug_str, "Delta: %.2fms", display_deltatime);
-			append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
-
-			sprintf_s(debug_str, "Frames: %lu", g_game_metrics.frames);
-			append_ui_text(&g_debug_font, debug_str, 10.5f, 100.0f);
-
-			sprintf_s(debug_str, "Draw calls: %lld", ++g_frame_data.draw_calls);
-			append_ui_text(&g_debug_font, debug_str, 17.0f, 100.0f);
-
-			sprintf_s(debug_str, "Camera X=%.2f Y=%.2f Z=%.2f", g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
-
-			sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
-
-			sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
-
-			sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene_spotlights.items_count, g_scene_spotlights.max_items);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 96.0f);
-
-			char* t_mode = nullptr;
-			const char* tt = "Translate";
-			const char* tr = "Rotate";
-			const char* ts = "Scale";
-			const char* transform_mode_debug_str_format = "Transform mode: %s";
-
-			if (g_transform_mode.mode == TransformMode::Translate) t_mode = const_cast<char*>(tt);
-			if (g_transform_mode.mode == TransformMode::Rotate)	t_mode = const_cast<char*>(tr);
-			if (g_transform_mode.mode == TransformMode::Scale)		t_mode = const_cast<char*>(ts);
-
-			sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
-			append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
-			draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
-		}
+		print_debug_texts();
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

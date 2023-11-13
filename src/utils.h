@@ -144,3 +144,5 @@ float get_line_distance_width(glm::vec3 line_start, glm::vec3 line_end, glm::vec
 SimpleShader simple_shader_init();
 
 Framebuffer framebuffer_init();
+
+void print_debug_texts();

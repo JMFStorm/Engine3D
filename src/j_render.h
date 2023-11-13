@@ -26,3 +26,9 @@ void draw_lines_ontop(float thickness);
 void draw_selection_arrows(glm::vec3 position);
 
 void init_all_shaders();
+
+void draw_shadow_map_debug_screen();
+
+void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh);
+
+void draw_ui_text(FontData* font_data, float red, float green, float blue);

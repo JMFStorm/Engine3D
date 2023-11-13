@@ -7,6 +7,7 @@
 #include <GL/glew.h>
 
 #include "j_assert.h"
+#include "j_render.h"
 
 glm::mat4 get_projection_matrix()
 {
@@ -404,4 +405,48 @@ SimpleShader simple_shader_init()
 		.vbo = 0,
 	};
 	return shader;
+}
+
+void print_debug_texts()
+{
+	char debug_str[256];
+
+	sprintf_s(debug_str, "FPS: %d", g_game_metrics.fps);
+	append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
+
+	float display_deltatime = g_frame_data.deltatime * 1000;
+	sprintf_s(debug_str, "Delta: %.2fms", display_deltatime);
+	append_ui_text(&g_debug_font, debug_str, 4.5f, 100.0f);
+
+	sprintf_s(debug_str, "Frames: %lu", g_game_metrics.frames);
+	append_ui_text(&g_debug_font, debug_str, 10.5f, 100.0f);
+
+	sprintf_s(debug_str, "Draw calls: %lld", ++g_frame_data.draw_calls);
+	append_ui_text(&g_debug_font, debug_str, 17.0f, 100.0f);
+
+	sprintf_s(debug_str, "Camera X=%.2f Y=%.2f Z=%.2f", g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
+	append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
+
+	sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
+	append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
+
+	sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
+	append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
+
+	sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene_spotlights.items_count, g_scene_spotlights.max_items);
+	append_ui_text(&g_debug_font, debug_str, 0.5f, 96.0f);
+
+	char* t_mode = nullptr;
+	const char* tt = "Translate";
+	const char* tr = "Rotate";
+	const char* ts = "Scale";
+	const char* transform_mode_debug_str_format = "Transform mode: %s";
+
+	if (g_transform_mode.mode == TransformMode::Translate) t_mode = const_cast<char*>(tt);
+	if (g_transform_mode.mode == TransformMode::Rotate)	t_mode = const_cast<char*>(tr);
+	if (g_transform_mode.mode == TransformMode::Scale)		t_mode = const_cast<char*>(ts);
+
+	sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
+	append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
+	draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
 }

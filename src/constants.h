@@ -17,3 +17,7 @@ constexpr const u64 SHADOW_MAP_WIDTH = 1024 * 2;
 constexpr const u64 SHADOW_MAP_HEIGHT = 1024 * 2;
 
 constexpr f32 SHADOW_MAP_NEAR_PLANE = 0.25f;
+
+constexpr float debug_font_vh = 1.0f;
+constexpr const char* g_debug_font_path = "G:/projects/game/Engine3D/resources/fonts/Inter-Regular.ttf";
+constexpr const s64 g_max_UI_chars = 1000;

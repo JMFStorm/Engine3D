@@ -21,6 +21,7 @@ extern std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_ind
 extern std::unordered_map<s64, char*> g_mat_data_map_inverse;
 
 extern MemoryBuffer g_temp_memory;
+extern MemoryBuffer g_ui_text_vertex_buffer;
 
 extern TransformationMode g_transform_mode;
 
@@ -47,3 +48,7 @@ extern UserSettings g_user_settings;
 extern MemoryBuffer g_line_vertex_buffer;
 extern s64 g_line_buffer_size;
 extern s64 g_line_indicies;
+
+extern s64 g_text_buffer_size;
+extern s64 g_text_indicies;
+extern FontData g_debug_font;
