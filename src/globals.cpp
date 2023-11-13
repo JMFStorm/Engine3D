@@ -15,6 +15,8 @@ std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_mat_data_map = {};
 std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map = {};
 std::unordered_map<s64, char*> g_mat_data_map_inverse = {};
 
+MemoryBuffer g_temp_memory = {};
+
 TransformationMode g_transform_mode = {};
 
 JArray g_materials = {};
@@ -35,6 +37,9 @@ SimpleShader g_billboard_shader = {};
 SimpleShader g_ui_text_shader = {};
 SimpleShader g_line_shader = {};
 SimpleShader g_wireframe_shader = {};
+SimpleShader g_scene_framebuffer_shader = {};
+
+Framebuffer g_scene_framebuffer = {};
 
 UserSettings g_user_settings = {
 	.window_size_px = { 1900, 1200 },

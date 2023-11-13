@@ -318,7 +318,7 @@ Framebuffer init_spotlight_shadow_map()
 	glGenFramebuffers(1, &shadow_map.id);
 	glGenTextures(1, &shadow_map.texture_gpu_id);
 	glBindTexture(GL_TEXTURE_2D, shadow_map.texture_gpu_id);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -330,6 +330,7 @@ Framebuffer init_spotlight_shadow_map()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, shadow_map.id);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadow_map.texture_gpu_id, 0);
+	glDrawBuffer(GL_NONE);
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);

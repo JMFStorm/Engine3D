@@ -20,6 +20,8 @@ extern std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_mat_data_map;
 extern std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map;
 extern std::unordered_map<s64, char*> g_mat_data_map_inverse;
 
+extern MemoryBuffer g_temp_memory;
+
 extern TransformationMode g_transform_mode;
 
 extern JArray g_materials;
@@ -37,6 +39,8 @@ extern SimpleShader g_billboard_shader;
 extern SimpleShader g_ui_text_shader;
 extern SimpleShader g_line_shader;
 extern SimpleShader g_wireframe_shader;
+extern SimpleShader g_scene_framebuffer_shader;
+extern Framebuffer g_scene_framebuffer;
 
 extern UserSettings g_user_settings;
 

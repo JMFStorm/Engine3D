@@ -683,3 +683,214 @@ void draw_selection_arrows(glm::vec3 position)
 		draw_lines_ontop(14.0f);
 	}
 }
+
+void init_all_shaders()
+{
+	// Init billboard shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/billboard_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/billboard_fs.glsl";
+
+		g_billboard_shader = simple_shader_init();
+
+		g_billboard_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		{
+			glGenVertexArrays(1, &g_billboard_shader.vao);
+			glGenBuffers(1, &g_billboard_shader.vbo);
+
+			glBindVertexArray(g_billboard_shader.vao);
+			glBindBuffer(GL_ARRAY_BUFFER, g_billboard_shader.vbo);
+
+			float vertices[] =
+			{
+				// Coords			 // UVs
+				-0.5f, -0.5f, 0.0f,	 0.0f, 0.0f, // bottom left
+				 0.5f, -0.5f, 0.0f,	 1.0f, 0.0f, // bottom right
+				-0.5f,  0.5f, 0.0f,	 0.0f, 1.0f, // top left
+
+				-0.5f,  0.5f, 0.0f,	 0.0f, 1.0f, // top left 
+				 0.5f, -0.5f, 0.0f,	 1.0f, 0.0f, // bottom right
+				 0.5f,  0.5f, 0.0f,	 1.0f, 1.0f  // top right
+			};
+
+			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+			// Coord attribute
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+			glEnableVertexAttribArray(0);
+
+			// UV attribute
+			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+			glEnableVertexAttribArray(1);
+		}
+	}
+
+	// Init UI text shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_fs.glsl";
+
+		g_ui_text_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		{
+			glGenVertexArrays(1, &g_ui_text_shader.vao);
+			glGenBuffers(1, &g_ui_text_shader.vbo);
+
+			glBindVertexArray(g_ui_text_shader.vao);
+			glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
+
+			// Coord attribute
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+			glEnableVertexAttribArray(0);
+
+			// UV attribute
+			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+			glEnableVertexAttribArray(1);
+		}
+	}
+
+	// Init mesh shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_fs.glsl";
+
+		g_mesh_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		{
+			glGenVertexArrays(1, &g_mesh_shader.vao);
+			glBindVertexArray(g_mesh_shader.vao);
+
+			glGenBuffers(1, &g_mesh_shader.vbo);
+			glBindBuffer(GL_ARRAY_BUFFER, g_mesh_shader.vbo);
+
+			// Coord attribute
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+			glEnableVertexAttribArray(0);
+
+			// UV attribute
+			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+			glEnableVertexAttribArray(1);
+
+			// Normal attribute
+			glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+			glEnableVertexAttribArray(2);
+		}
+	}
+
+	// Init wireframe shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_fs.glsl";
+
+		g_wireframe_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+
+		glGenVertexArrays(1, &g_wireframe_shader.vao);
+		glBindVertexArray(g_wireframe_shader.vao);
+
+		glGenBuffers(1, &g_wireframe_shader.vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_shader.vbo);
+
+		// Coord attribute
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+	}
+
+	// Init line shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_fs.glsl";
+
+		g_line_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+
+		glGenVertexArrays(1, &g_line_shader.vao);
+		glBindVertexArray(g_line_shader.vao);
+		glGenBuffers(1, &g_line_shader.vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
+
+		// Coord attribute
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		// Color attribute
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(1);
+	}
+
+	// Init framebuffer shaders
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
+
+		g_scene_framebuffer_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+
+		glGenVertexArrays(1, &g_scene_framebuffer_shader.vao);
+		glGenBuffers(1, &g_scene_framebuffer_shader.vbo);
+		glBindVertexArray(g_scene_framebuffer_shader.vao);
+
+		float quadVertices[] = {
+			// Coords	   // Uv
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			-1.0f, -1.0f,  0.0f, 0.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
+
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
+			 1.0f,  1.0f,  1.0f, 1.0f
+		};
+
+		glBindBuffer(GL_ARRAY_BUFFER, g_scene_framebuffer_shader.vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+	}
+
+	// Init shadow map shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_fs.glsl";
+
+		g_shdow_map_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+
+		glGenVertexArrays(1, &g_shdow_map_shader.vao);
+		glGenBuffers(1, &g_shdow_map_shader.vbo);
+		glBindVertexArray(g_shdow_map_shader.vao);
+		glBindBuffer(GL_ARRAY_BUFFER, g_shdow_map_shader.vbo);
+
+		// Position attribute
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	}
+
+	// Init shadow map debug shader
+	{
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_fs.glsl";
+
+		g_shdow_map_debug_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+
+		unsigned int vbo;
+		glGenVertexArrays(1, &g_shdow_map_debug_shader.vao);
+		glGenBuffers(1, &vbo);
+		glBindVertexArray(g_shdow_map_debug_shader.vao);
+
+		float quadVertices[] = {
+			// Coords	   // Uv
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			-1.0f, -1.0f,  0.0f, 0.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
+
+			-1.0f,  1.0f,  0.0f, 1.0f,
+			 1.0f, -1.0f,  1.0f, 0.0f,
+			 1.0f,  1.0f,  1.0f, 1.0f
+		};
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+	}
+}

@@ -52,11 +52,6 @@ MemoryBuffer g_scene_spotlights_memory = {};
 
 GLFWwindow* g_window;
 
-static int g_scene_framebuffer_shader;
-static unsigned int g_scene_framebuffer_vao;
-
-static Framebuffer g_scene_framebuffer = {};
-
 static unsigned int g_editor_framebuffer;
 static unsigned int g_editor_framebuffer_texture;
 static unsigned int g_editor_framebuffer_renderbuffer;
@@ -71,7 +66,6 @@ constexpr const s64 g_max_UI_chars = 1000;
 FontData g_debug_font;
 
 constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
-MemoryBuffer g_temp_memory = { 0 };
 MemoryBuffer g_ui_text_vertex_buffer = { 0 };
 
 const char* pointlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\images\\pointlight_billboard.png";
@@ -516,6 +510,7 @@ void duplicate_selected_object()
 	else if (g_selected_object.type == ObjectType::Spotlight)
 	{
 		Spotlight light_copy = *(Spotlight*)j_array_get(&g_scene_spotlights, g_selected_object.selection_index);
+		light_copy.shadow_map = init_spotlight_shadow_map();
 		s64 index = add_new_spotlight(light_copy);
 		g_selected_object.type = ObjectType::Spotlight;
 		g_selected_object.selection_index = index;
@@ -953,214 +948,7 @@ int main(int argc, char* argv[])
 		g_inputs.as_struct.space = ButtonState{ .key = GLFW_KEY_SPACE };
 	}
 
-	// Init billboard shader
-	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/billboard_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/billboard_fs.glsl";
-
-		g_billboard_shader = simple_shader_init();
-
-		g_billboard_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		{
-			glGenVertexArrays(1, &g_billboard_shader.vao);
-			glGenBuffers(1, &g_billboard_shader.vbo);
-
-			glBindVertexArray(g_billboard_shader.vao);
-			glBindBuffer(GL_ARRAY_BUFFER, g_billboard_shader.vbo);
-
-			float vertices[] =
-			{
-				// Coords			 // UVs
-				-0.5f, -0.5f, 0.0f,	 0.0f, 0.0f, // bottom left
-				 0.5f, -0.5f, 0.0f,	 1.0f, 0.0f, // bottom right
-				-0.5f,  0.5f, 0.0f,	 0.0f, 1.0f, // top left
-
-				-0.5f,  0.5f, 0.0f,	 0.0f, 1.0f, // top left 
-				 0.5f, -0.5f, 0.0f,	 1.0f, 0.0f, // bottom right
-				 0.5f,  0.5f, 0.0f,	 1.0f, 1.0f  // top right
-			};
-
-			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-			// Coord attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);
-
-			// UV attribute
-			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-			glEnableVertexAttribArray(1);
-		}
-	}
-
-	// Init UI text shader
-	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_fs.glsl";
-
-		g_ui_text_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		{
-			glGenVertexArrays(1, &g_ui_text_shader.vao);
-			glGenBuffers(1, &g_ui_text_shader.vbo);
-
-			glBindVertexArray(g_ui_text_shader.vao);
-			glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
-
-			// Coord attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);
-
-			// UV attribute
-			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-			glEnableVertexAttribArray(1);
-		}
-	}
-
-	// Init mesh shader
-	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_fs.glsl";
-
-		g_mesh_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		{
-			glGenVertexArrays(1, &g_mesh_shader.vao);
-			glBindVertexArray(g_mesh_shader.vao);
-
-			glGenBuffers(1, &g_mesh_shader.vbo);
-			glBindBuffer(GL_ARRAY_BUFFER, g_mesh_shader.vbo);
-
-			// Coord attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);
-
-			// UV attribute
-			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-			glEnableVertexAttribArray(1);
-
-			// Normal attribute
-			glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
-			glEnableVertexAttribArray(2);
-		}
-	}
-
-	// Init wireframe shader
-	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_fs.glsl";
-
-		g_wireframe_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-
-		glGenVertexArrays(1, &g_wireframe_shader.vao);
-		glBindVertexArray(g_wireframe_shader.vao);
-
-		glGenBuffers(1, &g_wireframe_shader.vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_shader.vbo);
-
-		// Coord attribute
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(0);
-	}
-
-	// Init line shader
-	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_fs.glsl";
-
-		g_line_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-
-		glGenVertexArrays(1, &g_line_shader.vao);
-		glBindVertexArray(g_line_shader.vao);
-		glGenBuffers(1, &g_line_shader.vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
-
-		// Coord attribute
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(0);
-
-		// Color attribute
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-		glEnableVertexAttribArray(1);
-	}
-
-	// Init framebuffer shaders
-	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
-
-		g_scene_framebuffer_shader = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-
-		unsigned int quadVBO;
-		glGenVertexArrays(1, &g_scene_framebuffer_vao);
-		glGenBuffers(1, &quadVBO);
-		glBindVertexArray(g_scene_framebuffer_vao);
-
-		float quadVertices[] = {
-			// Coords	   // Uv
-			-1.0f,  1.0f,  0.0f, 1.0f,
-			-1.0f, -1.0f,  0.0f, 0.0f,
-			 1.0f, -1.0f,  1.0f, 0.0f,
-
-			-1.0f,  1.0f,  0.0f, 1.0f,
-			 1.0f, -1.0f,  1.0f, 0.0f,
-			 1.0f,  1.0f,  1.0f, 1.0f
-		};
-
-		glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-	}
-
-	// Init shadow map shader
-	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_fs.glsl";
-
-		g_shdow_map_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-
-		glGenVertexArrays(1, &g_shdow_map_shader.vao);
-		glGenBuffers(1, &g_shdow_map_shader.vbo);
-		glBindVertexArray(g_shdow_map_shader.vao);
-		glBindBuffer(GL_ARRAY_BUFFER, g_shdow_map_shader.vbo);
-
-		// Position attribute
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	}
-
-	// Init shadow map debug shader
-	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_fs.glsl";
-
-		g_shdow_map_debug_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-
-		unsigned int vbo;
-		glGenVertexArrays(1, &g_shdow_map_debug_shader.vao);
-		glGenBuffers(1, &vbo);
-		glBindVertexArray(g_shdow_map_debug_shader.vao);
-
-		float quadVertices[] = {
-			// Coords	   // Uv
-			-1.0f,  1.0f,  0.0f, 1.0f,
-			-1.0f, -1.0f,  0.0f, 0.0f,
-			 1.0f, -1.0f,  1.0f, 0.0f,
-
-			-1.0f,  1.0f,  0.0f, 1.0f,
-			 1.0f, -1.0f,  1.0f, 0.0f,
-			 1.0f,  1.0f,  1.0f, 1.0f
-		};
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-	}
+	init_all_shaders();
 
 	// Init textures/materials
 	{
@@ -1299,6 +1087,10 @@ int main(int argc, char* argv[])
 		glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer);
 		init_framebuffer_resize(&g_editor_framebuffer_texture, &g_editor_framebuffer_renderbuffer);
 	}
+
+	GLint maxTextureUnits;
+	glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
+	std::cout << "Max Texture Units: " << maxTextureUnits << std::endl;
 
 	g_use_linear_texture_filtering = false;
 	g_generate_texture_mipmaps = false;
@@ -1730,7 +1522,7 @@ int main(int argc, char* argv[])
 			glFrontFace(GL_CW);
 			glCullFace(GL_FRONT);
 			glUseProgram(g_shdow_map_shader.id);
-			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+			glViewport(0, 0, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
 
 			for (int i = 0; i < g_scene_spotlights.items_count; i++)
 			{
@@ -1878,13 +1670,13 @@ int main(int argc, char* argv[])
 			glDisable(GL_DEPTH_TEST);
 			glClear(GL_COLOR_BUFFER_BIT);
 
-			glUseProgram(g_scene_framebuffer_shader);
-			glBindVertexArray(g_scene_framebuffer_vao);
+			glUseProgram(g_scene_framebuffer_shader.id);
+			glBindVertexArray(g_scene_framebuffer_shader.vao);
 
-			unsigned int inversion_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_inversion");
-			unsigned int blur_loc = glGetUniformLocation(g_scene_framebuffer_shader, "use_blur");
-			unsigned int blur_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader, "blur_amount");
-			unsigned int gamma_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader, "gamma_amount");
+			unsigned int inversion_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "use_inversion");
+			unsigned int blur_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "use_blur");
+			unsigned int blur_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "blur_amount");
+			unsigned int gamma_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "gamma_amount");
 
 			glUniform1i(inversion_loc, g_inverse_color);
 			glUniform1i(blur_loc, g_blur_effect);

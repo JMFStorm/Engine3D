@@ -24,3 +24,5 @@ void draw_lines(float thickness);
 void draw_lines_ontop(float thickness);
 
 void draw_selection_arrows(glm::vec3 position);
+
+void init_all_shaders();

@@ -1,5 +1,4 @@
 TODOS:
-- deserialize spotlights
 - light on/off
 - material.data -file re-organizes items when adding new material
 
