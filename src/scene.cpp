@@ -45,7 +45,8 @@ Spotlight spotlight_deserialize(SpotlightSerialized serialized)
 		.specular = serialized.specular,
 		.range = serialized.range,
 		.cutoff = serialized.cutoff,
-		.outer_cutoff = serialized.outer_cutoff
+		.outer_cutoff = serialized.outer_cutoff,
+		.is_on = serialized.is_on,
 	};
 	return spotlight;
 }
@@ -58,7 +59,8 @@ SpotlightSerialized spotlight_serialize(Spotlight spotlight)
 		.specular = spotlight.specular,
 		.range = spotlight.range,
 		.cutoff = spotlight.cutoff,
-		.outer_cutoff = spotlight.outer_cutoff
+		.outer_cutoff = spotlight.outer_cutoff,
+		.is_on = spotlight.is_on,
 	};
 	return serialized;
 }

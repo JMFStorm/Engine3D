@@ -269,6 +269,9 @@ void draw_mesh(Mesh* mesh)
 		{
 			auto pointlight = *(Pointlight*)j_array_get(&g_scene_pointlights, i);
 
+			sprintf_s(str_value, "pointlights[%d].is_on", i);
+			unsigned int light_is_on_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
+
 			sprintf_s(str_value, "pointlights[%d].position", i);
 			unsigned int light_pos_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
@@ -284,6 +287,7 @@ void draw_mesh(Mesh* mesh)
 			sprintf_s(str_value, "pointlights[%d].range", i);
 			unsigned int light_range_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
+			glUniform1i(light_is_on_loc, pointlight.is_on);
 			glUniform3f(light_pos_loc, pointlight.transforms.translation.x, pointlight.transforms.translation.y, pointlight.transforms.translation.z);
 			glUniform3f(light_diff_loc, pointlight.diffuse.x, pointlight.diffuse.y, pointlight.diffuse.z);
 			glUniform1f(light_spec_loc, pointlight.specular);
@@ -304,6 +308,9 @@ void draw_mesh(Mesh* mesh)
 
 			glm::vec3 spot_dir = get_spotlight_dir(spotlight);
 			glm::mat4 light_space_matrix = get_spotlight_light_space_matrix(spotlight);
+
+			sprintf_s(str_value, "spotlights[%d].is_on", i);
+			unsigned int sp_is_on_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
 
 			sprintf_s(str_value, "spotlights[%d].diffuse", i);
 			unsigned int sp_diff_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
@@ -332,6 +339,7 @@ void draw_mesh(Mesh* mesh)
 			sprintf_s(str_value, "spotlights[%d].shadow_map", i);
 			unsigned int sp_shadow_map = glGetUniformLocation(g_mesh_shader.id, str_value);
 
+			glUniform1i(sp_is_on_loc, spotlight.is_on);
 			glUniform3f(sp_diff_loc, spotlight.diffuse.x, spotlight.diffuse.y, spotlight.diffuse.z);
 			glUniform3f(sp_pos_loc, spotlight.transforms.translation.x, spotlight.transforms.translation.y, spotlight.transforms.translation.z);
 			glUniform3f(sp_dir_loc, spot_dir.x, spot_dir.y, spot_dir.z);

@@ -352,6 +352,7 @@ Spotlight spotlight_init()
 		.range = 5.0f,
 		.cutoff = 0.90f,
 		.outer_cutoff = 0.85,
+		.is_on = true,
 	};
 	return sp;
 }
@@ -363,7 +364,8 @@ Pointlight pointlight_init()
 		.diffuse = glm::vec3(1.0f),
 		.range = 6.0f,
 		.specular = 1.0f,
-		.intensity = 1.0f
+		.intensity = 1.0f,
+		.is_on = true,
 	};
 	return p_light;
 }

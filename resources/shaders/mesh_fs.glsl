@@ -6,6 +6,7 @@ struct Pointlight {
     float range;
     float specular;
     float intensity;
+    bool is_on;
 };
 
 struct Spotlight {
@@ -18,6 +19,7 @@ struct Spotlight {
     float range;
     float cutoff;
     float outer_cutoff;
+    bool is_on;
 };
 
 struct Material {
@@ -159,12 +161,12 @@ void main()
 
     for (int i = 0; i < pointlights_count; i++)
     {
-        color_result += point_lights_color(pointlights[i], norm, fs_in.fragPos, view_dir);
+        if (pointlights[i].is_on) color_result += point_lights_color(pointlights[i], norm, fs_in.fragPos, view_dir);
     }
 
     for (int i = 0; i < spotlights_count; i++)
     {
-        color_result += spotlight_color(spotlights[i], norm, fs_in.fragPos, view_dir);
+        if (spotlights[i].is_on) color_result += spotlight_color(spotlights[i], norm, fs_in.fragPos, view_dir);
     }
 
     color_result = color_result + ambient;

@@ -54,6 +54,7 @@ typedef struct Pointlight {
 	f32 range;
 	f32 specular;
 	f32 intensity;
+	bool is_on;
 } Pointlight;
 
 typedef struct Spotlight {
@@ -64,6 +65,7 @@ typedef struct Spotlight {
 	f32 range;
 	f32 cutoff;
 	f32 outer_cutoff;
+	bool is_on;
 } Spotlight;
 
 typedef struct SpotlightSerialized {
@@ -73,6 +75,7 @@ typedef struct SpotlightSerialized {
 	f32 range;
 	f32 cutoff;
 	f32 outer_cutoff;
+	bool is_on;
 } SpotlightSerialized;
 
 typedef struct SceneSelection {
