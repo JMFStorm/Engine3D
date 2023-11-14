@@ -1,7 +1,8 @@
 TODOS:
-- material.data -file re-organizes items when adding new material
+- spotlight fov fix
 - popup text for scene save
 - multiple scenes system
-- spotlight fov fix
+- material.data -file re-organizes items when adding new material
+
 
 

@@ -44,8 +44,8 @@ Spotlight spotlight_deserialize(SpotlightSerialized serialized)
 		.diffuse = serialized.diffuse,
 		.specular = serialized.specular,
 		.range = serialized.range,
-		.cutoff = serialized.cutoff,
-		.outer_cutoff = serialized.outer_cutoff,
+		.fov = serialized.fov,
+		.outer_cutoff_fov = serialized.outer_cutoff_fov,
 		.is_on = serialized.is_on,
 	};
 	return spotlight;
@@ -58,8 +58,8 @@ SpotlightSerialized spotlight_serialize(Spotlight spotlight)
 		.diffuse = spotlight.diffuse,
 		.specular = spotlight.specular,
 		.range = spotlight.range,
-		.cutoff = spotlight.cutoff,
-		.outer_cutoff = spotlight.outer_cutoff,
+		.fov = spotlight.fov,
+		.outer_cutoff_fov = spotlight.outer_cutoff_fov,
 		.is_on = spotlight.is_on,
 	};
 	return serialized;

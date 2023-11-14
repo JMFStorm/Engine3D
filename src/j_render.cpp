@@ -339,14 +339,18 @@ void draw_mesh(Mesh* mesh)
 			sprintf_s(str_value, "spotlights[%d].shadow_map", i);
 			unsigned int sp_shadow_map = glGetUniformLocation(g_mesh_shader.id, str_value);
 
+			float cutoff = glm::cos(glm::radians(spotlight.fov / 2.0f));
+			float cos = glm::cos(glm::radians(spotlight.outer_cutoff_fov / 2.0f));
+			float outer_cutoff = cutoff - (cutoff - cos);
+
 			glUniform1i(sp_is_on_loc, spotlight.is_on);
 			glUniform3f(sp_diff_loc, spotlight.diffuse.x, spotlight.diffuse.y, spotlight.diffuse.z);
 			glUniform3f(sp_pos_loc, spotlight.transforms.translation.x, spotlight.transforms.translation.y, spotlight.transforms.translation.z);
 			glUniform3f(sp_dir_loc, spot_dir.x, spot_dir.y, spot_dir.z);
 			glUniform1f(sp_spec_loc, spotlight.specular);
 			glUniform1f(sp_rng_loc, spotlight.range);
-			glUniform1f(sp_cutoff_loc, spotlight.cutoff);
-			glUniform1f(sp_outer_cutoff_loc, spotlight.outer_cutoff);
+			glUniform1f(sp_cutoff_loc, cutoff);
+			glUniform1f(sp_outer_cutoff_loc, outer_cutoff);
 			glUniformMatrix4fv(sp_light_matrix, 1, GL_FALSE, glm::value_ptr(light_space_matrix));
 			glUniform1i(sp_shadow_map, shadow_loc_i++);
 

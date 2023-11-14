@@ -267,9 +267,8 @@ glm::mat4 get_spotlight_light_space_matrix(Spotlight spotlight)
 	spot_dir += glm::vec3(0.0001f, 0.001f, 0.0001f); // WTF, why?
 	glm::vec3 light_pos = spotlight.transforms.translation;
 	glm::vec3 spot_look_at = spotlight.transforms.translation + spot_dir;
-
-	float spotlight_degrees = 120.0f;
-	glm::mat4 light_projection = glm::perspective(glm::radians(spotlight_degrees), 1.0f, SHADOW_MAP_NEAR_PLANE, spotlight.range * 10);
+	float fov_radians = glm::radians(spotlight.outer_cutoff_fov);
+	glm::mat4 light_projection = glm::perspective(fov_radians, 1.0f, SHADOW_MAP_NEAR_PLANE, spotlight.range * 10);
 	glm::mat4 light_view = glm::lookAt(light_pos, spot_look_at, glm::vec3(0.0, 1.0, 0.0));
 	return light_projection * light_view;
 }
@@ -350,8 +349,8 @@ Spotlight spotlight_init()
 		.diffuse = glm::vec3(1),
 		.specular = 2.0f,
 		.range = 5.0f,
-		.cutoff = 0.90f,
-		.outer_cutoff = 0.85,
+		.fov = 90.0f,
+		.outer_cutoff_fov = 0.95f,
 		.is_on = true,
 	};
 	return sp;

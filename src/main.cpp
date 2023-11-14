@@ -696,11 +696,11 @@ int main(int argc, char* argv[])
 						ImGui::Checkbox("On/off", &selected_spotlight_ptr->is_on);
 						ImGui::ColorEdit3("Color", &selected_spotlight_ptr->diffuse[0], 0);
 						ImGui::InputFloat3("Position", &selected_spotlight_ptr->transforms.translation[0], "%.2f");
-						ImGui::InputFloat3("Direction", &selected_spotlight_ptr->transforms.rotation[0], "%.2f");
+						ImGui::InputFloat3("Rotation", &selected_spotlight_ptr->transforms.rotation[0], "%.2f");
 						ImGui::InputFloat("Specular", &selected_spotlight_ptr->specular, 0, 0, "%.2f");
 						ImGui::InputFloat("Range", &selected_spotlight_ptr->range, 0, 0, "%.2f");
-						ImGui::InputFloat("Cutoff", &selected_spotlight_ptr->cutoff, 0, 0, "%.2f");
-						ImGui::InputFloat("Outer cutoff", &selected_spotlight_ptr->outer_cutoff, 0, 0, "%.2f");
+						ImGui::InputFloat("FOV", &selected_spotlight_ptr->fov, 0, 0, "%.1f");
+						ImGui::InputFloat("Outer cutoff", &selected_spotlight_ptr->outer_cutoff_fov, 0, 0, "%.1f");
 						ImGui::Checkbox("DEBUG_SHADOWMAP", &DEBUG_SHADOWMAP);
 					}
 				}

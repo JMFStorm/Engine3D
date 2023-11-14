@@ -63,8 +63,8 @@ typedef struct Spotlight {
 	glm::vec3 diffuse;
 	f32 specular;
 	f32 range;
-	f32 cutoff;
-	f32 outer_cutoff;
+	f32 fov;
+	f32 outer_cutoff_fov;
 	bool is_on;
 } Spotlight;
 
@@ -73,8 +73,8 @@ typedef struct SpotlightSerialized {
 	glm::vec3 diffuse;
 	f32 specular;
 	f32 range;
-	f32 cutoff;
-	f32 outer_cutoff;
+	f32 fov;
+	f32 outer_cutoff_fov;
 	bool is_on;
 } SpotlightSerialized;
 
