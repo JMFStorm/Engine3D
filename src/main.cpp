@@ -995,7 +995,6 @@ int main(int argc, char* argv[])
 
 		// Shadow map framebuffers
 		{
-			glFrontFace(GL_CW);
 			glCullFace(GL_FRONT);
 			glUseProgram(g_shdow_map_shader.id);
 			glViewport(0, 0, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
@@ -1026,7 +1025,6 @@ int main(int argc, char* argv[])
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			glFrontFace(GL_CCW);
 			glCullFace(GL_BACK);
 		}
 

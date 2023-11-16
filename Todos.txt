@@ -1,5 +1,5 @@
 TODOS:
-- spotlight fov fix
+- shadow map font face culling for planes
 - popup text for scene save
 - multiple scenes system
 - material.data -file re-organizes items when adding new material

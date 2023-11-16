@@ -69,10 +69,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm, vec3 light_pos, 
     vec3 light_dir = normalize(light_pos - fs_in.fragPos);
     float fragment_dot = (1.0 - dot(frag_norm, light_dir));
 
-    float bias_max = 0.005;
-    float bias_min = 0.00005;
-    float bias = max(bias_max * fragment_dot, bias_min);
-    if (currentDepth - bias < closestDepth) return 0.0;
+    if (currentDepth < closestDepth) return 0.0;
 
     float shadow = 0;
     vec2 texelSize = 1.0 / textureSize(shadow_map, 0);
@@ -80,7 +77,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 frag_norm, vec3 light_pos, 
     for(int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
             float pcfDepth = texture(shadow_map, projCoords.xy + vec2(x, y) * texelSize).r; 
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+            shadow += currentDepth > pcfDepth ? 1.0 : 0.0;        
         }    
     }
 
