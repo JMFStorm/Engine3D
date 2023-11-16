@@ -1,5 +1,7 @@
 #pragma once
 
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 #include <unordered_map>
 
 #include "j_array.h"
@@ -10,6 +12,7 @@
 
 extern bool DEBUG_SHADOWMAP;
 
+extern GLFWwindow* g_window;
 extern GameCamera g_scene_camera;
 extern bool g_camera_move_mode;
 
@@ -64,3 +67,5 @@ extern s64 g_line_indicies;
 extern s64 g_text_buffer_size;
 extern s64 g_text_indicies;
 extern FontData g_debug_font;
+
+extern PostProcessingSettings g_pp_settings;

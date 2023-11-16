@@ -206,3 +206,10 @@ typedef struct SimpleShader {
 	u32 vao;
 	u32 vbo;
 } SimpleShader;
+
+typedef struct PostProcessingSettings {
+	bool inverse_color;
+	bool blur_effect;
+	f32 blur_effect_amount;
+	f32 gamma_amount;
+} PostProcessingSettings;

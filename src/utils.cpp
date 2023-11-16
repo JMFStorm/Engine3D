@@ -574,3 +574,14 @@ bool is_primitive(ObjectType type)
 {
 	return type == ObjectType::Plane || type == ObjectType::Cube;
 }
+
+PostProcessingSettings pps_init()
+{
+	PostProcessingSettings res = {
+		.inverse_color = false,
+		.blur_effect = false,
+		.blur_effect_amount = 8.0f,
+		.gamma_amount = 1.6f
+	};
+	return res;
+}

@@ -5,6 +5,7 @@ bool g_camera_move_mode = false;
 
 int g_selected_texture_item = 0;
 
+GLFWwindow* g_window = {};
 GameCamera g_scene_camera = {};
 GameMetrics g_game_metrics = {};
 GameInputsU g_inputs = {};
@@ -64,3 +65,5 @@ s64 g_line_indicies = 0;
 s64 g_text_buffer_size = 0;
 s64 g_text_indicies = 0;
 FontData g_debug_font = {};
+
+PostProcessingSettings g_pp_settings = {};

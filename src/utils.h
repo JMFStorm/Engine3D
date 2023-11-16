@@ -133,3 +133,5 @@ void init_memory_buffers();
 glm::vec3 get_camera_ray_from_scene_px(int x, int y);
 
 bool is_primitive(ObjectType type);
+
+PostProcessingSettings pps_init();
