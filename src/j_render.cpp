@@ -128,11 +128,10 @@ void draw_mesh_shadow_map(Mesh* mesh)
 {
 	glm::mat4 model = get_model_matrix(mesh);
 	unsigned int model_loc = glGetUniformLocation(g_shdow_map_shader.id, "model");
-	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 
 	s64 draw_indicies = 0;
 
-	if (mesh->mesh_type == E_Primitive_Plane)
+	if (mesh->mesh_type == MeshType::Plane)
 	{
 		float vertices[] =
 		{
@@ -150,7 +149,7 @@ void draw_mesh_shadow_map(Mesh* mesh)
 		glBindBuffer(GL_ARRAY_BUFFER, g_shdow_map_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
-	else if (mesh->mesh_type == E_Primitive_Cube)
+	else if (mesh->mesh_type == MeshType::Cube)
 	{
 		float vertices[] =
 		{
@@ -214,6 +213,8 @@ void draw_mesh_shadow_map(Mesh* mesh)
 		glBindBuffer(GL_ARRAY_BUFFER, g_shdow_map_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
+
+	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -365,7 +366,7 @@ void draw_mesh(Mesh* mesh)
 
 	s64 draw_indicies = 0;
 
-	if (mesh->mesh_type == E_Primitive_Plane)
+	if (mesh->mesh_type == MeshType::Plane)
 	{
 		float vertices[] =
 		{
@@ -383,7 +384,7 @@ void draw_mesh(Mesh* mesh)
 		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
-	else if (mesh->mesh_type == E_Primitive_Cube)
+	else if (mesh->mesh_type == MeshType::Cube)
 	{
 		float vertices[] =
 		{
@@ -489,7 +490,7 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 
 	s64 draw_indicies = 0;
 
-	if (mesh->mesh_type == E_Primitive_Plane)
+	if (mesh->mesh_type == MeshType::Plane)
 	{
 		float vertices[] =
 		{
@@ -515,7 +516,7 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 		glBindBuffer(GL_ARRAY_BUFFER, g_wireframe_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
-	else if (mesh->mesh_type == E_Primitive_Cube)
+	else if (mesh->mesh_type == MeshType::Cube)
 	{
 		float vertices[] =
 		{

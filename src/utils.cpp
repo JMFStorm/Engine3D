@@ -350,7 +350,7 @@ Spotlight spotlight_init()
 		.specular = 2.0f,
 		.range = 5.0f,
 		.fov = 90.0f,
-		.outer_cutoff_fov = 0.95f,
+		.outer_cutoff_fov = 90.0f,
 		.is_on = true,
 	};
 	return sp;
@@ -490,7 +490,10 @@ void init_memory_buffers()
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
 
-	memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene meshes"));
+	memory_buffer_mallocate(&g_scene_planes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene plane meshes"));
+	g_scene_planes = j_array_init(SCENE_PLANES_MAX_COUNT, sizeof(Mesh), g_scene_planes_memory.memory);
+
+	memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene '3D' meshes"));
 	g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), g_scene_meshes_memory.memory);
 
 	memory_buffer_mallocate(&g_scene_pointlights_memory, sizeof(Pointlight) * SCENE_POINTLIGHTS_MAX_COUNT, const_cast<char*>("Scene pointlights"));
@@ -565,4 +568,9 @@ glm::mat4 get_rotation_matrix(glm::vec3 rotation)
 
 	glm::mat4 rotation_matrix = glm::mat4_cast(finalRotation);
 	return rotation_matrix;
+}
+
+bool is_primitive(ObjectType type)
+{
+	return type == ObjectType::Plane || type == ObjectType::Cube;
 }

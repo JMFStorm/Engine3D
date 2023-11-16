@@ -131,3 +131,5 @@ void init_framebuffer_resize(unsigned int* framebuffer_texture_id, unsigned int*
 void init_memory_buffers();
 
 glm::vec3 get_camera_ray_from_scene_px(int x, int y);
+
+bool is_primitive(ObjectType type);

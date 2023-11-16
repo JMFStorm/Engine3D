@@ -120,6 +120,17 @@ void save_scene()
 	// Scene camera
 	output_file.write(reinterpret_cast<char*>(&data), sizeof(data));
 
+	// Plane count
+	output_file.write(reinterpret_cast<char*>(&g_scene_planes.items_count), sizeof(s64));
+
+	// Plane data
+	for (int i = 0; i < g_scene_planes.items_count; i++)
+	{
+		Mesh* plane_ptr = (Mesh*)j_array_get(&g_scene_planes, i);
+		MeshData plane_data = mesh_serialize(plane_ptr);
+		output_file.write(reinterpret_cast<char*>(&plane_data), sizeof(plane_data));
+	}
+
 	// Mesh count
 	output_file.write(reinterpret_cast<char*>(&g_scene_meshes.items_count), sizeof(s64));
 
@@ -180,6 +191,19 @@ void load_scene()
 	input_file.read(reinterpret_cast<char*>(&cam_data), sizeof(cam_data));
 	g_scene_camera = cam_data;
 	g_scene_camera.aspect_ratio_horizontal = h_aspect;
+
+	// Plane count
+	s64 plane_count = 0;
+	input_file.read(reinterpret_cast<char*>(&plane_count), sizeof(s64));
+
+	// Plane data
+	for (int i = 0; i < plane_count; i++)
+	{
+		MeshData plane_data;
+		input_file.read(reinterpret_cast<char*>(&plane_data), sizeof(plane_data));
+		Mesh plane = mesh_deserialize(plane_data);
+		j_array_add(&g_scene_planes, (byte*)&plane);
+	}
 
 	// Mesh count
 	s64 mesh_count = 0;

@@ -12,7 +12,8 @@ TransformMode get_curr_transformation_mode()
 	if (g_inputs.as_struct.w.pressed && g_selected_object.type != ObjectType::Pointlight)
 		return TransformMode::Rotate;
 
-	if (g_inputs.as_struct.e.pressed && g_selected_object.type == ObjectType::Primitive)
+	if (g_inputs.as_struct.e.pressed 
+		&& is_primitive(g_selected_object.type))
 		return TransformMode::Scale;
 
 	return g_transform_mode.mode;
@@ -20,7 +21,10 @@ TransformMode get_curr_transformation_mode()
 
 void* get_selected_object_ptr()
 {
-	if (g_selected_object.type == ObjectType::Primitive)
+	if (g_selected_object.type == ObjectType::Plane)
+		return (void*)j_array_get(&g_scene_planes, g_selected_object.selection_index);
+
+	if (g_selected_object.type == ObjectType::Cube)
 		return (void*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
 
 	if (g_selected_object.type == ObjectType::Pointlight)
@@ -34,7 +38,13 @@ void* get_selected_object_ptr()
 
 glm::vec3 get_selected_object_translation()
 {
-	if (g_selected_object.type == ObjectType::Primitive)
+	if (g_selected_object.type == ObjectType::Plane)
+	{
+		Mesh* mesh = (Mesh*)j_array_get(&g_scene_planes, g_selected_object.selection_index);
+		return mesh->transforms.translation;
+	}
+
+	if (g_selected_object.type == ObjectType::Cube)
 	{
 		Mesh* mesh = (Mesh*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
 		return mesh->transforms.translation;
@@ -59,7 +69,8 @@ Transforms* get_selected_object_transforms()
 {
 	switch (g_selected_object.type)
 	{
-		case ObjectType::Primitive:
+		case ObjectType::Plane:
+		case ObjectType::Cube:
 		{
 			Mesh* as_mesh = (Mesh*)get_selected_object_ptr();
 			return &as_mesh->transforms;
@@ -88,17 +99,31 @@ void delete_on_object_index(JArray* jarray_ptr, s64 jarray_index)
 
 void delete_selected_object()
 {
-	if (g_selected_object.type == ObjectType::Primitive) delete_on_object_index(&g_scene_meshes, g_selected_object.selection_index);
+	if (g_selected_object.type == ObjectType::Plane) delete_on_object_index(&g_scene_planes, g_selected_object.selection_index);
+	else if (g_selected_object.type == ObjectType::Cube) delete_on_object_index(&g_scene_meshes, g_selected_object.selection_index);
 	else if (g_selected_object.type == ObjectType::Pointlight) delete_on_object_index(&g_scene_pointlights, g_selected_object.selection_index);
 	else if (g_selected_object.type == ObjectType::Spotlight) delete_on_object_index(&g_scene_spotlights, g_selected_object.selection_index);
 }
 
 s64 add_new_mesh(Mesh new_mesh)
 {
+	s64 new_index = -1;
 	s64 material_index = g_materials_index_map[new_mesh.material->color_texture->file_name];
 	g_selected_texture_item = material_index;
-	j_array_add(&g_scene_meshes, (byte*)&new_mesh);
-	s64 new_index = g_scene_meshes.items_count - 1;
+
+	if (new_mesh.mesh_type == MeshType::Cube)
+	{
+		j_array_add(&g_scene_meshes, (byte*)&new_mesh);
+		new_index = g_scene_meshes.items_count - 1;
+	}
+	else if (new_mesh.mesh_type == MeshType::Plane)
+	{
+		j_array_add(&g_scene_planes, (byte*)&new_mesh);
+		new_index = g_scene_planes.items_count - 1;
+	}
+
+	ASSERT_TRUE(new_index != -1, "Add new mesh");
+
 	return new_index;
 }
 
@@ -118,11 +143,18 @@ s64 add_new_spotlight(Spotlight new_light)
 
 void duplicate_selected_object()
 {
-	if (g_selected_object.type == ObjectType::Primitive)
+	if (g_selected_object.type == ObjectType::Plane)
+	{
+		Mesh mesh_copy = *(Mesh*)j_array_get(&g_scene_planes, g_selected_object.selection_index);
+		s64 index = add_new_mesh(mesh_copy);
+		g_selected_object.type = ObjectType::Plane;
+		g_selected_object.selection_index = index;
+	}
+	else if (g_selected_object.type == ObjectType::Cube)
 	{
 		Mesh mesh_copy = *(Mesh*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
 		s64 index = add_new_mesh(mesh_copy);
-		g_selected_object.type = ObjectType::Primitive;
+		g_selected_object.type = ObjectType::Cube;
 		g_selected_object.selection_index = index;
 	}
 	else if (g_selected_object.type == ObjectType::Pointlight)
@@ -147,7 +179,7 @@ void select_object_index(ObjectType type, s64 index)
 	g_selected_object.type = type;
 	g_selected_object.selection_index = index;
 
-	if (type == ObjectType::Primitive)
+	if (is_primitive(type))
 	{
 		Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
 		auto selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
@@ -247,7 +279,7 @@ s64 get_pointlight_selection_index(JArray* lights, f32* select_dist, glm::vec3 r
 	{
 		as_light = (Pointlight*)j_array_get(lights, i);
 		as_cube = {};
-		as_cube.mesh_type = E_Primitive_Cube;
+		as_cube.mesh_type = MeshType::Cube;
 		as_cube.transforms.translation = as_light->transforms.translation;
 		as_cube.transforms.scale = glm::vec3(0.35f);
 
@@ -275,7 +307,7 @@ s64 get_spotlight_selection_index(JArray* lights, f32* select_dist, glm::vec3 ra
 	{
 		as_light = (Spotlight*)j_array_get(lights, i);
 		as_cube = {};
-		as_cube.mesh_type = E_Primitive_Cube;
+		as_cube.mesh_type = MeshType::Cube;
 		as_cube.transforms.translation = as_light->transforms.translation;
 		as_cube.transforms.scale = glm::vec3(0.35f);
 
@@ -301,7 +333,7 @@ s64 get_mesh_selection_index(JArray* meshes, f32* select_dist, glm::vec3 ray_ori
 	{
 		Mesh* mesh = (Mesh*)j_array_get(meshes, i);
 
-		if (mesh->mesh_type == E_Primitive_Plane)
+		if (mesh->mesh_type == MeshType::Plane)
 		{
 			auto plane_up = glm::vec3(0.0f, 1.0f, 0.0f);
 			glm::mat4 rotationMatrix = get_rotation_matrix(mesh->transforms.rotation);
@@ -341,7 +373,7 @@ s64 get_mesh_selection_index(JArray* meshes, f32* select_dist, glm::vec3 ray_ori
 				}
 			}
 		}
-		else if (mesh->mesh_type == E_Primitive_Cube)
+		else if (mesh->mesh_type == MeshType::Cube)
 		{
 			f32 new_select_dist;
 			bool selected_cube = get_cube_selection(mesh, &new_select_dist, ray_origin, ray_direction);

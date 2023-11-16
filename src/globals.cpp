@@ -17,6 +17,7 @@ std::unordered_map<s64, char*> g_mat_data_map_inverse = {};
 MemoryBuffer g_temp_memory = {};
 MemoryBuffer g_ui_text_vertex_buffer = {};
 MemoryBuffer g_materials_memory = {};
+MemoryBuffer g_scene_planes_memory = {};
 MemoryBuffer g_scene_meshes_memory = {};
 MemoryBuffer g_scene_pointlights_memory = {};
 MemoryBuffer g_scene_spotlights_memory = {};
@@ -29,6 +30,7 @@ TransformationMode g_transform_mode = {};
 JArray g_materials = {};
 JArray g_scene_spotlights = {};
 JArray g_scene_pointlights = {};
+JArray g_scene_planes = {};
 JArray g_scene_meshes = {};
 JArray g_textures = {};
 

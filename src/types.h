@@ -31,6 +31,11 @@ enum class Axis {
 	Z
 };
 
+enum class MeshType {
+	Plane,
+	Cube
+};
+
 enum class TransformMode {
 	Translate,
 	Rotate,
@@ -39,11 +44,8 @@ enum class TransformMode {
 
 enum class ObjectType {
 	None,
-	Primitive,
+	Plane,
+	Cube,
 	Pointlight,
 	Spotlight
 };
-
-constexpr const s64 E_Primitive_Plane = 0;
-constexpr const s64 E_Primitive_Cube = 1;
-constexpr const s64 E_Primitive_Sphere = 2;

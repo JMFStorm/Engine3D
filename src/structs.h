@@ -31,13 +31,13 @@ typedef struct MaterialData {
 typedef struct Mesh {
 	Transforms transforms;
 	Material* material;
-	s64 mesh_type;
+	MeshType mesh_type;
 	f32 uv_multiplier;
 } Mesh;
 
 typedef struct MeshData {
 	Transforms transforms;
-	s64 mesh_type;
+	MeshType mesh_type;
 	s64 material_id;
 	f32 uv_multiplier;
 } MeshData;

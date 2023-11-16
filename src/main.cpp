@@ -270,7 +270,7 @@ bool try_init_transform_mode()
 {
 	bool has_valid_mode = g_transform_mode.mode == TransformMode::Translate
 		|| (g_transform_mode.mode == TransformMode::Rotate && g_selected_object.type != ObjectType::Pointlight)
-		|| (g_transform_mode.mode == TransformMode::Scale && g_selected_object.type == ObjectType::Primitive);
+		|| (g_transform_mode.mode == TransformMode::Scale && is_primitive(g_selected_object.type));
 
 	if (!has_valid_mode) return false;
 
@@ -610,22 +610,22 @@ int main(int argc, char* argv[])
 						Mesh new_plane = {
 							.transforms = transforms_init(),
 							.material = (Material*)j_array_get(&g_materials, 0),
-							.mesh_type = E_Primitive_Plane,
+							.mesh_type = MeshType::Plane,
 							.uv_multiplier = 1.0f,
 						};
 						s64 new_mesh_index = add_new_mesh(new_plane);
-						select_object_index(ObjectType::Primitive, new_mesh_index);
+						select_object_index(ObjectType::Plane, new_mesh_index);
 					}
 					if (ImGui::Button("Add Cube"))
 					{
 						Mesh new_cube = {
 							.transforms = transforms_init(),
 							.material = (Material*)j_array_get(&g_materials, 0),
-							.mesh_type = E_Primitive_Cube,
+							.mesh_type = MeshType::Cube,
 							.uv_multiplier = 1.0f,
 						};
 						s64 new_mesh_index = add_new_mesh(new_cube);
-						select_object_index(ObjectType::Primitive, new_mesh_index);
+						select_object_index(ObjectType::Cube, new_mesh_index);
 					}
 					if (ImGui::Button("Add pointlight"))
 					{
@@ -643,7 +643,7 @@ int main(int argc, char* argv[])
 
 				// Selection properties
 				{
-					if (g_selected_object.type == ObjectType::Primitive)
+					if (is_primitive(g_selected_object.type))
 					{
 						char selected_mesh_str[24];
 						sprintf_s(selected_mesh_str, "Mesh index: %lld", g_selected_object.selection_index);
@@ -789,14 +789,15 @@ int main(int argc, char* argv[])
 				glm::vec3 ray_origin = g_scene_camera.position;
 				glm::vec3 ray_direction = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
 
-				s64 object_types_count = 3;
-				ObjectType select_types[] = { ObjectType::Primitive, ObjectType::Pointlight, ObjectType::Spotlight };
-				s64 object_index[3] = { -1, -1, -1 };
-				f32 closest_dist[3] = {};
+				s64 object_types_count = 4;
+				ObjectType select_types[] = { ObjectType::Plane, ObjectType::Cube, ObjectType::Pointlight, ObjectType::Spotlight };
+				s64 object_index[4] = { -1, -1, -1, -1 };
+				f32 closest_dist[4] = {};
 
-				object_index[0] = get_mesh_selection_index(&g_scene_meshes, &closest_dist[0], ray_origin, ray_direction);
-				object_index[1] = get_pointlight_selection_index(&g_scene_pointlights, &closest_dist[1], ray_origin, ray_direction);
-				object_index[2] = get_spotlight_selection_index(&g_scene_spotlights, &closest_dist[2], ray_origin, ray_direction);
+				object_index[0] = get_mesh_selection_index(&g_scene_planes, &closest_dist[0], ray_origin, ray_direction);
+				object_index[1] = get_mesh_selection_index(&g_scene_meshes, &closest_dist[1], ray_origin, ray_direction);
+				object_index[2] = get_pointlight_selection_index(&g_scene_pointlights, &closest_dist[2], ray_origin, ray_direction);
+				object_index[3] = get_spotlight_selection_index(&g_scene_spotlights, &closest_dist[3], ray_origin, ray_direction);
 
 				ObjectType selected_type = ObjectType::None;
 				s64 closest_obj_index = -1;
@@ -995,7 +996,6 @@ int main(int argc, char* argv[])
 
 		// Shadow map framebuffers
 		{
-			glCullFace(GL_FRONT);
 			glUseProgram(g_shdow_map_shader.id);
 			glViewport(0, 0, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
 
@@ -1012,6 +1012,13 @@ int main(int argc, char* argv[])
 
 				glUseProgram(g_shdow_map_shader.id);
 				glBindVertexArray(g_shdow_map_shader.vao);
+				glCullFace(GL_FRONT);
+
+				for (int i = 0; i < g_scene_planes.items_count; i++)
+				{
+					Mesh plane = *(Mesh*)j_array_get(&g_scene_planes, i);
+					draw_mesh_shadow_map(&plane);
+				}
 
 				for (int i = 0; i < g_scene_meshes.items_count; i++)
 				{
@@ -1040,6 +1047,12 @@ int main(int argc, char* argv[])
 			append_line(glm::vec3(0.0f, -1000.0f, 0.0f), glm::vec3(0.0f, 1000.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 			append_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 			draw_lines(1.0f);
+
+			for (int i = 0; i < g_scene_planes.items_count; i++)
+			{
+				Mesh plane = *(Mesh*)j_array_get(&g_scene_planes, i);
+				draw_mesh(&plane);
+			}
 
 			for (int i = 0; i < g_scene_meshes.items_count; i++)
 			{
@@ -1106,7 +1119,7 @@ int main(int argc, char* argv[])
 			// Draw selection
 			if (has_object_selection())
 			{
-				if (g_selected_object.type == ObjectType::Primitive)
+				if (is_primitive(g_selected_object.type))
 				{
 					Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
 					draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
@@ -1116,7 +1129,7 @@ int main(int argc, char* argv[])
 				{
 					Pointlight* selected_light = (Pointlight*)get_selected_object_ptr();
 					Mesh as_cube = {};
-					as_cube.mesh_type = E_Primitive_Cube;
+					as_cube.mesh_type = MeshType::Cube;
 					as_cube.transforms.scale = glm::vec3(0.35f);
 					as_cube.transforms.translation = selected_light->transforms.translation;
 					draw_mesh_wireframe(&as_cube, selected_light->diffuse);
@@ -1126,7 +1139,7 @@ int main(int argc, char* argv[])
 				{
 					Spotlight* selected_light = (Spotlight*)get_selected_object_ptr();
 					Mesh as_cube = {};
-					as_cube.mesh_type = E_Primitive_Cube;
+					as_cube.mesh_type = MeshType::Cube;
 					as_cube.transforms.scale = glm::vec3(0.35f);
 					as_cube.transforms.translation = selected_light->transforms.translation;
 					draw_mesh_wireframe(&as_cube, selected_light->diffuse);

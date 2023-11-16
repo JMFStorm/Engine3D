@@ -24,6 +24,7 @@ extern std::unordered_map<s64, char*> g_mat_data_map_inverse;
 extern MemoryBuffer g_temp_memory;
 extern MemoryBuffer g_ui_text_vertex_buffer;
 extern MemoryBuffer g_materials_memory;
+extern MemoryBuffer g_scene_planes_memory;
 extern MemoryBuffer g_scene_meshes_memory;
 extern MemoryBuffer g_scene_pointlights_memory;
 extern MemoryBuffer g_scene_spotlights_memory;
@@ -36,6 +37,7 @@ extern TransformationMode g_transform_mode;
 extern JArray g_materials;
 extern JArray g_scene_spotlights;
 extern JArray g_scene_pointlights;
+extern JArray g_scene_planes;
 extern JArray g_scene_meshes;
 extern JArray g_textures;
 
