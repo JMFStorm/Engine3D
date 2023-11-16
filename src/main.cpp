@@ -1014,11 +1014,14 @@ int main(int argc, char* argv[])
 				glBindVertexArray(g_shdow_map_shader.vao);
 				glCullFace(GL_FRONT);
 
+				// Disable for planes
+				/*
 				for (int i = 0; i < g_scene_planes.items_count; i++)
 				{
 					Mesh plane = *(Mesh*)j_array_get(&g_scene_planes, i);
 					draw_mesh_shadow_map(&plane);
 				}
+				*/
 
 				for (int i = 0; i < g_scene_meshes.items_count; i++)
 				{

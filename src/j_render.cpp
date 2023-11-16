@@ -371,16 +371,25 @@ void draw_mesh(Mesh* mesh)
 		float vertices[] =
 		{
 			// Coords			// UV		 // Plane normal
-			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top right
-			0.0f, 0.0f, 0.0f,	0.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top left
-			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, 1.0f, 0.0f, // bot left
+			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f,  1.0f, 0.0f, //  right top
+			0.0f, 0.0f, 0.0f,	0.0f, 1.0f,	 0.0f,  1.0f, 0.0f, //  left  top
+			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f,  1.0f, 0.0f, //  left  bot
 
-			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, 1.0f, 0.0f, // top right
-			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, 1.0f, 0.0f, // bot left 
-			1.0f, 0.0f, 1.0f,	1.0f, 0.0f,	 0.0f, 1.0f, 0.0f  // bot right
+			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f,  1.0f, 0.0f, //  right top
+			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f,  1.0f, 0.0f, //  left  bot
+			1.0f, 0.0f, 1.0f,	1.0f, 0.0f,	 0.0f,  1.0f, 0.0f, //  right bot
+
+			// Other side
+			0.0f, 0.0f, 0.0f,	0.0f, 1.0f,	 0.0f, -1.0f, 0.0f, //  left  top
+			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, //  right top
+			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, //  left  bot
+
+			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, //  left  bot
+			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, //  right top
+			1.0f, 0.0f, 1.0f,	1.0f, 0.0f,	 0.0f, -1.0f, 0.0f  //  right bot
 		};
 
-		draw_indicies = 6;
+		draw_indicies = 12;
 		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
@@ -509,7 +518,7 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 
 			0.0f, 0.0f, 1.0f, // bot left 
 			1.0f, 0.0f, 0.0f, // top right
-			1.0f, 0.0f, 1.0f  // bot right
+			1.0f, 0.0f, 1.0f, // bot right
 		};
 
 		draw_indicies = 12;
