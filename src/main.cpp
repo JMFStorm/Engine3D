@@ -1031,7 +1031,7 @@ int main(int argc, char* argv[])
 			glEnable(GL_DEPTH_TEST);
 		}
 
-		if (/* DEBUG_SHADOWMAP && */ 0 < g_scene_spotlights.items_count) draw_shadow_map_debug_screen(0);
+		if (DEBUG_SHADOWMAP && g_selected_object.type == ObjectType::Spotlight) draw_selected_shadow_map();
 
 		print_debug_texts();
 

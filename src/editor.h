@@ -38,3 +38,5 @@ s64 get_pointlight_selection_index(JArray* lights, f32* select_dist, glm::vec3 r
 s64 get_spotlight_selection_index(JArray* lights, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction);
 
 s64 get_mesh_selection_index(JArray* meshes, f32* select_dist, glm::vec3 ray_origin, glm::vec3 ray_direction);
+
+void draw_selected_shadow_map();

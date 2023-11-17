@@ -3,6 +3,7 @@
 #include "globals.h"
 #include "j_assert.h"
 #include "utils.h"
+#include "j_render.h"
 
 TransformMode get_curr_transformation_mode()
 {
@@ -387,4 +388,10 @@ s64 get_mesh_selection_index(JArray* meshes, f32* select_dist, glm::vec3 ray_ori
 	}
 
 	return index;
+}
+
+void draw_selected_shadow_map()
+{
+	s64 index = g_selected_object.selection_index;
+	draw_shadow_map_debug_screen(index);
 }

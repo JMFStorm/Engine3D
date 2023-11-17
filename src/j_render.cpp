@@ -152,8 +152,8 @@ void draw_mesh_shadow_map(Mesh* mesh, Spotlight* spotlight)
 		glm::vec3 spotlight_view_dir = glm::normalize(glm::vec3(sp_rotation * glm::vec4(0, -1.0f, 0, 0)));
 
 		float dot_result = glm::dot(glm::normalize(spotlight_view_dir), -plane_normal);
-		float dot_result_mult = 1.0f - dot_result;
-		float shadow_bias = 0.005f + (0.025f * dot_result_mult);
+		float dot_result_mult = dot_result;
+		float shadow_bias = 0.025f + (0.05f * dot_result_mult);
 
 		glm::vec3 plane_view_dir = glm::normalize(glm::vec3(mesh->transforms.translation - spotlight->transforms.translation));
 		model = glm::translate(model, plane_view_dir * shadow_bias);
