@@ -124,7 +124,7 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 	glBindVertexArray(0);
 }
 
-void draw_mesh_shadow_map(Mesh* mesh)
+void draw_mesh_shadow_map(Mesh* mesh, Spotlight* spotlight)
 {
 	glm::mat4 model = get_model_matrix(mesh);
 	unsigned int model_loc = glGetUniformLocation(g_shdow_map_shader.id, "model");
@@ -144,6 +144,19 @@ void draw_mesh_shadow_map(Mesh* mesh)
 			0.0f, 0.0f, 1.0f, // bot left 
 			1.0f, 0.0f, 1.0f, // bot right
 		};
+
+		glm::mat4 rotation = get_rotation_matrix(mesh->transforms.rotation);
+		glm::vec3 plane_normal = glm::vec3(rotation * glm::vec4(0, 1.0f, 0, 0));
+
+		glm::mat4 sp_rotation = get_rotation_matrix(spotlight->transforms.rotation);
+		glm::vec3 spotlight_view_dir = glm::normalize(glm::vec3(sp_rotation * glm::vec4(0, -1.0f, 0, 0)));
+
+		float dot_result = glm::dot(glm::normalize(spotlight_view_dir), -plane_normal);
+		float dot_result_mult = 1.0f - dot_result;
+		float shadow_bias = 0.005f + (0.025f * dot_result_mult);
+
+		glm::vec3 plane_view_dir = glm::normalize(glm::vec3(mesh->transforms.translation - spotlight->transforms.translation));
+		model = glm::translate(model, plane_view_dir * shadow_bias);
 
 		draw_indicies = 6;
 		glBindBuffer(GL_ARRAY_BUFFER, g_shdow_map_shader.vbo);
@@ -215,7 +228,6 @@ void draw_mesh_shadow_map(Mesh* mesh)
 	}
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
-
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDrawArrays(GL_TRIANGLES, 0, draw_indicies);
@@ -378,18 +390,9 @@ void draw_mesh(Mesh* mesh)
 			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f,  1.0f, 0.0f, //  right top
 			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f,  1.0f, 0.0f, //  left  bot
 			1.0f, 0.0f, 1.0f,	1.0f, 0.0f,	 0.0f,  1.0f, 0.0f, //  right bot
-
-			// Other side
-			0.0f, 0.0f, 0.0f,	0.0f, 1.0f,	 0.0f, -1.0f, 0.0f, //  left  top
-			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, //  right top
-			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, //  left  bot
-
-			0.0f, 0.0f, 1.0f,	0.0f, 0.0f,	 0.0f, -1.0f, 0.0f, //  left  bot
-			1.0f, 0.0f, 0.0f,	1.0f, 1.0f,	 0.0f, -1.0f, 0.0f, //  right top
-			1.0f, 0.0f, 1.0f,	1.0f, 0.0f,	 0.0f, -1.0f, 0.0f  //  right bot
 		};
 
-		draw_indicies = 12;
+		draw_indicies = 6;
 		glBindBuffer(GL_ARRAY_BUFFER, g_mesh_shader.vbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	}
@@ -917,7 +920,7 @@ void init_all_shaders()
 	}
 }
 
-void draw_shadow_map_debug_screen()
+void draw_shadow_map_debug_screen(s64 spotlight_index)
 {
 	glEnable(GL_DEPTH_TEST);
 	glViewport(0, 0, 500, 500);
@@ -930,7 +933,7 @@ void draw_shadow_map_debug_screen()
 	unsigned int far_loc = glGetUniformLocation(g_shdow_map_debug_shader.id, "far_plane");
 	glUniform1f(far_loc, far_plane);
 
-	Spotlight* sp = (Spotlight*)get_selected_object_ptr();
+	Spotlight* sp = (Spotlight*)j_array_get(&g_scene_spotlights, spotlight_index);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, sp->shadow_map.texture_gpu_id);

@@ -860,21 +860,21 @@ int main(int argc, char* argv[])
 
 				glUseProgram(g_shdow_map_shader.id);
 				glBindVertexArray(g_shdow_map_shader.vao);
-				glCullFace(GL_FRONT);
+				glCullFace(GL_BACK);
 
 				// Disable for planes
-				/*
 				for (int i = 0; i < g_scene_planes.items_count; i++)
 				{
 					Mesh plane = *(Mesh*)j_array_get(&g_scene_planes, i);
-					draw_mesh_shadow_map(&plane);
+					draw_mesh_shadow_map(&plane, spotlight);
 				}
-				*/
+
+				glCullFace(GL_FRONT);
 
 				for (int i = 0; i < g_scene_meshes.items_count; i++)
 				{
 					Mesh mesh = *(Mesh*)j_array_get(&g_scene_meshes, i);
-					draw_mesh_shadow_map(&mesh);
+					draw_mesh_shadow_map(&mesh, spotlight);
 				}
 			}
 
@@ -1031,7 +1031,7 @@ int main(int argc, char* argv[])
 			glEnable(GL_DEPTH_TEST);
 		}
 
-		if (DEBUG_SHADOWMAP && g_selected_object.type == ObjectType::Spotlight) draw_shadow_map_debug_screen();
+		if (/* DEBUG_SHADOWMAP && */ 0 < g_scene_spotlights.items_count) draw_shadow_map_debug_screen(0);
 
 		print_debug_texts();
 

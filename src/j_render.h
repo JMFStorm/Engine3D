@@ -11,7 +11,7 @@ int compile_shader(const char* vertex_shader_path, const char* fragment_shader_p
 
 void draw_billboard(glm::vec3 position, Texture texture, float scale);
 
-void draw_mesh_shadow_map(Mesh* mesh);
+void draw_mesh_shadow_map(Mesh* mesh, Spotlight* spotlight);
 
 void draw_mesh(Mesh* mesh);
 
@@ -27,7 +27,7 @@ void draw_selection_arrows(glm::vec3 position);
 
 void init_all_shaders();
 
-void draw_shadow_map_debug_screen();
+void draw_shadow_map_debug_screen(s64 spotlight_index);
 
 void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y_vh);
 
