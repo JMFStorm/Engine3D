@@ -38,6 +38,7 @@ SceneSelection g_selected_object = {
 	.type = ObjectType::None,
 };
 
+SimpleShader g_skybox_shader = {};
 SimpleShader g_shdow_map_debug_shader = {};
 SimpleShader g_shdow_map_shader = {};
 SimpleShader g_mesh_shader = {};
@@ -65,3 +66,5 @@ s64 g_text_indicies = 0;
 FontData g_debug_font = {};
 
 PostProcessingSettings g_pp_settings = {};
+
+unsigned int g_skybox_cubemap = 0;

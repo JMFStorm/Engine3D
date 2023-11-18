@@ -46,7 +46,7 @@ int load_image_into_texture_id(const char* image_path)
 	unsigned int texture;
 	int x, y, n;
 
-	stbi_set_flip_vertically_on_load(1);
+	stbi_set_flip_vertically_on_load(true);
 	byte* data = stbi_load(image_path, &x, &y, &n, 0);
 	ASSERT_TRUE(data != NULL, "Load texture");
 	ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
@@ -369,6 +369,8 @@ int main(int argc, char* argv[])
 				materials_count++;
 			}
 		}
+
+		g_skybox_cubemap = load_cubemap();
 
 		// Read .jmat files
 		ASSERT_TRUE(std::filesystem::is_directory(g_materials_dir_path), "Valid materials directory");
@@ -803,6 +805,8 @@ int main(int argc, char* argv[])
 			glEnable(GL_DEPTH_TEST);
 			glClearColor(0.34f, 0.44f, 0.42f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			draw_skybox();
 
 			// Coordinate lines
 			append_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));

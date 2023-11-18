@@ -7,6 +7,7 @@
 #include "globals.h"
 #include "utils.h"
 #include "editor.h"
+#include <stb_image.h>
 
 bool check_shader_compile_error(GLuint shader)
 {
@@ -711,6 +712,74 @@ void draw_selection_arrows(glm::vec3 position)
 
 void init_all_shaders()
 {
+	// Skybox
+	{		
+		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/skybox_vs.glsl";
+		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/skybox_fs.glsl";
+
+		g_skybox_shader = simple_shader_init();
+
+		g_skybox_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		{
+			glGenVertexArrays(1, &g_skybox_shader.vao);
+			glGenBuffers(1, &g_skybox_shader.vbo);
+
+			glBindVertexArray(g_skybox_shader.vao);
+			glBindBuffer(GL_ARRAY_BUFFER, g_skybox_shader.vbo);
+
+			float skybox_verticies[] = {
+				// Coords          
+				-1.0f,  1.0f, -1.0f,
+				-1.0f, -1.0f, -1.0f,
+				 1.0f, -1.0f, -1.0f,
+				 1.0f, -1.0f, -1.0f,
+				 1.0f,  1.0f, -1.0f,
+				-1.0f,  1.0f, -1.0f,
+
+				-1.0f, -1.0f,  1.0f,
+				-1.0f, -1.0f, -1.0f,
+				-1.0f,  1.0f, -1.0f,
+				-1.0f,  1.0f, -1.0f,
+				-1.0f,  1.0f,  1.0f,
+				-1.0f, -1.0f,  1.0f,
+
+				 1.0f, -1.0f, -1.0f,
+				 1.0f, -1.0f,  1.0f,
+				 1.0f,  1.0f,  1.0f,
+				 1.0f,  1.0f,  1.0f,
+				 1.0f,  1.0f, -1.0f,
+				 1.0f, -1.0f, -1.0f,
+
+				-1.0f, -1.0f,  1.0f,
+				-1.0f,  1.0f,  1.0f,
+				 1.0f,  1.0f,  1.0f,
+				 1.0f,  1.0f,  1.0f,
+				 1.0f, -1.0f,  1.0f,
+				-1.0f, -1.0f,  1.0f,
+
+				-1.0f,  1.0f, -1.0f,
+				 1.0f,  1.0f, -1.0f,
+				 1.0f,  1.0f,  1.0f,
+				 1.0f,  1.0f,  1.0f,
+				-1.0f,  1.0f,  1.0f,
+				-1.0f,  1.0f, -1.0f,
+
+				-1.0f, -1.0f, -1.0f,
+				-1.0f, -1.0f,  1.0f,
+				 1.0f, -1.0f, -1.0f,
+				 1.0f, -1.0f, -1.0f,
+				-1.0f, -1.0f,  1.0f,
+				 1.0f, -1.0f,  1.0f
+			};
+
+			glBufferData(GL_ARRAY_BUFFER, sizeof(skybox_verticies), skybox_verticies, GL_STATIC_DRAW);
+
+			// Coord attribute
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+			glEnableVertexAttribArray(0);
+		}
+	}
+
 	// Init billboard shader
 	{
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/billboard_vs.glsl";
@@ -1032,4 +1101,63 @@ void draw_ui_text(FontData* font_data, float red, float green, float blue)
 	g_text_buffer_size = 0;
 	g_text_indicies = 0;
 	g_frame_data.draw_calls++;
+}
+
+unsigned int load_cubemap()
+{
+	unsigned int texture_id;
+	glGenTextures(1, &texture_id);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);
+
+	const s64 cube_faces = 6;
+	const char* cubemaps[cube_faces] = {
+		"G:\\projects\\game\\Engine3D\\resources\\skybox\\right.jpg",
+		"G:\\projects\\game\\Engine3D\\resources\\skybox\\left.jpg",
+		"G:\\projects\\game\\Engine3D\\resources\\skybox\\top.jpg",
+		"G:\\projects\\game\\Engine3D\\resources\\skybox\\bottom.jpg",
+		"G:\\projects\\game\\Engine3D\\resources\\skybox\\front.jpg",
+		"G:\\projects\\game\\Engine3D\\resources\\skybox\\back.jpg",
+	};
+
+	int width, height, nrChannels;
+	stbi_set_flip_vertically_on_load(false);
+
+	for (unsigned int i = 0; i < cube_faces; i++)
+	{
+		unsigned char* data = stbi_load(cubemaps[i], &width, &height, &nrChannels, 0);
+		ASSERT_TRUE(data, "Image load");
+
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		stbi_image_free(data);
+	}
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+	return texture_id;
+}
+
+void draw_skybox()
+{
+	glDepthMask(GL_FALSE);
+	glUseProgram(g_skybox_shader.id);
+
+	glm::mat4 projection = get_projection_matrix();
+	glm::mat4 view = get_view_matrix();
+	glm::mat4 view_matrix = glm::mat3(view);
+
+	unsigned int view_loc = glGetUniformLocation(g_skybox_shader.id, "view");
+	unsigned int projection_loc = glGetUniformLocation(g_skybox_shader.id, "projection");
+
+	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view_matrix));
+	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
+
+	glBindVertexArray(g_skybox_shader.vao);
+
+	glBindTexture(GL_TEXTURE_CUBE_MAP, g_skybox_cubemap);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glDepthMask(GL_TRUE);
 }

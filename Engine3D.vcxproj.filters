@@ -96,6 +96,8 @@
     <None Include="resources\shaders\shadow_map_fs.glsl" />
     <None Include="resources\shaders\shadow_map_debug_vs.glsl" />
     <None Include="resources\shaders\shadow_map_debug_fs.glsl" />
+    <None Include="resources\shaders\skybox_vs.glsl" />
+    <None Include="resources\shaders\skybox_fs.glsl" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lib\glew32.lib" />

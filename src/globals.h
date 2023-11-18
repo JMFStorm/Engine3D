@@ -46,6 +46,7 @@ extern int g_selected_texture_item;
 
 extern SceneSelection g_selected_object;
 
+extern SimpleShader g_skybox_shader;
 extern SimpleShader g_shdow_map_debug_shader;
 extern SimpleShader g_shdow_map_shader;
 extern SimpleShader g_mesh_shader;
@@ -54,6 +55,7 @@ extern SimpleShader g_ui_text_shader;
 extern SimpleShader g_line_shader;
 extern SimpleShader g_wireframe_shader;
 extern SimpleShader g_scene_framebuffer_shader;
+
 extern Framebuffer g_scene_framebuffer;
 
 extern UserSettings g_user_settings;
@@ -67,3 +69,5 @@ extern s64 g_text_indicies;
 extern FontData g_debug_font;
 
 extern PostProcessingSettings g_pp_settings;
+
+extern unsigned int g_skybox_cubemap;

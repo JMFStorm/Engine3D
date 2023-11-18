@@ -180,6 +180,8 @@
     <None Include="resources\shaders\shadow_map_debug_vs.glsl" />
     <None Include="resources\shaders\simple_reactangle_fs.glsl" />
     <None Include="resources\shaders\simple_reactangle_vs.glsl" />
+    <None Include="resources\shaders\skybox_fs.glsl" />
+    <None Include="resources\shaders\skybox_vs.glsl" />
     <None Include="resources\shaders\ui_text_fs.glsl" />
     <None Include="resources\shaders\ui_text_vs.glsl" />
     <None Include="resources\shaders\wireframe_fs.glsl" />
