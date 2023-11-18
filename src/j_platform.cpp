@@ -9,7 +9,7 @@
 
 bool file_dialog_get_filepath(char file_path[])
 {
-	OPENFILENAME ofn;
+	OPENFILENAMEW ofn;
 	WCHAR temp_wchars[FILE_PATH_LEN] = {};
 
 	ZeroMemory(&ofn, sizeof(ofn));
@@ -20,7 +20,7 @@ bool file_dialog_get_filepath(char file_path[])
 	ofn.nMaxFile = FILE_PATH_LEN;
 	ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
 
-	int result = GetOpenFileName(&ofn);
+	int result = GetOpenFileNameW(&ofn);
 	if (!result) return false;
 
 	int arraySize = wcslen(temp_wchars) + 1;

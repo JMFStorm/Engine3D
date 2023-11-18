@@ -16,9 +16,9 @@ set IMGUI_FILES=imgui\*.cpp
 
 set NODEFAULTS=/NODEFAULTLIB:MSVCRT
 set LINK_FLAGS=/LTCG /OPT:REF /OPT:ICF /INCREMENTAL:NO
-set LINKED_LIBRARIES=glfw3.lib libglew32.lib glew32.lib opengl32.lib freetype.lib kernel32.lib gdi32.lib shell32.lib
+set LINKED_LIBRARIES=glfw3.lib libglew32.lib glew32.lib opengl32.lib freetype.lib kernel32.lib gdi32.lib shell32.lib Comdlg32.lib
 
-REM NEEDED(?) => winspool.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib user32.lib
+REM NEEDED(?) => winspool.lib ole32.lib oleaut32.lib uuid.lib advapi32.lib user32.lib
 
 cl /O2 /GL /Fo.\dist\obj\ /std:c++20 /EHsc /MT /MP %SOURCE_FILES% %IMGUI_FILES% /I%INCLUDE_DIR% /link %LINK_FLAGS% /OUT:dist/Engine3D.exe %NODEFAULTS% /LIBPATH:%LIB_DIR% %LINKED_LIBRARIES%
 
