@@ -7,6 +7,7 @@
 #include "structs.h"
 #include "globals.h"
 #include "utils.h"
+#include "j_platform.h"
 
 MeshData mesh_serialize(Mesh* mesh)
 {
@@ -254,7 +255,18 @@ void save_all()
 		printf("Saved material: %s\n", to_save.color_texture->file_name);
 	}
 
-	save_scene(g_scene.filepath);
+	char used_filepath[FILE_PATH_LEN] = {};
+
+	if (strcmp(g_scene.filepath, "") == 0)
+	{
+		file_dialog_make_filepath(used_filepath);
+	}
+	else
+	{
+		strcpy_s(used_filepath, FILE_PATH_LEN, g_scene.filepath);
+	}
+
+	save_scene(used_filepath);
 }
 
 void new_scene()

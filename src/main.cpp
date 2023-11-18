@@ -256,93 +256,6 @@ void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
-bool try_init_transform_mode()
-{
-	bool has_valid_mode = g_transform_mode.mode == TransformMode::Translate
-		|| (g_transform_mode.mode == TransformMode::Rotate && g_selected_object.type != ObjectType::Pointlight)
-		|| (g_transform_mode.mode == TransformMode::Scale && is_primitive(g_selected_object.type));
-
-	if (!has_valid_mode) return false;
-
-	if (g_inputs.as_struct.x.is_down) g_transform_mode.axis = Axis::X;
-	else if (g_inputs.as_struct.c.is_down) g_transform_mode.axis = Axis::Y;
-	else if (g_inputs.as_struct.z.is_down) g_transform_mode.axis = Axis::Z;
-
-	double xpos, ypos;
-	glfwGetCursorPos(g_window, &xpos, &ypos);
-
-	glm::vec3 intersection_point;
-	std::array<glm::vec3, 2> use_normals = get_axis_xor_normals(g_transform_mode.axis);
-	g_transform_mode.transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
-
-	Transforms selected_obj_t = *get_selected_object_transforms();
-
-	if (g_transform_mode.mode == TransformMode::Translate)
-	{
-		g_transform_mode.transform_plane_normal = get_vec_for_largest_abs_dot_product(g_transform_mode.transform_ray, use_normals.data(), use_normals.size());
-
-		bool intersection = calculate_plane_ray_intersection(
-			g_transform_mode.transform_plane_normal,
-			selected_obj_t.translation,
-			g_scene_camera.position,
-			g_transform_mode.transform_ray,
-			intersection_point);
-
-		if (!intersection) return false;
-
-		g_transform_mode.prev_intersection_point = intersection_point;
-		g_transform_mode.new_tranformation = selected_obj_t.translation;
-	}
-	else if (g_transform_mode.mode == TransformMode::Scale)
-	{
-		glm::mat4 model = get_rotation_matrix(selected_obj_t.rotation);
-
-		use_normals[0] = model * glm::vec4(use_normals[0], 1.0f);
-		use_normals[1] = model * glm::vec4(use_normals[1], 1.0f);
-
-		g_transform_mode.transform_plane_normal = get_vec_for_largest_abs_dot_product(g_transform_mode.transform_ray, use_normals.data(), use_normals.size());
-
-		bool intersection = calculate_plane_ray_intersection(
-			g_transform_mode.transform_plane_normal,
-			selected_obj_t.translation,
-			g_scene_camera.position,
-			g_transform_mode.transform_ray,
-			intersection_point);
-
-		if (!intersection) return false;
-
-		glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
-		used_normal = model * glm::vec4(used_normal, 1.0f);
-
-		glm::vec3 point_on_scale_plane = closest_point_on_plane(intersection_point, selected_obj_t.translation, used_normal);
-		g_transform_mode.prev_intersection_point = point_on_scale_plane;
-		g_transform_mode.new_tranformation = selected_obj_t.scale;
-	}
-	else if (g_transform_mode.mode == TransformMode::Rotate)
-	{
-		g_transform_mode.transform_plane_normal = get_normal_for_axis(g_transform_mode.axis);
-
-		bool intersection = calculate_plane_ray_intersection(
-			g_transform_mode.transform_plane_normal,
-			selected_obj_t.translation,
-			g_scene_camera.position,
-			g_transform_mode.transform_ray,
-			intersection_point);
-
-		if (!intersection) return false;
-
-		g_transform_mode.prev_intersection_point = intersection_point;
-		g_transform_mode.new_tranformation = selected_obj_t.rotation;
-	}
-
-	return true;
-}
-
-inline bool has_object_selection()
-{
-	return g_selected_object.type != ObjectType::None;
-}
-
 Texture texture_load_from_filepath(char* path)
 {
 	int texture_id = load_image_into_texture_id(path);
@@ -572,8 +485,6 @@ int main(int argc, char* argv[])
 	{
 		glfwPollEvents();
 
-		// -------------
-		// ImGui logics
 		imgui_new_frame();
 
 		right_hand_editor_panel();
