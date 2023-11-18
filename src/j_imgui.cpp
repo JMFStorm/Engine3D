@@ -6,6 +6,8 @@
 #include "globals.h"
 #include "utils.h"
 #include "editor.h"
+#include "scene.h"
+#include "j_platform.h"
 
 void imgui_new_frame()
 {
@@ -25,12 +27,44 @@ void init_imgui()
 	ImGui_ImplOpenGL3_Init("#version 330 core");
 }
 
+void main_menu_bar()
+{
+	if (ImGui::BeginMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("New scene", nullptr, false, true))
+			{
+				printf("New scene\n");
+			}
+
+			if (ImGui::MenuItem("Open scene", nullptr, false, true))
+			{
+				char file_path[FILE_PATH_LEN] = {};
+				file_dialog_get_filepath(file_path);
+				printf("Selected file: %s\n", file_path);
+			}
+
+			if (ImGui::MenuItem("Save all (ctrl + s)", nullptr, false, true))
+			{
+				save_all();
+			}
+
+			ImGui::EndMenu();
+		}
+
+		ImGui::EndMenuBar();
+	}
+}
+
 void right_hand_editor_panel()
 {
 	ImGui::SetNextWindowPos(ImVec2(static_cast<float>(g_game_metrics.game_width_px - PROPERTIES_PANEL_WIDTH), 0), ImGuiCond_Always);
 	ImGui::SetNextWindowSize(ImVec2(PROPERTIES_PANEL_WIDTH, g_game_metrics.game_height_px), ImGuiCond_Always);
 
-	ImGui::Begin("Properties", nullptr, 0);
+	ImGui::Begin("Properties", nullptr, ImGuiWindowFlags_MenuBar);
+
+	main_menu_bar();
 
 	// Add new objects
 	{

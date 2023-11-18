@@ -253,7 +253,7 @@ void save_all()
 	{
 		Material to_save = *(Material*)j_array_get(&g_materials, i);
 		save_material(to_save);
-		printf("Mat saved.\n");
+		printf("Material: %s saved.\n", to_save.color_texture->file_name);
 	}
 
 	save_scene();

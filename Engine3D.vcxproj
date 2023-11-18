@@ -157,6 +157,7 @@
     <ClCompile Include="src\j_buffers.cpp" />
     <ClCompile Include="src\j_files.cpp" />
     <ClCompile Include="src\j_imgui.cpp" />
+    <ClCompile Include="src\j_platform.cpp" />
     <ClCompile Include="src\j_render.cpp" />
     <ClCompile Include="src\j_strings.cpp" />
     <ClCompile Include="src\main.cpp" />
@@ -316,6 +317,7 @@
     <ClInclude Include="include\stb_image.h" />
     <ClInclude Include="src\j_files.h" />
     <ClInclude Include="src\j_imgui.h" />
+    <ClInclude Include="src\j_platform.h" />
     <ClInclude Include="src\j_render.h" />
     <ClInclude Include="src\j_strings.h" />
     <ClInclude Include="src\scene.h" />
