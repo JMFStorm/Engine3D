@@ -52,3 +52,8 @@ void j_array_unordered_delete(JArray* jarray, u64 index)
 	j_array_replace(jarray, last_element, index);
 	j_array_pop_back(jarray);
 }
+
+void j_array_empty(JArray* jarray)
+{
+	jarray->items_count = 0;
+}

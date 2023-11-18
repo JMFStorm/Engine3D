@@ -107,9 +107,9 @@ Material material_deserialize(MaterialData mat_data)
 	return mat;
 }
 
-void save_scene()
+void save_scene(char* filepath)
 {
-	std::ofstream output_file("scene_01.jmap", std::ios::binary);
+	std::ofstream output_file(filepath, std::ios::binary);
 	ASSERT_TRUE(output_file.is_open(), ".jmap file opened for save");
 
 	GameCamera data = g_scene_camera;
@@ -121,65 +121,62 @@ void save_scene()
 	output_file.write(reinterpret_cast<char*>(&data), sizeof(data));
 
 	// Plane count
-	output_file.write(reinterpret_cast<char*>(&g_scene_planes.items_count), sizeof(s64));
+	output_file.write(reinterpret_cast<char*>(&g_scene.planes.items_count), sizeof(s64));
 
 	// Plane data
-	for (int i = 0; i < g_scene_planes.items_count; i++)
+	for (int i = 0; i < g_scene.planes.items_count; i++)
 	{
-		Mesh* plane_ptr = (Mesh*)j_array_get(&g_scene_planes, i);
+		Mesh* plane_ptr = (Mesh*)j_array_get(&g_scene.planes, i);
 		MeshData plane_data = mesh_serialize(plane_ptr);
 		output_file.write(reinterpret_cast<char*>(&plane_data), sizeof(plane_data));
 	}
 
 	// Mesh count
-	output_file.write(reinterpret_cast<char*>(&g_scene_meshes.items_count), sizeof(s64));
+	output_file.write(reinterpret_cast<char*>(&g_scene.meshes.items_count), sizeof(s64));
 
 	// Mesh data
-	for (int i = 0; i < g_scene_meshes.items_count; i++)
+	for (int i = 0; i < g_scene.meshes.items_count; i++)
 	{
-		Mesh* mesh_ptr = (Mesh*)j_array_get(&g_scene_meshes, i);
+		Mesh* mesh_ptr = (Mesh*)j_array_get(&g_scene.meshes, i);
 		MeshData m_data = mesh_serialize(mesh_ptr);
 		output_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
 	}
 
 	// Pointlight count
-	output_file.write(reinterpret_cast<char*>(&g_scene_pointlights.items_count), sizeof(s64));
+	output_file.write(reinterpret_cast<char*>(&g_scene.pointlights.items_count), sizeof(s64));
 
 	// Pointlight data
-	for (int i = 0; i < g_scene_pointlights.items_count; i++)
+	for (int i = 0; i < g_scene.pointlights.items_count; i++)
 	{
-		Pointlight light = *(Pointlight*)j_array_get(&g_scene_pointlights, i);
+		Pointlight light = *(Pointlight*)j_array_get(&g_scene.pointlights, i);
 		output_file.write(reinterpret_cast<char*>(&light), sizeof(light));
 	}
 
 	// Spotlight count
-	output_file.write(reinterpret_cast<char*>(&g_scene_spotlights.items_count), sizeof(s64));
+	output_file.write(reinterpret_cast<char*>(&g_scene.spotlights.items_count), sizeof(s64));
 
 	// Spotlight data
-	for (int i = 0; i < g_scene_spotlights.items_count; i++)
+	for (int i = 0; i < g_scene.spotlights.items_count; i++)
 	{
-		Spotlight light = *(Spotlight*)j_array_get(&g_scene_spotlights, i);
+		Spotlight light = *(Spotlight*)j_array_get(&g_scene.spotlights, i);
 		SpotlightSerialized sp_data = spotlight_serialize(light);
 		output_file.write(reinterpret_cast<char*>(&sp_data), sizeof(sp_data));
 	}
 
 	output_file.close();
+	printf("Saved scene: %s\n", g_scene.filepath);
 }
 
-void load_scene()
+void load_scene(char* filepath)
 {
-	const char* filename = "scene_01.jmap";
 	float h_aspect = (float)g_game_metrics.scene_width_px / (float)g_game_metrics.scene_height_px;
 
-	if (!std::filesystem::exists(filename))
-	{
-		printf(".jmap file not found.\n");
-		g_scene_camera = scene_camera_init(h_aspect);
-		return;
-	}
+	ASSERT_TRUE(std::filesystem::exists(filepath), "Scene filepath exists");
 
-	std::ifstream input_file(filename, std::ios::binary);
+	std::ifstream input_file(filepath, std::ios::binary);
 	ASSERT_TRUE(input_file.is_open(), ".jmap file opened for load");
+
+	strcpy_s(g_scene.filepath, FILE_PATH_LEN, filepath);
 
 	// Header
 	char header[6] = { 0 };
@@ -202,7 +199,7 @@ void load_scene()
 		MeshData plane_data;
 		input_file.read(reinterpret_cast<char*>(&plane_data), sizeof(plane_data));
 		Mesh plane = mesh_deserialize(plane_data);
-		j_array_add(&g_scene_planes, (byte*)&plane);
+		j_array_add(&g_scene.planes, (byte*)&plane);
 	}
 
 	// Mesh count
@@ -215,7 +212,7 @@ void load_scene()
 		MeshData m_data;
 		input_file.read(reinterpret_cast<char*>(&m_data), sizeof(m_data));
 		Mesh mesh = mesh_deserialize(m_data);
-		j_array_add(&g_scene_meshes, (byte*)&mesh);
+		j_array_add(&g_scene.meshes, (byte*)&mesh);
 	}
 
 	// Pointlight count
@@ -227,7 +224,7 @@ void load_scene()
 	{
 		Pointlight light;
 		input_file.read(reinterpret_cast<char*>(&light), sizeof(light));
-		j_array_add(&g_scene_pointlights, (byte*)&light);
+		j_array_add(&g_scene.pointlights, (byte*)&light);
 	}
 
 	// Spotlight count
@@ -241,10 +238,11 @@ void load_scene()
 		SpotlightSerialized sp_data;
 		input_file.read(reinterpret_cast<char*>(&sp_data), sizeof(sp_data));
 		Spotlight sp = spotlight_deserialize(sp_data);
-		j_array_add(&g_scene_spotlights, (byte*)&sp);
+		j_array_add(&g_scene.spotlights, (byte*)&sp);
 	}
 
 	input_file.close();
+	printf("Loaded scene: %s\n", g_scene.filepath);
 }
 
 void save_all()
@@ -253,8 +251,17 @@ void save_all()
 	{
 		Material to_save = *(Material*)j_array_get(&g_materials, i);
 		save_material(to_save);
-		printf("Material: %s saved.\n", to_save.color_texture->file_name);
+		printf("Saved material: %s\n", to_save.color_texture->file_name);
 	}
 
-	save_scene();
+	save_scene(g_scene.filepath);
+}
+
+void new_scene()
+{
+	g_scene_camera = scene_camera_init(g_scene_camera.aspect_ratio_horizontal);
+	j_array_empty(&g_scene.planes);
+	j_array_empty(&g_scene.meshes);
+	j_array_empty(&g_scene.pointlights);
+	j_array_empty(&g_scene.spotlights);
 }

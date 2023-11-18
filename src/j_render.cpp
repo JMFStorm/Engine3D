@@ -276,11 +276,11 @@ void draw_mesh(Mesh* mesh)
 
 		// Pointlights
 		unsigned int pointlights_count_loc = glGetUniformLocation(g_mesh_shader.id, "pointlights_count");
-		glUniform1i(pointlights_count_loc, g_scene_pointlights.items_count);
+		glUniform1i(pointlights_count_loc, g_scene.pointlights.items_count);
 
-		for (int i = 0; i < g_scene_pointlights.items_count; i++)
+		for (int i = 0; i < g_scene.pointlights.items_count; i++)
 		{
-			auto pointlight = *(Pointlight*)j_array_get(&g_scene_pointlights, i);
+			auto pointlight = *(Pointlight*)j_array_get(&g_scene.pointlights, i);
 
 			sprintf_s(str_value, "pointlights[%d].is_on", i);
 			unsigned int light_is_on_loc = glGetUniformLocation(g_mesh_shader.id, str_value);
@@ -310,14 +310,14 @@ void draw_mesh(Mesh* mesh)
 
 		// Spotlights
 		unsigned int spotlights_count_loc = glGetUniformLocation(g_mesh_shader.id, "spotlights_count");
-		glUniform1i(spotlights_count_loc, g_scene_spotlights.items_count);
+		glUniform1i(spotlights_count_loc, g_scene.spotlights.items_count);
 
 		int shadow_map_tex_id = GL_TEXTURE2;
 		int shadow_loc_i = 2;
 
-		for (int i = 0; i < g_scene_spotlights.items_count; i++)
+		for (int i = 0; i < g_scene.spotlights.items_count; i++)
 		{
-			auto spotlight = *(Spotlight*)j_array_get(&g_scene_spotlights, i);
+			auto spotlight = *(Spotlight*)j_array_get(&g_scene.spotlights, i);
 
 			glm::vec3 spot_dir = get_spotlight_dir(spotlight);
 			glm::mat4 light_space_matrix = get_spotlight_light_space_matrix(spotlight);
@@ -933,7 +933,7 @@ void draw_shadow_map_debug_screen(s64 spotlight_index)
 	unsigned int far_loc = glGetUniformLocation(g_shdow_map_debug_shader.id, "far_plane");
 	glUniform1f(far_loc, far_plane);
 
-	Spotlight* sp = (Spotlight*)j_array_get(&g_scene_spotlights, spotlight_index);
+	Spotlight* sp = (Spotlight*)j_array_get(&g_scene.spotlights, spotlight_index);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, sp->shadow_map.texture_gpu_id);

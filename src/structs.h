@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include "types.h"
 #include "constants.h"
+#include "j_array.h"
 
 typedef struct Transforms {
 	glm::vec3 translation;
@@ -213,3 +214,11 @@ typedef struct PostProcessingSettings {
 	f32 blur_effect_amount;
 	f32 gamma_amount;
 } PostProcessingSettings;
+
+typedef struct Scene {
+	char filepath[FILE_PATH_LEN];
+	JArray planes;
+	JArray meshes;
+	JArray pointlights;
+	JArray spotlights;
+} Scene;

@@ -566,7 +566,7 @@ int main(int argc, char* argv[])
 
 	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
-	load_scene();
+	new_scene();
 
 	while (!glfwWindowShouldClose(g_window))
 	{
@@ -642,10 +642,10 @@ int main(int argc, char* argv[])
 				s64 object_index[4] = { -1, -1, -1, -1 };
 				f32 closest_dist[4] = {};
 
-				object_index[0] = get_mesh_selection_index(&g_scene_planes, &closest_dist[0], ray_origin, ray_direction);
-				object_index[1] = get_mesh_selection_index(&g_scene_meshes, &closest_dist[1], ray_origin, ray_direction);
-				object_index[2] = get_pointlight_selection_index(&g_scene_pointlights, &closest_dist[2], ray_origin, ray_direction);
-				object_index[3] = get_spotlight_selection_index(&g_scene_spotlights, &closest_dist[3], ray_origin, ray_direction);
+				object_index[0] = get_mesh_selection_index(&g_scene.planes, &closest_dist[0], ray_origin, ray_direction);
+				object_index[1] = get_mesh_selection_index(&g_scene.meshes, &closest_dist[1], ray_origin, ray_direction);
+				object_index[2] = get_pointlight_selection_index(&g_scene.pointlights, &closest_dist[2], ray_origin, ray_direction);
+				object_index[3] = get_spotlight_selection_index(&g_scene.spotlights, &closest_dist[3], ray_origin, ray_direction);
 
 				ObjectType selected_type = ObjectType::None;
 				s64 closest_obj_index = -1;
@@ -847,9 +847,9 @@ int main(int argc, char* argv[])
 			glUseProgram(g_shdow_map_shader.id);
 			glViewport(0, 0, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
 
-			for (int i = 0; i < g_scene_spotlights.items_count; i++)
+			for (int i = 0; i < g_scene.spotlights.items_count; i++)
 			{
-				Spotlight* spotlight = (Spotlight*)j_array_get(&g_scene_spotlights, i);
+				Spotlight* spotlight = (Spotlight*)j_array_get(&g_scene.spotlights, i);
 				glm::mat4 light_space_matrix = get_spotlight_light_space_matrix(*spotlight);
 
 				unsigned int light_matrix_loc = glGetUniformLocation(g_shdow_map_shader.id, "lightSpaceMatrix");
@@ -863,17 +863,17 @@ int main(int argc, char* argv[])
 				glCullFace(GL_BACK);
 
 				// Disable for planes
-				for (int i = 0; i < g_scene_planes.items_count; i++)
+				for (int i = 0; i < g_scene.planes.items_count; i++)
 				{
-					Mesh plane = *(Mesh*)j_array_get(&g_scene_planes, i);
+					Mesh plane = *(Mesh*)j_array_get(&g_scene.planes, i);
 					draw_mesh_shadow_map(&plane, spotlight);
 				}
 
 				glCullFace(GL_FRONT);
 
-				for (int i = 0; i < g_scene_meshes.items_count; i++)
+				for (int i = 0; i < g_scene.meshes.items_count; i++)
 				{
-					Mesh mesh = *(Mesh*)j_array_get(&g_scene_meshes, i);
+					Mesh mesh = *(Mesh*)j_array_get(&g_scene.meshes, i);
 					draw_mesh_shadow_map(&mesh, spotlight);
 				}
 			}
@@ -899,29 +899,29 @@ int main(int argc, char* argv[])
 			append_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 			draw_lines(1.0f);
 
-			for (int i = 0; i < g_scene_planes.items_count; i++)
+			for (int i = 0; i < g_scene.planes.items_count; i++)
 			{
-				Mesh plane = *(Mesh*)j_array_get(&g_scene_planes, i);
+				Mesh plane = *(Mesh*)j_array_get(&g_scene.planes, i);
 				draw_mesh(&plane);
 			}
 
-			for (int i = 0; i < g_scene_meshes.items_count; i++)
+			for (int i = 0; i < g_scene.meshes.items_count; i++)
 			{
-				Mesh mesh = *(Mesh*)j_array_get(&g_scene_meshes, i);
+				Mesh mesh = *(Mesh*)j_array_get(&g_scene.meshes, i);
 				draw_mesh(&mesh);
 			}
 
 			// Pointlights
-			for (int i = 0; i < g_scene_pointlights.items_count; i++)
+			for (int i = 0; i < g_scene.pointlights.items_count; i++)
 			{
-				auto light = *(Pointlight*)j_array_get(&g_scene_pointlights, i);
+				auto light = *(Pointlight*)j_array_get(&g_scene.pointlights, i);
 				draw_billboard(light.transforms.translation, pointlight_texture, 0.5f);
 			}
 
 			// Spotlights
-			for (int i = 0; i < g_scene_spotlights.items_count; i++)
+			for (int i = 0; i < g_scene.spotlights.items_count; i++)
 			{
-				auto spotlight = *(Spotlight*)j_array_get(&g_scene_spotlights, i);
+				auto spotlight = *(Spotlight*)j_array_get(&g_scene.spotlights, i);
 				draw_billboard(spotlight.transforms.translation, spotlight_texture, 0.5f);
 				glm::vec3 sp_dir = get_spotlight_dir(spotlight);
 				append_line(spotlight.transforms.translation, spotlight.transforms.translation + sp_dir, spotlight.diffuse);

@@ -8,6 +8,7 @@
 #include "editor.h"
 #include "scene.h"
 #include "j_platform.h"
+#include "j_assert.h"
 
 void imgui_new_frame()
 {
@@ -27,6 +28,25 @@ void init_imgui()
 	ImGui_ImplOpenGL3_Init("#version 330 core");
 }
 
+void try_open_scene()
+{
+	char file_path[FILE_PATH_LEN] = {};
+	bool success = file_dialog_get_filepath(file_path);
+	ASSERT_TRUE(success, "Open scene");
+
+	char* file_ext = str_get_file_ext(file_path);
+	bool is_j_map = strcmp(file_ext, ".jmap") == 0;
+
+	if (!is_j_map)
+	{
+		printf("Selected file is not .jmap. Won't load scene.\n");
+		return;
+	}
+
+	new_scene();
+	load_scene(file_path);
+}
+
 void main_menu_bar()
 {
 	if (ImGui::BeginMenuBar())
@@ -35,14 +55,12 @@ void main_menu_bar()
 		{
 			if (ImGui::MenuItem("New scene", nullptr, false, true))
 			{
-				printf("New scene\n");
+				new_scene();
 			}
 
 			if (ImGui::MenuItem("Open scene", nullptr, false, true))
 			{
-				char file_path[FILE_PATH_LEN] = {};
-				file_dialog_get_filepath(file_path);
-				printf("Selected file: %s\n", file_path);
+				try_open_scene();
 			}
 
 			if (ImGui::MenuItem("Save all (ctrl + s)", nullptr, false, true))

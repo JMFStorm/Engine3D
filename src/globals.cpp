@@ -28,11 +28,9 @@ MemoryBuffer g_material_names_memory = {};
 JStringArray g_material_names = {};
 TransformationMode g_transform_mode = {};
 
+Scene g_scene = {};
+
 JArray g_materials = {};
-JArray g_scene_spotlights = {};
-JArray g_scene_pointlights = {};
-JArray g_scene_planes = {};
-JArray g_scene_meshes = {};
 JArray g_textures = {};
 
 SceneSelection g_selected_object = {

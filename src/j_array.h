@@ -20,3 +20,5 @@ void j_array_pop_back(JArray* array);
 void j_array_replace(JArray* array, byte* new_element_ptr, u64 index);
 
 void j_array_unordered_delete(JArray* jarray, u64 index);
+
+void j_array_empty(JArray* jarray);

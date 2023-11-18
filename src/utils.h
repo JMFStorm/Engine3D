@@ -73,6 +73,8 @@ inline float get_vec3_val_by_axis(glm::vec3 vec, Axis axis)
 
 bool str_trim_file_ext(char* str);
 
+char* str_get_file_ext(char* str);
+
 float normalize_screen_px_to_ndc(int value, int max);
 
 float normalize_value(float value, float src_max, float dest_max);

@@ -37,11 +37,9 @@ extern MemoryBuffer g_material_names_memory;
 extern JStringArray g_material_names;
 extern TransformationMode g_transform_mode;
 
+extern Scene g_scene;
+
 extern JArray g_materials;
-extern JArray g_scene_spotlights;
-extern JArray g_scene_pointlights;
-extern JArray g_scene_planes;
-extern JArray g_scene_meshes;
 extern JArray g_textures;
 
 extern int g_selected_texture_item;

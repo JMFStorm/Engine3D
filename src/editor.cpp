@@ -23,16 +23,16 @@ TransformMode get_curr_transformation_mode()
 void* get_selected_object_ptr()
 {
 	if (g_selected_object.type == ObjectType::Plane)
-		return (void*)j_array_get(&g_scene_planes, g_selected_object.selection_index);
+		return (void*)j_array_get(&g_scene.planes, g_selected_object.selection_index);
 
 	if (g_selected_object.type == ObjectType::Cube)
-		return (void*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
+		return (void*)j_array_get(&g_scene.meshes, g_selected_object.selection_index);
 
 	if (g_selected_object.type == ObjectType::Pointlight)
-		return (void*)j_array_get(&g_scene_pointlights, g_selected_object.selection_index);
+		return (void*)j_array_get(&g_scene.pointlights, g_selected_object.selection_index);
 
 	if (g_selected_object.type == ObjectType::Spotlight)
-		return (void*)j_array_get(&g_scene_spotlights, g_selected_object.selection_index);
+		return (void*)j_array_get(&g_scene.spotlights, g_selected_object.selection_index);
 
 	return nullptr;
 }
@@ -41,25 +41,25 @@ glm::vec3 get_selected_object_translation()
 {
 	if (g_selected_object.type == ObjectType::Plane)
 	{
-		Mesh* mesh = (Mesh*)j_array_get(&g_scene_planes, g_selected_object.selection_index);
+		Mesh* mesh = (Mesh*)j_array_get(&g_scene.planes, g_selected_object.selection_index);
 		return mesh->transforms.translation;
 	}
 
 	if (g_selected_object.type == ObjectType::Cube)
 	{
-		Mesh* mesh = (Mesh*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
+		Mesh* mesh = (Mesh*)j_array_get(&g_scene.meshes, g_selected_object.selection_index);
 		return mesh->transforms.translation;
 	}
 
 	if (g_selected_object.type == ObjectType::Pointlight)
 	{
-		Pointlight* p_light = (Pointlight*)j_array_get(&g_scene_pointlights, g_selected_object.selection_index);
+		Pointlight* p_light = (Pointlight*)j_array_get(&g_scene.pointlights, g_selected_object.selection_index);
 		return p_light->transforms.translation;
 	}
 
 	if (g_selected_object.type == ObjectType::Spotlight)
 	{
-		Spotlight* s_light = (Spotlight*)j_array_get(&g_scene_spotlights, g_selected_object.selection_index);
+		Spotlight* s_light = (Spotlight*)j_array_get(&g_scene.spotlights, g_selected_object.selection_index);
 		return s_light->transforms.translation;
 	}
 
@@ -100,10 +100,10 @@ void delete_on_object_index(JArray* jarray_ptr, s64 jarray_index)
 
 void delete_selected_object()
 {
-	if (g_selected_object.type == ObjectType::Plane) delete_on_object_index(&g_scene_planes, g_selected_object.selection_index);
-	else if (g_selected_object.type == ObjectType::Cube) delete_on_object_index(&g_scene_meshes, g_selected_object.selection_index);
-	else if (g_selected_object.type == ObjectType::Pointlight) delete_on_object_index(&g_scene_pointlights, g_selected_object.selection_index);
-	else if (g_selected_object.type == ObjectType::Spotlight) delete_on_object_index(&g_scene_spotlights, g_selected_object.selection_index);
+	if (g_selected_object.type == ObjectType::Plane) delete_on_object_index(&g_scene.planes, g_selected_object.selection_index);
+	else if (g_selected_object.type == ObjectType::Cube) delete_on_object_index(&g_scene.meshes, g_selected_object.selection_index);
+	else if (g_selected_object.type == ObjectType::Pointlight) delete_on_object_index(&g_scene.pointlights, g_selected_object.selection_index);
+	else if (g_selected_object.type == ObjectType::Spotlight) delete_on_object_index(&g_scene.spotlights, g_selected_object.selection_index);
 }
 
 s64 add_new_mesh(Mesh new_mesh)
@@ -114,13 +114,13 @@ s64 add_new_mesh(Mesh new_mesh)
 
 	if (new_mesh.mesh_type == MeshType::Cube)
 	{
-		j_array_add(&g_scene_meshes, (byte*)&new_mesh);
-		new_index = g_scene_meshes.items_count - 1;
+		j_array_add(&g_scene.meshes, (byte*)&new_mesh);
+		new_index = g_scene.meshes.items_count - 1;
 	}
 	else if (new_mesh.mesh_type == MeshType::Plane)
 	{
-		j_array_add(&g_scene_planes, (byte*)&new_mesh);
-		new_index = g_scene_planes.items_count - 1;
+		j_array_add(&g_scene.planes, (byte*)&new_mesh);
+		new_index = g_scene.planes.items_count - 1;
 	}
 
 	ASSERT_TRUE(new_index != -1, "Add new mesh");
@@ -130,15 +130,15 @@ s64 add_new_mesh(Mesh new_mesh)
 
 s64 add_new_pointlight(Pointlight new_light)
 {
-	j_array_add(&g_scene_pointlights, (byte*)&new_light);
-	s64 new_index = g_scene_pointlights.items_count - 1;
+	j_array_add(&g_scene.pointlights, (byte*)&new_light);
+	s64 new_index = g_scene.pointlights.items_count - 1;
 	return new_index;
 }
 
 s64 add_new_spotlight(Spotlight new_light)
 {
-	j_array_add(&g_scene_spotlights, (byte*)&new_light);
-	s64 new_index = g_scene_spotlights.items_count - 1;
+	j_array_add(&g_scene.spotlights, (byte*)&new_light);
+	s64 new_index = g_scene.spotlights.items_count - 1;
 	return new_index;
 }
 
@@ -146,28 +146,28 @@ void duplicate_selected_object()
 {
 	if (g_selected_object.type == ObjectType::Plane)
 	{
-		Mesh mesh_copy = *(Mesh*)j_array_get(&g_scene_planes, g_selected_object.selection_index);
+		Mesh mesh_copy = *(Mesh*)j_array_get(&g_scene.planes, g_selected_object.selection_index);
 		s64 index = add_new_mesh(mesh_copy);
 		g_selected_object.type = ObjectType::Plane;
 		g_selected_object.selection_index = index;
 	}
 	else if (g_selected_object.type == ObjectType::Cube)
 	{
-		Mesh mesh_copy = *(Mesh*)j_array_get(&g_scene_meshes, g_selected_object.selection_index);
+		Mesh mesh_copy = *(Mesh*)j_array_get(&g_scene.meshes, g_selected_object.selection_index);
 		s64 index = add_new_mesh(mesh_copy);
 		g_selected_object.type = ObjectType::Cube;
 		g_selected_object.selection_index = index;
 	}
 	else if (g_selected_object.type == ObjectType::Pointlight)
 	{
-		Pointlight light_copy = *(Pointlight*)j_array_get(&g_scene_pointlights, g_selected_object.selection_index);
+		Pointlight light_copy = *(Pointlight*)j_array_get(&g_scene.pointlights, g_selected_object.selection_index);
 		s64 index = add_new_pointlight(light_copy);
 		g_selected_object.type = ObjectType::Pointlight;
 		g_selected_object.selection_index = index;
 	}
 	else if (g_selected_object.type == ObjectType::Spotlight)
 	{
-		Spotlight light_copy = *(Spotlight*)j_array_get(&g_scene_spotlights, g_selected_object.selection_index);
+		Spotlight light_copy = *(Spotlight*)j_array_get(&g_scene.spotlights, g_selected_object.selection_index);
 		light_copy.shadow_map = init_spotlight_shadow_map();
 		s64 index = add_new_spotlight(light_copy);
 		g_selected_object.type = ObjectType::Spotlight;

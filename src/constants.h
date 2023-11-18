@@ -13,6 +13,7 @@ constexpr const s64 SCENE_TEXTURES_MAX_COUNT = 100;
 constexpr const s64 SCENE_PLANES_MAX_COUNT = 100;
 constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
 constexpr const s64 MAX_LINES_BUFFER = 200;
+constexpr const s64 MAX_UI_CHARS = 1000;
 
 constexpr const s64 PROPERTIES_PANEL_WIDTH = 400;
 
@@ -25,4 +26,3 @@ constexpr const u64 SHADOW_MAP_HEIGHT = 1024;
 constexpr const f32 SHADOW_MAP_NEAR_PLANE = 0.25f;
 
 constexpr const float debug_font_vh = 1.0f;
-constexpr const s64 g_max_UI_chars = 1000;

@@ -37,6 +37,13 @@ bool str_trim_file_ext(char* str)
 	return true;
 }
 
+char* str_get_file_ext(char* str)
+{
+	char* last_dot = strrchr(str, '.');
+	if (last_dot == nullptr) return nullptr;
+	return last_dot;
+}
+
 float normalize_screen_px_to_ndc(int value, int max)
 {
 	float this1 = static_cast<float>(value) / static_cast<float>(max);
@@ -429,13 +436,13 @@ void print_debug_texts()
 	sprintf_s(debug_str, "Camera X=%.2f Y=%.2f Z=%.2f", g_scene_camera.position.x, g_scene_camera.position.y, g_scene_camera.position.z);
 	append_ui_text(&g_debug_font, debug_str, 0.5f, 99.0f);
 
-	sprintf_s(debug_str, "Meshes %lld / %lld", g_scene_meshes.items_count, g_scene_meshes.max_items);
+	sprintf_s(debug_str, "Meshes %lld / %lld", g_scene.meshes.items_count, g_scene.meshes.max_items);
 	append_ui_text(&g_debug_font, debug_str, 0.5f, 98.0f);
 
-	sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene_pointlights.items_count, g_scene_pointlights.max_items);
+	sprintf_s(debug_str, "Pointlights %lld / %lld", g_scene.pointlights.items_count, g_scene.pointlights.max_items);
 	append_ui_text(&g_debug_font, debug_str, 0.5f, 97.0f);
 
-	sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene_spotlights.items_count, g_scene_spotlights.max_items);
+	sprintf_s(debug_str, "Spotlights %lld / %lld", g_scene.spotlights.items_count, g_scene.spotlights.max_items);
 	append_ui_text(&g_debug_font, debug_str, 0.5f, 96.0f);
 
 	char* t_mode = nullptr;
@@ -488,19 +495,19 @@ void init_framebuffer_resize(unsigned int* framebuffer_texture_id, unsigned int*
 
 void init_memory_buffers()
 {
-	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Temp memory"));
+	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Permanent temp memory"));
 
 	memory_buffer_mallocate(&g_scene_planes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene plane meshes"));
-	g_scene_planes = j_array_init(SCENE_PLANES_MAX_COUNT, sizeof(Mesh), g_scene_planes_memory.memory);
+	g_scene.planes = j_array_init(SCENE_PLANES_MAX_COUNT, sizeof(Mesh), g_scene_planes_memory.memory);
 
-	memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene '3D' meshes"));
-	g_scene_meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), g_scene_meshes_memory.memory);
+	memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene 3D meshes"));
+	g_scene.meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), g_scene_meshes_memory.memory);
 
 	memory_buffer_mallocate(&g_scene_pointlights_memory, sizeof(Pointlight) * SCENE_POINTLIGHTS_MAX_COUNT, const_cast<char*>("Scene pointlights"));
-	g_scene_pointlights = j_array_init(SCENE_POINTLIGHTS_MAX_COUNT, sizeof(Pointlight), g_scene_pointlights_memory.memory);
+	g_scene.pointlights = j_array_init(SCENE_POINTLIGHTS_MAX_COUNT, sizeof(Pointlight), g_scene_pointlights_memory.memory);
 
 	memory_buffer_mallocate(&g_scene_spotlights_memory, sizeof(Spotlight) * SCENE_SPOTLIGHTS_MAX_COUNT, const_cast<char*>("Scene spotlights"));
-	g_scene_spotlights = j_array_init(SCENE_SPOTLIGHTS_MAX_COUNT, sizeof(Spotlight), g_scene_spotlights_memory.memory);
+	g_scene.spotlights = j_array_init(SCENE_SPOTLIGHTS_MAX_COUNT, sizeof(Spotlight), g_scene_spotlights_memory.memory);
 
 	memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
 	g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), g_texture_memory.memory);
@@ -509,16 +516,16 @@ void init_memory_buffers()
 	g_materials = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Material), g_materials_memory.memory);
 
 	constexpr const s64 material_names_arr_size = FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
-	memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material items"));
+	memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material strings"));
 	g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
 
 	int vertex_bytes_for_char = sizeof(float) * 30;
-	int text_buffer_size = vertex_bytes_for_char * g_max_UI_chars;
-	memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text draw verticies"));
+	int text_buffer_size = vertex_bytes_for_char * MAX_UI_CHARS;
+	memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text vertex buffer"));
 
 	int vertex_bytes_for_line = sizeof(float) * 12;
 	int line_buffer_size = vertex_bytes_for_line * MAX_LINES_BUFFER;
-	memory_buffer_mallocate(&g_line_vertex_buffer, text_buffer_size, const_cast<char*>("Line draw verticies"));
+	memory_buffer_mallocate(&g_line_vertex_buffer, text_buffer_size, const_cast<char*>("Line vertex buffer"));
 }
 
 glm::vec3 get_camera_ray_from_scene_px(int x, int y)
