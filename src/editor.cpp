@@ -477,3 +477,52 @@ bool try_init_transform_mode()
 
 	return true;
 }
+
+void draw_selection_arrows(glm::vec3 position)
+{
+	auto vec_x = glm::vec3(1.0f, 0, 0);
+	auto vec_y = glm::vec3(0, 1.0f, 0);
+	auto vec_z = glm::vec3(0, 0, 1.0f);
+
+	if (g_transform_mode.mode == TransformMode::Rotate)
+	{
+		auto transforms = get_selected_object_transforms();
+		auto rotation_m = glm::mat3(get_rotation_matrix(transforms->rotation));
+
+		vec_x = rotation_m * vec_x;
+		vec_z = rotation_m * vec_z;
+
+		auto start_x = position - vec_x * 0.5f;
+		auto start_y = position - vec_y * 0.5f;
+		auto start_z = position - vec_z * 0.5f;
+
+		auto end_x = position + vec_x * 0.5f;
+		auto end_y = position + vec_y * 0.5f;
+		auto end_z = position + vec_z * 0.5f;
+
+		append_line(start_y, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
+		append_line(start_x, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
+		append_line(start_z, end_z, glm::vec3(0.0f, 0.0f, 1.0f));
+		draw_lines_ontop(7.0f);
+	}
+	else
+	{
+		if (g_transform_mode.mode == TransformMode::Scale)
+		{
+			Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
+			glm::mat4 rotation_mat = get_rotation_matrix(mesh_ptr->transforms.rotation);
+			vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
+			vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
+			vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
+		}
+
+		auto end_x = position + vec_x;
+		auto end_y = position + vec_y;
+		auto end_z = position + vec_z;
+
+		append_line(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
+		append_line(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
+		append_line(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f));
+		draw_lines_ontop(14.0f);
+	}
+}

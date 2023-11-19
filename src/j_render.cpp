@@ -105,16 +105,8 @@ void draw_billboard(glm::vec3 position, Texture texture, float scale)
 	model = model * rotation_matrix;
 	model = glm::scale(model, glm::vec3(scale));
 
-	glm::mat4 projection = get_projection_matrix();
-	glm::mat4 view = get_view_matrix();
-
 	unsigned int model_loc = glGetUniformLocation(g_billboard_shader.id, "model");
-	unsigned int view_loc = glGetUniformLocation(g_billboard_shader.id, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_billboard_shader.id, "projection");
-
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
-	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture.gpu_id);
@@ -241,16 +233,11 @@ void draw_mesh(Mesh* mesh)
 	glBindVertexArray(g_mesh_shader.vao);
 
 	glm::mat4 model = get_model_matrix(mesh);
-	glm::mat4 projection = get_projection_matrix();
-	glm::mat4 view = get_view_matrix();
 
 	unsigned int model_loc = glGetUniformLocation(g_mesh_shader.id, "model");
-	unsigned int view_loc = glGetUniformLocation(g_mesh_shader.id, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_mesh_shader.id, "projection");
 	unsigned int camera_view_loc = glGetUniformLocation(g_mesh_shader.id, "view_coords");
 
 	unsigned int ambient_loc = glGetUniformLocation(g_mesh_shader.id, "global_ambient_light");
-
 	unsigned int use_texture_loc = glGetUniformLocation(g_mesh_shader.id, "use_texture");
 	unsigned int use_gloss_texture_loc = glGetUniformLocation(g_mesh_shader.id, "use_specular_texture");
 	unsigned int uv_loc = glGetUniformLocation(g_mesh_shader.id, "uv_multiplier");
@@ -261,8 +248,6 @@ void draw_mesh(Mesh* mesh)
 	unsigned int material_shine_loc = glGetUniformLocation(g_mesh_shader.id, "material.shininess");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
-	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	glUniform1f(uv_loc, mesh->uv_multiplier);
 	glUniform1i(color_texture_loc, 0);
@@ -488,17 +473,11 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 	glBindVertexArray(g_wireframe_shader.vao);
 
 	glm::mat4 model = get_model_matrix(mesh);
-	glm::mat4 projection = get_projection_matrix();
-	glm::mat4 view = get_view_matrix();
 
 	unsigned int model_loc = glGetUniformLocation(g_wireframe_shader.id, "model");
-	unsigned int view_loc = glGetUniformLocation(g_wireframe_shader.id, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_wireframe_shader.id, "projection");
 	unsigned int color_loc = glGetUniformLocation(g_wireframe_shader.id, "color");
 
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
-	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 	glUniform3f(color_loc, color.r, color.g, color.b);
 
 	s64 draw_indicies = 0;
@@ -628,17 +607,8 @@ void draw_lines(float thickness)
 	glBindVertexArray(g_line_shader.vao);
 
 	glm::mat4 model = glm::mat4(1.0f);
-	glm::mat4 projection = glm::perspective(glm::radians(g_scene_camera.fov), g_scene_camera.aspect_ratio_horizontal, 0.1f, 100.0f);
-	auto new_mat_4 = g_scene_camera.position + g_scene_camera.front_vec;
-	glm::mat4 view = glm::lookAt(g_scene_camera.position, new_mat_4, g_scene_camera.up_vec);
-
 	unsigned int model_loc = glGetUniformLocation(g_line_shader.id, "model");
-	unsigned int view_loc = glGetUniformLocation(g_line_shader.id, "view");
-	unsigned int projection_loc = glGetUniformLocation(g_line_shader.id, "projection");
-
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
-	glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
 	glBufferData(GL_ARRAY_BUFFER, g_line_buffer_size, g_line_vertex_buffer.memory, GL_DYNAMIC_DRAW);
@@ -659,55 +629,6 @@ void draw_lines_ontop(float thickness)
 	glDisable(GL_DEPTH_TEST);
 	draw_lines(thickness);
 	glEnable(GL_DEPTH_TEST);
-}
-
-void draw_selection_arrows(glm::vec3 position)
-{
-	auto vec_x = glm::vec3(1.0f, 0, 0);
-	auto vec_y = glm::vec3(0, 1.0f, 0);
-	auto vec_z = glm::vec3(0, 0, 1.0f);
-
-	if (g_transform_mode.mode == TransformMode::Rotate)
-	{
-		auto transforms = get_selected_object_transforms();
-		auto rotation_m = glm::mat3(get_rotation_matrix(transforms->rotation));
-
-		vec_x = rotation_m * vec_x;
-		vec_z = rotation_m * vec_z;
-
-		auto start_x = position - vec_x * 0.5f;
-		auto start_y = position - vec_y * 0.5f;
-		auto start_z = position - vec_z * 0.5f;
-
-		auto end_x = position + vec_x * 0.5f;
-		auto end_y = position + vec_y * 0.5f;
-		auto end_z = position + vec_z * 0.5f;
-
-		append_line(start_y, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
-		append_line(start_x, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
-		append_line(start_z, end_z, glm::vec3(0.0f, 0.0f, 1.0f));
-		draw_lines_ontop(7.0f);
-	}
-	else
-	{
-		if (g_transform_mode.mode == TransformMode::Scale)
-		{
-			Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
-			glm::mat4 rotation_mat = get_rotation_matrix(mesh_ptr->transforms.rotation);
-			vec_x = rotation_mat * glm::vec4(vec_x, 1.0f);
-			vec_y = rotation_mat * glm::vec4(vec_y, 1.0f);
-			vec_z = rotation_mat * glm::vec4(vec_z, 1.0f);
-		}
-
-		auto end_x = position + vec_x;
-		auto end_y = position + vec_y;
-		auto end_z = position + vec_z;
-
-		append_line(position, end_x, glm::vec3(1.0f, 0.0f, 0.0f));
-		append_line(position, end_y, glm::vec3(0.0f, 1.0f, 0.0f));
-		append_line(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f));
-		draw_lines_ontop(14.0f);
-	}
 }
 
 void init_all_shaders()
@@ -825,6 +746,9 @@ void init_all_shaders()
 			// UV attribute
 			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 			glEnableVertexAttribArray(1);
+
+			unsigned int view_matrices_loc = glGetUniformBlockIndex(g_billboard_shader.id, "ViewMatrices");
+			glUniformBlockBinding(g_billboard_shader.id, view_matrices_loc, 0);
 		}
 	}
 
@@ -875,6 +799,9 @@ void init_all_shaders()
 			// Normal attribute
 			glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
 			glEnableVertexAttribArray(2);
+
+			unsigned int view_matrices_loc = glGetUniformBlockIndex(g_mesh_shader.id, "ViewMatrices");
+			glUniformBlockBinding(g_mesh_shader.id, view_matrices_loc, 0);
 		}
 	}
 
@@ -894,6 +821,9 @@ void init_all_shaders()
 		// Coord attribute
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
+
+		unsigned int view_matrices_loc = glGetUniformBlockIndex(g_wireframe_shader.id, "ViewMatrices");
+		glUniformBlockBinding(g_wireframe_shader.id, view_matrices_loc, 0);
 	}
 
 	// Init line shader
@@ -916,10 +846,8 @@ void init_all_shaders()
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 		glEnableVertexAttribArray(1);
 
-		glUseProgram(g_line_shader.id);
 		unsigned int view_matrices_loc = glGetUniformBlockIndex(g_line_shader.id, "ViewMatrices");
 		glUniformBlockBinding(g_line_shader.id, view_matrices_loc, 0);
-		glUseProgram(0);
 	}
 
 	// Init framebuffer shaders

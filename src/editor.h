@@ -44,6 +44,8 @@ void draw_selected_shadow_map();
 
 bool try_init_transform_mode();
 
+void draw_selection_arrows(glm::vec3 position);
+
 inline bool has_object_selection()
 {
 	return g_selected_object.type != ObjectType::None;

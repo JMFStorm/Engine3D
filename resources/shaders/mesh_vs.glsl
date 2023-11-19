@@ -5,9 +5,13 @@ layout (location = 1) in vec2 aTexCoord;
 layout (location = 2) in vec3 aNormal;
 
 uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
 uniform float uv_multiplier;
+
+layout (std140) uniform ViewMatrices
+{
+    mat4 projection;
+    mat4 view;
+};
 
 out VS_OUT {
     vec3 fragPos;
