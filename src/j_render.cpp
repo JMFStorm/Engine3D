@@ -712,6 +712,15 @@ void draw_selection_arrows(glm::vec3 position)
 
 void init_all_shaders()
 {
+	// View & Projection UBO
+	{
+		glGenBuffers(1, &g_view_proj_ubo);
+		glBindBuffer(GL_UNIFORM_BUFFER, g_view_proj_ubo);
+		glBufferData(GL_UNIFORM_BUFFER, SIZEOF_VIEW_MATRICES, NULL, GL_STATIC_DRAW);
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, g_view_proj_ubo, 0, SIZEOF_VIEW_MATRICES);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	}
+
 	// Skybox
 	{		
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/skybox_vs.glsl";
@@ -906,6 +915,11 @@ void init_all_shaders()
 		// Color attribute
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 		glEnableVertexAttribArray(1);
+
+		glUseProgram(g_line_shader.id);
+		unsigned int view_matrices_loc = glGetUniformBlockIndex(g_line_shader.id, "ViewMatrices");
+		glUniformBlockBinding(g_line_shader.id, view_matrices_loc, 0);
+		glUseProgram(0);
 	}
 
 	// Init framebuffer shaders

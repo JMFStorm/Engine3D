@@ -71,3 +71,4 @@ extern FontData g_debug_font;
 extern PostProcessingSettings g_pp_settings;
 
 extern unsigned int g_skybox_cubemap;
+extern unsigned int g_view_proj_ubo;

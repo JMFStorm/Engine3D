@@ -68,3 +68,4 @@ FontData g_debug_font = {};
 PostProcessingSettings g_pp_settings = {};
 
 unsigned int g_skybox_cubemap = 0;
+unsigned int g_view_proj_ubo = 0;

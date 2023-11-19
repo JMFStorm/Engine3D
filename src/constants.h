@@ -16,6 +16,7 @@ constexpr const s64 MAX_LINES_BUFFER = 200;
 constexpr const s64 MAX_UI_CHARS = 1000;
 
 constexpr const s64 PROPERTIES_PANEL_WIDTH = 400;
+constexpr const s64 SIZEOF_VIEW_MATRICES = 2 * sizeof(glm::mat4);
 
 constexpr const s64 FILE_PATH_LEN = 256;
 constexpr const s64 FILENAME_LEN = FILE_PATH_LEN / 4;

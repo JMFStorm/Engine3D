@@ -755,6 +755,19 @@ int main(int argc, char* argv[])
 		// -------------
 		// Draw OpenGL
 
+		// UBOs
+		{
+			glBindBuffer(GL_UNIFORM_BUFFER, g_view_proj_ubo);
+
+			auto projection = get_projection_matrix();
+			auto view = get_view_matrix();
+
+			glBufferSubData(GL_UNIFORM_BUFFER, 0,				  sizeof(glm::mat4), glm::value_ptr(projection));
+			glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+
+			glBindBuffer(GL_UNIFORM_BUFFER, 0);
+		}
+
 		// Shadow map framebuffers
 		{
 			glUseProgram(g_shdow_map_shader.id);
