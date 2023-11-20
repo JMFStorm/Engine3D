@@ -1,8 +1,8 @@
 TODOS:
+- batch vertex data into gpu
+- instanced rendering
+- sharpening
+- skybox on/off
 - shadow map for planes
 - popup text for scene save
-- multiple scenes system
 - material.data -file re-organizes items when adding new material
-
-
-

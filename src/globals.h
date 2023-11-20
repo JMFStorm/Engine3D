@@ -60,9 +60,7 @@ extern Framebuffer g_scene_framebuffer;
 
 extern UserSettings g_user_settings;
 
-extern MemoryBuffer g_line_vertex_buffer;
-extern s64 g_line_buffer_size;
-extern s64 g_line_indicies;
+extern s64 g_lines_buffered;
 
 extern s64 g_text_buffer_size;
 extern s64 g_text_indicies;

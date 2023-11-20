@@ -522,10 +522,6 @@ void init_memory_buffers()
 	int vertex_bytes_for_char = sizeof(float) * 30;
 	int text_buffer_size = vertex_bytes_for_char * MAX_UI_CHARS;
 	memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text vertex buffer"));
-
-	int vertex_bytes_for_line = sizeof(float) * 12;
-	int line_buffer_size = vertex_bytes_for_line * MAX_LINES_BUFFER;
-	memory_buffer_mallocate(&g_line_vertex_buffer, text_buffer_size, const_cast<char*>("Line vertex buffer"));
 }
 
 glm::vec3 get_camera_ray_from_scene_px(int x, int y)

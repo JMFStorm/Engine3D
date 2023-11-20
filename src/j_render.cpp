@@ -585,20 +585,17 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 
 void append_line(glm::vec3 start, glm::vec3 end, glm::vec3 color)
 {
-	float vertices[] =
+	float vertices[12] =
 	{
 		// Coords				   // Color					 
 		start.x, start.y, start.z, color.r, color.g, color.b,
 		end.x,   end.y,   end.z,   color.r, color.g, color.b,
 	};
 
-	float* memory_location = (float*)g_line_vertex_buffer.memory;
-
-	s64 index = g_line_indicies * 6;
-	memcpy(&memory_location[index], vertices, sizeof(vertices));
-
-	g_line_buffer_size += sizeof(vertices);
-	g_line_indicies += 2;
+	s64 bytes_offset = g_lines_buffered * 12 * sizeof(float);
+	glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
+	glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(vertices), vertices);
+	g_lines_buffered++;
 }
 
 void draw_lines(float thickness)
@@ -610,14 +607,11 @@ void draw_lines(float thickness)
 	unsigned int model_loc = glGetUniformLocation(g_line_shader.id, "model");
 	glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
 
-	glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
-	glBufferData(GL_ARRAY_BUFFER, g_line_buffer_size, g_line_vertex_buffer.memory, GL_DYNAMIC_DRAW);
-
+	s64 indicies = g_lines_buffered * 2;
 	glLineWidth(thickness);
-	glDrawArrays(GL_LINES, 0, g_line_indicies);
+	glDrawArrays(GL_LINES, 0, indicies);
 
-	g_line_buffer_size = 0;
-	g_line_indicies = 0;
+	g_lines_buffered = 0;
 	g_frame_data.draw_calls++;
 
 	glUseProgram(0);
@@ -837,6 +831,9 @@ void init_all_shaders()
 		glBindVertexArray(g_line_shader.vao);
 		glGenBuffers(1, &g_line_shader.vbo);
 		glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
+
+		s64 max_size_bytes = MAX_LINES_BUFFERED * sizeof(float) * 12;
+		glBufferData(GL_ARRAY_BUFFER, max_size_bytes, nullptr, GL_DYNAMIC_DRAW);
 
 		// Coord attribute
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);

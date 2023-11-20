@@ -12,7 +12,7 @@ constexpr const s64 SCENE_SPOTLIGHTS_MAX_COUNT = 100;
 constexpr const s64 SCENE_TEXTURES_MAX_COUNT = 100;
 constexpr const s64 SCENE_PLANES_MAX_COUNT = 100;
 constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
-constexpr const s64 MAX_LINES_BUFFER = 200;
+constexpr const s64 MAX_LINES_BUFFERED = 200;
 constexpr const s64 MAX_UI_CHARS = 1000;
 
 constexpr const s64 PROPERTIES_PANEL_WIDTH = 400;

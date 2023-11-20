@@ -57,9 +57,7 @@ UserSettings g_user_settings = {
 	.world_ambient = glm::vec3(0.075f),
 };
 
-MemoryBuffer g_line_vertex_buffer = {};
-s64 g_line_buffer_size = 0;
-s64 g_line_indicies = 0;
+s64 g_lines_buffered = 0;
 
 s64 g_text_buffer_size = 0;
 s64 g_text_indicies = 0;
