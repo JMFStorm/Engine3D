@@ -8,6 +8,7 @@
 #include "globals.h"
 #include "utils.h"
 #include "j_platform.h"
+#include "editor.h"
 
 MeshData mesh_serialize(Mesh* mesh)
 {
@@ -259,7 +260,8 @@ void save_all()
 
 	if (strcmp(g_scene.filepath, "") == 0)
 	{
-		file_dialog_make_filepath(used_filepath);
+		bool success = file_dialog_make_filepath(used_filepath);
+		if (!success) return;
 	}
 	else
 	{
@@ -272,8 +274,11 @@ void save_all()
 void new_scene()
 {
 	g_scene_camera = scene_camera_init(g_scene_camera.aspect_ratio_horizontal);
+	deselect_selection();
+
 	j_array_empty(&g_scene.planes);
 	j_array_empty(&g_scene.meshes);
 	j_array_empty(&g_scene.pointlights);
 	j_array_empty(&g_scene.spotlights);
+	memset(g_scene.filepath, 0, 256);
 }

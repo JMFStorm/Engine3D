@@ -32,7 +32,7 @@ void try_open_scene()
 {
 	char file_path[FILE_PATH_LEN] = {};
 	bool success = file_dialog_get_filepath(file_path);
-	ASSERT_TRUE(success, "Open scene");
+	if (!success) return;
 
 	char* file_ext = str_get_file_ext(file_path);
 	bool is_j_map = strcmp(file_ext, ".jmap") == 0;
