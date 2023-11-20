@@ -58,9 +58,8 @@ UserSettings g_user_settings = {
 };
 
 s64 g_lines_buffered = 0;
+s64 g_ui_chars_buffered = 0;
 
-s64 g_text_buffer_size = 0;
-s64 g_text_indicies = 0;
 FontData g_debug_font = {};
 
 PostProcessingSettings g_pp_settings = {};

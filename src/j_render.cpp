@@ -5,6 +5,7 @@
 #include "j_assert.h"
 #include "j_files.h"
 #include "globals.h"
+#include "constants.h"
 #include "utils.h"
 #include "editor.h"
 #include <stb_image.h>
@@ -585,14 +586,14 @@ void draw_mesh_wireframe(Mesh* mesh, glm::vec3 color)
 
 void append_line(glm::vec3 start, glm::vec3 end, glm::vec3 color)
 {
-	float vertices[12] =
+	float vertices[LINE_VERICIES] =
 	{
 		// Coords				   // Color					 
 		start.x, start.y, start.z, color.r, color.g, color.b,
 		end.x,   end.y,   end.z,   color.r, color.g, color.b,
 	};
 
-	s64 bytes_offset = g_lines_buffered * 12 * sizeof(float);
+	s64 bytes_offset = g_lines_buffered * LINE_VERICIES * sizeof(float);
 	glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
 	glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(vertices), vertices);
 	g_lines_buffered++;
@@ -752,21 +753,24 @@ void init_all_shaders()
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_fs.glsl";
 
 		g_ui_text_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		{
-			glGenVertexArrays(1, &g_ui_text_shader.vao);
-			glGenBuffers(1, &g_ui_text_shader.vbo);
+		
+		glGenVertexArrays(1, &g_ui_text_shader.vao);
+		glGenBuffers(1, &g_ui_text_shader.vbo);
 
-			glBindVertexArray(g_ui_text_shader.vao);
-			glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
+		glBindVertexArray(g_ui_text_shader.vao);
+		glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
 
-			// Coord attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);
+		s64 max_size_bytes = MAX_UI_CHARS_BUFFERED * sizeof(float) * UI_CHAR_VERTICIES;
+		glBufferData(GL_ARRAY_BUFFER, max_size_bytes, nullptr, GL_DYNAMIC_DRAW);
 
-			// UV attribute
-			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-			glEnableVertexAttribArray(1);
-		}
+		// Coord attribute
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		// UV attribute
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(1);
+		
 	}
 
 	// Init mesh shader
@@ -832,7 +836,7 @@ void init_all_shaders()
 		glGenBuffers(1, &g_line_shader.vbo);
 		glBindBuffer(GL_ARRAY_BUFFER, g_line_shader.vbo);
 
-		s64 max_size_bytes = MAX_LINES_BUFFERED * sizeof(float) * 12;
+		s64 max_size_bytes = MAX_LINES_BUFFERED * sizeof(float) * LINE_VERICIES;
 		glBufferData(GL_ARRAY_BUFFER, max_size_bytes, nullptr, GL_DYNAMIC_DRAW);
 
 		// Coord attribute
@@ -965,9 +969,7 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 	int text_offset_y_px = 0;
 	int line_height_px = font_data->font_height_px;
 
-	float* memory_location = (float*)g_ui_text_vertex_buffer.memory;
-
-	// Assume font start position is top left corner
+	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
 
 	for (int i = 0; i < length; i++)
 	{
@@ -983,6 +985,7 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 		int char_index = static_cast<int>(current_char) - 32;
 		CharData current = chars[char_index];
 
+		// Assume font start position is top left corner
 		int char_height_px = current.height;
 		int char_width_px = current.width;
 
@@ -996,7 +999,7 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px, g_game_metrics.scene_width_px);
 		float y1 = normalize_screen_px_to_ndc(y_start + char_height_px, g_game_metrics.scene_height_px);
 
-		float vertices[] =
+		float vertices[UI_CHAR_VERTICIES] =
 		{
 			// Coords			// UV
 			x0, y1, 0.0f,		current.UV_x0, current.UV_y1, // top left
@@ -1008,15 +1011,15 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 			x1, y0, 0.0f,		current.UV_x1, current.UV_y0  // bottom right
 		};
 
-		s64 index = g_text_indicies * 5;
-		memcpy(&memory_location[index], vertices, sizeof(vertices));
+		s64 bytes_offset = g_ui_chars_buffered * UI_CHAR_VERTICIES * sizeof(float);
+		glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(vertices), vertices);
 
-		g_text_buffer_size += sizeof(vertices);
-		g_text_indicies += 6;
-
+		g_ui_chars_buffered++;
 		text_offset_x_px += current.advance;
 		text++;
 	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void draw_ui_text(FontData* font_data, float red, float green, float blue)
@@ -1027,19 +1030,17 @@ void draw_ui_text(FontData* font_data, float red, float green, float blue)
 	int color_uniform = glGetUniformLocation(g_ui_text_shader.id, "textColor");
 	glUniform3f(color_uniform, red, green, blue);
 
-	glBindBuffer(GL_ARRAY_BUFFER, g_ui_text_shader.vbo);
-	glBufferData(GL_ARRAY_BUFFER, g_text_buffer_size, g_ui_text_vertex_buffer.memory, GL_DYNAMIC_DRAW);
-
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
-	glDrawArrays(GL_TRIANGLES, 0, g_text_indicies);
+
+	s64 indicies = g_ui_chars_buffered * 6;
+	glDrawArrays(GL_TRIANGLES, 0, indicies);
+
+	g_ui_chars_buffered = 0;
+	g_frame_data.draw_calls++;
 
 	glUseProgram(0);
 	glBindVertexArray(0);
-
-	g_text_buffer_size = 0;
-	g_text_indicies = 0;
-	g_frame_data.draw_calls++;
 }
 
 unsigned int load_cubemap()

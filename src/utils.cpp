@@ -518,10 +518,6 @@ void init_memory_buffers()
 	constexpr const s64 material_names_arr_size = FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
 	memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material strings"));
 	g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
-
-	int vertex_bytes_for_char = sizeof(float) * 30;
-	int text_buffer_size = vertex_bytes_for_char * MAX_UI_CHARS;
-	memory_buffer_mallocate(&g_ui_text_vertex_buffer, text_buffer_size, const_cast<char*>("UI text vertex buffer"));
 }
 
 glm::vec3 get_camera_ray_from_scene_px(int x, int y)
