@@ -641,11 +641,13 @@ void append_simple_rect(glm::vec2 offset, glm::vec3 color)
 	g_rects_buffered++;
 }
 
-void draw_simple_rects()
+void draw_simple_rects(Texture texture)
 {
 	glUseProgram(g_simple_rect_shader.id);
 	glBindVertexArray(g_simple_rect_shader.vao);
 
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture.gpu_id);
 	glDrawArraysInstanced(GL_TRIANGLES, 0, 6, g_rects_buffered);
 
 	g_rects_buffered = 0;
@@ -685,39 +687,43 @@ void init_all_shaders()
 
 		float vertices[] =
 		{
-			// Coords			
-			-0.25f, -0.25f, 0.0f,	 // bottom left
-			 0.25f, -0.25f, 0.0f,	 // bottom right
-			-0.25f,  0.25f, 0.0f,	 // top left
-
-			-0.25f,  0.25f, 0.0f,	 // top left 
-			 0.25f, -0.25f, 0.0f,	 // bottom right
-			 0.25f,  0.25f, 0.0f	 // top right
+			// Coords			   // UVs
+			-0.25f, -0.25f, 0.0f,  0.0f, 0.0f, // bottom left
+			 0.25f, -0.25f, 0.0f,  1.0f, 0.0f, // bottom right
+			-0.25f,  0.25f, 0.0f,  0.0f, 1.0f, // top left
+								   
+			-0.25f,  0.25f, 0.0f,  0.0f, 1.0f, // top left
+			 0.25f, -0.25f, 0.0f,  1.0f, 0.0f, // bottom right
+			 0.25f,  0.25f, 0.0f,  1.0f, 1.0f  // top right
 		};
 
 		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 		// Coord attribute
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
+
+		// UV attribute
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(1);
 
 		// Offset VBO
 		glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_offset_vbo);
 		int offsets_size = sizeof(float) * 2 * 100;
 		glBufferData(GL_ARRAY_BUFFER, offsets_size, nullptr, GL_DYNAMIC_DRAW);
 
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribDivisor(1, 1);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(2);
+		glVertexAttribDivisor(2, 1);
 
 		// Color VBO
 		glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_color_vbo);
 		offsets_size = sizeof(float) * 3 * 100;
 		glBufferData(GL_ARRAY_BUFFER, offsets_size, nullptr, GL_DYNAMIC_DRAW);
 
-		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(2);
-		glVertexAttribDivisor(2, 1);
+		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(3);
+		glVertexAttribDivisor(3, 1);
 
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindVertexArray(0);

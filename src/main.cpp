@@ -963,9 +963,11 @@ int main(int argc, char* argv[])
 
 		print_debug_texts();
 
-		// append_simple_rect(glm::vec2(-0.5f), glm::vec3(1.0f));
-		// append_simple_rect(glm::vec2(0.5f), glm::vec3(0.25f));
-		// draw_simple_rects();
+		append_simple_rect(glm::vec2(-0.5f), glm::vec3(1.0f, 0.0f, 1.0f));
+		append_simple_rect(glm::vec2(0.5f), glm::vec3(0.0f, 1.0f, 1.0f));
+
+		Texture text_tex = *(Texture*)j_array_get(&g_textures, 3);
+		draw_simple_rects(text_tex);
 
 		imgui_end_frame();
 

@@ -37,4 +37,4 @@ void draw_skybox();
 
 void append_simple_rect(glm::vec2 offset, glm::vec3 color);
 
-void draw_simple_rects();
+void draw_simple_rects(Texture texture);
