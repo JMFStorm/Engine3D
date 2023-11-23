@@ -38,6 +38,7 @@ SceneSelection g_selected_object = {
 	.type = ObjectType::None,
 };
 
+SimpleShader g_simple_rect_shader = {};
 SimpleShader g_skybox_shader = {};
 SimpleShader g_shdow_map_debug_shader = {};
 SimpleShader g_shdow_map_shader = {};
@@ -57,6 +58,7 @@ UserSettings g_user_settings = {
 	.world_ambient = glm::vec3(0.075f),
 };
 
+s64 g_rects_buffered = 0;
 s64 g_lines_buffered = 0;
 s64 g_ui_chars_buffered = 0;
 
@@ -66,3 +68,6 @@ PostProcessingSettings g_pp_settings = {};
 
 unsigned int g_skybox_cubemap = 0;
 unsigned int g_view_proj_ubo = 0;
+
+unsigned int g_simple_rect_color_vbo = 0;
+unsigned int g_simple_rect_offset_vbo = 0;

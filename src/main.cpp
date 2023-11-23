@@ -963,6 +963,10 @@ int main(int argc, char* argv[])
 
 		print_debug_texts();
 
+		// append_simple_rect(glm::vec2(-0.5f), glm::vec3(1.0f));
+		// append_simple_rect(glm::vec2(0.5f), glm::vec3(0.25f));
+		// draw_simple_rects();
+
 		imgui_end_frame();
 
 		glfwSwapBuffers(g_window);
