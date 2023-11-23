@@ -626,28 +626,27 @@ void draw_lines_ontop(float thickness)
 	glEnable(GL_DEPTH_TEST);
 }
 
-void append_simple_rect(glm::vec2 offset, glm::vec3 color)
+void append_simple_rect(glm::vec2 offset, glm::vec3 color, int texture_index)
 {
 	float offsets[2] = { offset.x, offset.y };
 	s64 bytes_offset = g_rects_buffered * sizeof(offsets);
 	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_offset_vbo);
 	glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(offsets), offsets);
 
-	float colors[3] = { color.x, color.y, color.z };
-	bytes_offset = g_rects_buffered * sizeof(colors);
-	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_color_vbo);
-	glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(colors), colors);
+	bytes_offset = g_rects_buffered * sizeof(int);
+	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_tex_index_vbo);
+	glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(int), &texture_index);
 
 	g_rects_buffered++;
 }
 
-void draw_simple_rects(Texture texture)
+void draw_simple_rects()
 {
 	glUseProgram(g_simple_rect_shader.id);
 	glBindVertexArray(g_simple_rect_shader.vao);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture.gpu_id);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, g_texture_arr_01);
 	glDrawArraysInstanced(GL_TRIANGLES, 0, 6, g_rects_buffered);
 
 	g_rects_buffered = 0;
@@ -680,7 +679,7 @@ void init_all_shaders()
 		glGenVertexArrays(1, &g_simple_rect_shader.vao);
 		glGenBuffers(1, &rect_vertex_vbo);
 		glGenBuffers(1, &g_simple_rect_offset_vbo);
-		glGenBuffers(1, &g_simple_rect_color_vbo);
+		glGenBuffers(1, &g_simple_rect_tex_index_vbo);
 
 		glBindVertexArray(g_simple_rect_shader.vao);
 		glBindBuffer(GL_ARRAY_BUFFER, rect_vertex_vbo);
@@ -716,12 +715,12 @@ void init_all_shaders()
 		glEnableVertexAttribArray(2);
 		glVertexAttribDivisor(2, 1);
 
-		// Color VBO
-		glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_color_vbo);
-		offsets_size = sizeof(float) * 3 * 100;
+		// Texture index VBO
+		glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_tex_index_vbo);
+		offsets_size = sizeof(int) * 100;
 		glBufferData(GL_ARRAY_BUFFER, offsets_size, nullptr, GL_DYNAMIC_DRAW);
 
-		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(int), (void*)0);
 		glEnableVertexAttribArray(3);
 		glVertexAttribDivisor(3, 1);
 

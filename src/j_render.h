@@ -35,6 +35,6 @@ unsigned int load_cubemap();
 
 void draw_skybox();
 
-void append_simple_rect(glm::vec2 offset, glm::vec3 color);
+void append_simple_rect(glm::vec2 offset, glm::vec3 color, int texture_index);
 
-void draw_simple_rects(Texture texture);
+void draw_simple_rects();

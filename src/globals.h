@@ -71,5 +71,7 @@ extern PostProcessingSettings g_pp_settings;
 extern unsigned int g_skybox_cubemap;
 extern unsigned int g_view_proj_ubo;
 
-extern unsigned int g_simple_rect_color_vbo;
 extern unsigned int g_simple_rect_offset_vbo;
+extern unsigned int g_simple_rect_tex_index_vbo;
+
+extern GLuint g_texture_arr_01;

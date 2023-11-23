@@ -451,6 +451,32 @@ int main(int argc, char* argv[])
 			strcpy_s(new_data.material_name, mat_data.first);
 			mat_data_file.write(reinterpret_cast<char*>(&new_data), sizeof(new_data));
 		}
+
+		// Texture array
+		{
+			constexpr const s64 TEXTURE_SIZE_1K = 1024;
+			glGenTextures(1, &g_texture_arr_01);
+			glBindTexture(GL_TEXTURE_2D_ARRAY, g_texture_arr_01);
+			glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 24);
+
+			byte* texture_data;
+			int x, y, n;
+			stbi_set_flip_vertically_on_load(true);
+			
+			texture_data = stbi_load("G:\\projects\\game\\Engine3D\\resources\\materials\\zellige_squares.png", &x, &y, &n, 0);
+			ASSERT_TRUE(texture_data != NULL, "Load texture");
+			ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
+			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
+			stbi_image_free(texture_data);
+			
+			texture_data = stbi_load("G:\\projects\\game\\Engine3D\\resources\\materials\\wood_floor_ash_white.png", &x, &y, &n, 0);
+			ASSERT_TRUE(texture_data != NULL, "Load texture");
+			ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
+			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 1, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
+			stbi_image_free(texture_data);
+
+			glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+		}
 	}
 
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
@@ -963,11 +989,12 @@ int main(int argc, char* argv[])
 
 		print_debug_texts();
 
-		append_simple_rect(glm::vec2(-0.5f), glm::vec3(1.0f, 0.0f, 1.0f));
-		append_simple_rect(glm::vec2(0.5f), glm::vec3(0.0f, 1.0f, 1.0f));
-
-		Texture text_tex = *(Texture*)j_array_get(&g_textures, 3);
-		draw_simple_rects(text_tex);
+		// Simple rect testing
+		{
+			// append_simple_rect(glm::vec2(-0.5f), glm::vec3(1.0f, 0.0f, 1.0f), 0);
+			// append_simple_rect(glm::vec2(0.5f), glm::vec3(0.0f, 1.0f, 1.0f), 1);
+			// draw_simple_rects();
+		}
 
 		imgui_end_frame();
 
