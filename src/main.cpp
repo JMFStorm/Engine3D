@@ -261,13 +261,16 @@ Texture texture_load_from_filepath(char* path)
 	int texture_id = load_image_into_texture_id(path);
 	char* file_name = strrchr(path, '\\');
 	file_name++;
+
 	str_trim_file_ext(file_name);
 	ASSERT_TRUE(file_name, "Filename from file path");
 	s64 name_len = strlen(file_name);
+
 	Texture texture = {
 		.file_name = "",
 		.gpu_id = texture_id,
 	};
+
 	memcpy(texture.file_name, file_name, name_len);
 	return texture;
 }
@@ -324,20 +327,13 @@ int main(int argc, char* argv[])
 
 	init_all_shaders();
 
-	g_pp_settings = pps_init();
+	g_pp_settings = post_processings_init();
 
 	// Init textures/materials
 	{
 		g_use_linear_texture_filtering = true;
 		g_generate_texture_mipmaps = true;
 		g_load_texture_sRGB = false;
-
-		char path_str[FILE_PATH_LEN] = { 0 };
-		strcpy_s(path_str, pointlight_image_path);
-		pointlight_texture = texture_load_from_filepath(path_str);
-
-		strcpy_s(path_str, spotlight_image_path);
-		spotlight_texture = texture_load_from_filepath(path_str);
 
 		char header[6] = { 0 };
 		char filepath[FILE_PATH_LEN] = { 0 };
@@ -369,8 +365,6 @@ int main(int argc, char* argv[])
 				materials_count++;
 			}
 		}
-
-		g_skybox_cubemap = load_cubemap();
 
 		// Read .jmat files
 		ASSERT_TRUE(std::filesystem::is_directory(g_materials_dir_path), "Valid materials directory");
@@ -451,32 +445,56 @@ int main(int argc, char* argv[])
 			strcpy_s(new_data.material_name, mat_data.first);
 			mat_data_file.write(reinterpret_cast<char*>(&new_data), sizeof(new_data));
 		}
+	}
 
-		// Texture array
-		{
-			constexpr const s64 TEXTURE_SIZE_1K = 1024;
-			glGenTextures(1, &g_texture_arr_01);
-			glBindTexture(GL_TEXTURE_2D_ARRAY, g_texture_arr_01);
-			glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 24);
+	// Texture array (test)
+	{
+		glGenTextures(1, &g_texture_arr_01);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, g_texture_arr_01);
+		glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_SRGB8, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 24);
 
-			byte* texture_data;
-			int x, y, n;
-			stbi_set_flip_vertically_on_load(true);
-			
-			texture_data = stbi_load("G:\\projects\\game\\Engine3D\\resources\\materials\\zellige_squares.png", &x, &y, &n, 0);
-			ASSERT_TRUE(texture_data != NULL, "Load texture");
-			ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
-			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
-			stbi_image_free(texture_data);
-			
-			texture_data = stbi_load("G:\\projects\\game\\Engine3D\\resources\\materials\\wood_floor_ash_white.png", &x, &y, &n, 0);
-			ASSERT_TRUE(texture_data != NULL, "Load texture");
-			ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
-			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 1, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
-			stbi_image_free(texture_data);
+		byte* texture_data;
+		int x, y, n;
+		stbi_set_flip_vertically_on_load(true);
 
-			glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-		}
+		texture_data = stbi_load("G:\\projects\\game\\Engine3D\\resources\\materials\\zellige_squares.png", &x, &y, &n, 0);
+		ASSERT_TRUE(texture_data != NULL, "Load texture");
+		ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
+		glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
+		stbi_image_free(texture_data);
+
+		texture_data = stbi_load("G:\\projects\\game\\Engine3D\\resources\\materials\\wood_floor_ash_white.png", &x, &y, &n, 0);
+		ASSERT_TRUE(texture_data != NULL, "Load texture");
+		ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
+		glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 1, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
+		stbi_image_free(texture_data);
+
+		glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+	}
+
+	// Load core textures
+	{
+		g_use_linear_texture_filtering = true;
+		g_generate_texture_mipmaps = true;
+		g_load_texture_sRGB = false;
+
+		char path_str[FILE_PATH_LEN] = { 0 };
+		strcpy_s(path_str, pointlight_image_path);
+		pointlight_texture = texture_load_from_filepath(path_str);
+
+		strcpy_s(path_str, spotlight_image_path);
+		spotlight_texture = texture_load_from_filepath(path_str);
+
+		g_skybox_cubemap = load_cubemap();
+	}
+
+	// Load fonts
+	{
+		g_use_linear_texture_filtering = false;
+		g_generate_texture_mipmaps = false;
+		g_load_texture_sRGB = false;
+		int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
+		load_font(&g_debug_font, font_height_px, g_debug_font_path);
 	}
 
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
@@ -491,12 +509,6 @@ int main(int argc, char* argv[])
 		glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer.id);
 		init_framebuffer_resize(&g_editor_framebuffer.texture_gpu_id, &g_editor_framebuffer.renderbuffer);
 	}
-
-	g_use_linear_texture_filtering = false;
-	g_generate_texture_mipmaps = false;
-	g_load_texture_sRGB = false;
-	int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
-	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
@@ -781,7 +793,7 @@ int main(int argc, char* argv[])
 		// -------------
 		// Draw OpenGL
 
-		// UBOs
+		// Update UBOs
 		{
 			glBindBuffer(GL_UNIFORM_BUFFER, g_view_proj_ubo);
 
@@ -988,13 +1000,6 @@ int main(int argc, char* argv[])
 		if (DEBUG_SHADOWMAP && g_selected_object.type == ObjectType::Spotlight) draw_selected_shadow_map();
 
 		print_debug_texts();
-
-		// Simple rect testing
-		{
-			// append_simple_rect(glm::vec2(-0.5f), glm::vec3(1.0f, 0.0f, 1.0f), 0);
-			// append_simple_rect(glm::vec2(0.5f), glm::vec3(0.0f, 1.0f, 1.0f), 1);
-			// draw_simple_rects();
-		}
 
 		imgui_end_frame();
 

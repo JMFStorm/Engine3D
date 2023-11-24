@@ -1,8 +1,14 @@
 TODOS:
-- batch vertex data into gpu
-- instanced rendering
+Internals
+- Malloc replace for stb_image
+- ttf load from stb
+- cpp unordered map replacement
+- cpp fileread replacement
+
+Features
+- read from assets_manifest
 - sharpening
 - skybox on/off
 - shadow map for planes
 - popup text for scene save
-- material.data -file re-organizes items when adding new material
+

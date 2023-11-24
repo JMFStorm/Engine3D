@@ -574,7 +574,7 @@ bool is_primitive(ObjectType type)
 	return type == ObjectType::Plane || type == ObjectType::Cube;
 }
 
-PostProcessingSettings pps_init()
+PostProcessingSettings post_processings_init()
 {
 	PostProcessingSettings res = {
 		.inverse_color = false,
