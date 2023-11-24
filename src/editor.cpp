@@ -111,7 +111,7 @@ s64 add_new_mesh(Mesh new_mesh)
 	s64 new_index = -1;
 	s64 material_index = 0;
 	// s64 material_index = g_materials_index_map[new_mesh.material->color_texture->file_name];
-	g_selected_texture_item = material_index;
+	g_selected_texture_item = material_index; // TODO: get index from material name
 
 	if (new_mesh.mesh_type == MeshType::Cube)
 	{
@@ -184,7 +184,7 @@ void select_object_index(ObjectType type, s64 index)
 	if (is_primitive(type))
 	{
 		Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
-		int texture_name_index = 0;
+		int texture_name_index = 0; // TODO: Get index from material name
 		// char* selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
 		g_selected_texture_item = texture_name_index;
 	}

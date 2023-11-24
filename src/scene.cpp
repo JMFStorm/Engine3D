@@ -247,6 +247,7 @@ void load_scene(char* filepath)
 
 void save_all()
 {
+	// TODO: save materials
 	/*
 	for (int i = 0; i < g_materials.items_count; i++)
 	{
