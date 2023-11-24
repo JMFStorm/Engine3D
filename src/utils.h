@@ -71,10 +71,6 @@ inline float get_vec3_val_by_axis(glm::vec3 vec, Axis axis)
 	return 0.0f;
 }
 
-bool str_trim_file_ext(char* str);
-
-char* str_get_file_ext(char* str);
-
 float normalize_screen_px_to_ndc(int value, int max);
 
 float normalize_value(float value, float src_max, float dest_max);
@@ -110,7 +106,7 @@ Transforms transforms_init();
 
 glm::vec3 get_spotlight_dir(Spotlight spotlight);
 
-Material material_init(Texture* color_ptr, Texture* specular_ptr);
+Material material_init();
 
 Spotlight spotlight_init();
 
@@ -137,3 +133,5 @@ glm::vec3 get_camera_ray_from_scene_px(int x, int y);
 bool is_primitive(ObjectType type);
 
 PostProcessingSettings post_processings_init();
+
+Texture texture_load_from_filepath(char* path);

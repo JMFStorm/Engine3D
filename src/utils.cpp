@@ -7,6 +7,7 @@
 #include <GL/glew.h>
 
 #include "j_assert.h"
+#include "j_buffers.h"
 #include "j_render.h"
 #include "j_strings.h"
 
@@ -27,21 +28,6 @@ glm::mat4 get_view_matrix()
 		g_scene_camera.position + g_scene_camera.front_vec,
 		g_scene_camera.up_vec);
 	return view;
-}
-
-bool str_trim_file_ext(char* str)
-{
-	char* last_dot = strrchr(str, '.');
-	if (last_dot == nullptr) return false;
-	*last_dot = '\0';
-	return true;
-}
-
-char* str_get_file_ext(char* str)
-{
-	char* last_dot = strrchr(str, '.');
-	if (last_dot == nullptr) return nullptr;
-	return last_dot;
 }
 
 float normalize_screen_px_to_ndc(int value, int max)
@@ -298,11 +284,11 @@ glm::vec3 get_spotlight_dir(Spotlight spotlight)
 	return glm::normalize(spot_dir);
 }
 
-Material material_init(Texture* color_ptr, Texture* specular_ptr)
+Material material_init()
 {
 	Material material = {
-		.color_texture = color_ptr,
-		.specular_texture = specular_ptr,
+		.color_texture = nullptr,
+		.specular_texture = nullptr,
 		.specular_mult = 1.0f,
 		.shininess = 32.0f,
 	};
@@ -518,6 +504,11 @@ void init_memory_buffers()
 	constexpr const s64 material_names_arr_size = FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
 	memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material strings"));
 	g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
+
+	s64 sizeof_material_id_elem = sizeof(char*) + sizeof(s64);
+	s64 sizeof_materials_id_map = (sizeof_material_id_elem) * MATERIALS_ID_MAP_CAPACITY;
+	memory_buffer_mallocate(&materials_id_map_memory, sizeof_materials_id_map, const_cast<char*>("Material ids hashmap"));
+	materials_id_map = hash_map_init(MATERIALS_ID_MAP_CAPACITY, sizeof_material_id_elem, materials_id_map_memory.memory);
 }
 
 glm::vec3 get_camera_ray_from_scene_px(int x, int y)
@@ -583,4 +574,23 @@ PostProcessingSettings post_processings_init()
 		.gamma_amount = 1.6f
 	};
 	return res;
+}
+
+Texture texture_load_from_filepath(char* path)
+{
+	int texture_id = load_image_into_texture_id(path);
+	char* file_name = strrchr(path, '\\');
+	file_name++;
+
+	str_trim_from_char(file_name, '.');
+	ASSERT_TRUE(file_name, "Filename from file path");
+	s64 name_len = strlen(file_name);
+
+	Texture texture = {
+		.file_name = "",
+		.gpu_id = texture_id,
+	};
+
+	memcpy(texture.file_name, file_name, name_len);
+	return texture;
 }

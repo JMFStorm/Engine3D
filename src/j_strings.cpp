@@ -25,3 +25,18 @@ char* j_strings_add(JStringArray* strings, char* char_ptr)
 
 	return str_ptr;
 }
+
+bool str_trim_from_char(char* str, char c)
+{
+	char* last_dot = strrchr(str, c);
+	if (last_dot == nullptr) return false;
+	*last_dot = '\0';
+	return true;
+}
+
+char* str_get_file_ext(char* str)
+{
+	char* last_dot = strrchr(str, '.');
+	if (last_dot == nullptr) return nullptr;
+	return last_dot;
+}

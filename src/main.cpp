@@ -8,7 +8,6 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
-#include <unordered_map>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -23,13 +22,14 @@
 #include "structs.h"
 #include "scene.h"
 #include "utils.h"
-#include "j_assert.h"
 #include "j_array.h"
+#include "j_assert.h"
 #include "j_buffers.h"
-#include "j_strings.h"
-#include "j_render.h"
-#include "j_imgui.h"
 #include "j_files.h"
+#include "j_imgui.h"
+#include "j_map.h"
+#include "j_render.h"
+#include "j_strings.h"
 
 Framebuffer g_editor_framebuffer;
 Texture pointlight_texture;
@@ -214,25 +214,6 @@ void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
-Texture texture_load_from_filepath(char* path)
-{
-	int texture_id = load_image_into_texture_id(path);
-	char* file_name = strrchr(path, '\\');
-	file_name++;
-
-	str_trim_file_ext(file_name);
-	ASSERT_TRUE(file_name, "Filename from file path");
-	s64 name_len = strlen(file_name);
-
-	Texture texture = {
-		.file_name = "",
-		.gpu_id = texture_id,
-	};
-
-	memcpy(texture.file_name, file_name, name_len);
-	return texture;
-}
-
 int main(int argc, char* argv[])
 {
 	init_memory_buffers();
@@ -287,121 +268,77 @@ int main(int argc, char* argv[])
 
 	g_pp_settings = post_processings_init();
 
-	// Init textures/materials
+	// Load assets
 	{
-		g_use_linear_texture_filtering = true;
-		g_generate_texture_mipmaps = true;
-		g_load_texture_sRGB = false;
-
-		char header[6] = { 0 };
-		char filepath[FILE_PATH_LEN] = { 0 };
-		const char* mat_data_filename = "materials.data";
+		FILE* file;
+		int success = fopen_s(&file, ASSETS_MANIFEST_PATH, "r");
+		ASSERT_TRUE(success == 0, "File opened");
 
 		s64 materials_count = 0;
+		s64 material_ids[32] = {};
+		char* material_str_names[32] = {};
+		char line_buffer[256];
 
-		// Read materials data file
+		for (;;)
 		{
-			sprintf_s(filepath, "%s\\%s", g_materials_dir_path, mat_data_filename);
+			int got_line = fgets(line_buffer, sizeof(line_buffer), file) != NULL;
+			if (got_line == NULL) break;
 
-			std::ifstream mat_data_file(filepath, std::ios::in | std::ios::out | std::ios::app);
-			mat_data_file.read(header, 5);
-			ASSERT_TRUE(strcmp(header, ".data") == 0, "valid .data header");
-
-			s64 materials_data_count = 0;
-			mat_data_file.read(reinterpret_cast<char*>(&materials_data_count), sizeof(materials_data_count));
-
-			// Add existing materials from data file
-			for (int i = 0; i < materials_data_count; i++)
+			if (strcmp(line_buffer, "materials/\n") == 0)
 			{
-				MaterialIdData existing_data = {};
-				mat_data_file.read(reinterpret_cast<char*>(&existing_data), sizeof(existing_data));
+				g_material_names = j_strings_init(2048, (char*)g_material_names_memory.memory);
 
-				char* new_name_ptr = j_strings_add(&g_material_names, existing_data.material_name);
-				g_mat_data_map.insert(std::make_pair(new_name_ptr, existing_data.material_id));
-				g_mat_data_map_inverse.insert(std::make_pair(existing_data.material_id, new_name_ptr));
-				g_materials_index_map[new_name_ptr] = materials_count;
-				materials_count++;
+				for (;;)
+				{
+					got_line = fgets(line_buffer, sizeof(line_buffer), file) != NULL;
+					if (got_line == NULL) break;
+
+					bool starts_new_material = line_buffer[0] == '-' && line_buffer[1] == ' ';
+					if (!starts_new_material) break;
+
+					char* endptr;
+					long material_id = strtol(&line_buffer[2], &endptr, 10);
+
+					char* material_name = ++endptr;
+					str_trim_from_char(material_name, '\n');
+					char* str_ptr = j_strings_add(&g_material_names, material_name);
+
+					material_str_names[materials_count] = str_ptr;
+					material_ids[materials_count] = material_id;
+					materials_count++;
+				}
 			}
 		}
 
-		// Read .jmat files
-		ASSERT_TRUE(std::filesystem::is_directory(g_materials_dir_path), "Valid materials directory");
-		const char* material_ext = ".jmat";
+		fclose(file);
 
-		for (const auto& entry : std::filesystem::directory_iterator(g_materials_dir_path))
+		for (int i = 0; i < materials_count; i++)
 		{
-			bool valid_file = entry.is_regular_file() && entry.path().extension() == material_ext;
-			if (!valid_file) continue;
+			char filepath[FILE_PATH_LEN] = {};
 
-			// Material file
-			Material new_material;
-			auto filename = entry.path().stem().filename().string();
-			sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename.c_str());
-
-			std::ifstream input_mat_file(filepath, std::ios::binary);
-			ASSERT_TRUE(input_mat_file.is_open(), ".jmat file opened");
-
-			input_mat_file.read(header, 5);
-			bool valid_header = strcmp(header, ".jmat") == 0;
-
-			if (valid_header)
-			{
-				MaterialData mat_data = {};
-				input_mat_file.read(reinterpret_cast<char*>(&mat_data), sizeof(mat_data));
-				new_material = material_deserialize(mat_data);
-			}
-
-			// Texture images
-			filename = entry.path().stem().filename().string();
-			sprintf_s(filepath, "%s\\%s.png", g_materials_dir_path, filename.c_str());
-
+			sprintf_s(filepath, "%s%s%s", MATERIALS_DIR_PATH, material_str_names[i], const_cast<char*>(".png"));
 			g_load_texture_sRGB = true;
 			Texture color_texture = texture_load_from_filepath(filepath);
-			Texture* color_texture_prt = (Texture*)j_array_add(&g_textures, (byte*)&color_texture);
+
+			sprintf_s(filepath, "%s%s%s", MATERIALS_DIR_PATH, material_str_names[i], const_cast<char*>("_specular.png"));
+			g_load_texture_sRGB = false;
+			Texture specular_texture = texture_load_from_filepath(filepath);
+
+			s64 id = material_ids[i];
+			Texture* color_texture_prt    = (Texture*)j_array_add(&g_textures, (byte*)&color_texture);
+			Texture* specular_texture_ptr = (Texture*)j_array_add(&g_textures, (byte*)&specular_texture);
+
+			Material new_material = material_init();
 			new_material.color_texture = color_texture_prt;
+			new_material.specular_texture = specular_texture_ptr;
+			new_material.id = id;
+			Material* new_material_ptr = (Material*)j_array_add(&g_materials, (byte*)&new_material);
 
-			Texture* specular_texture_ptr = nullptr;
-			sprintf_s(filepath, "%s\\%s_specular.png", g_materials_dir_path, filename.c_str());
-			std::ifstream spec_file(filepath);
-
-			if (spec_file.good())
-			{
-				g_load_texture_sRGB = false;
-				Texture specular_texture = texture_load_from_filepath(filepath);
-				specular_texture_ptr = (Texture*)j_array_add(&g_textures, (byte*)&specular_texture);
-				new_material.specular_texture = specular_texture_ptr;
-			}
-
-			if (!valid_header) new_material = material_init(color_texture_prt, specular_texture_ptr);
-			Material* new_material_prt = (Material*)j_array_add(&g_materials, (byte*)&new_material);
-
-			// Add new material as data
-			bool not_found = g_mat_data_map.find(color_texture.file_name) == g_mat_data_map.end();
-
-			if (not_found)
-			{
-				char* new_str = j_strings_add(&g_material_names, color_texture.file_name);
-				g_mat_data_map.insert(std::make_pair(new_str, materials_count));
-				g_mat_data_map_inverse.insert(std::make_pair(materials_count, new_str));
-				g_materials_index_map[new_str] = materials_count;
-				++materials_count;
-			}
-		}
-
-		// Add material ids to .data
-		sprintf_s(filepath, "%s\\%s", g_materials_dir_path, mat_data_filename);
-		std::ofstream mat_data_file(filepath, std::ios::binary | std::ios::trunc);
-		mat_data_file.write(".data", 5);
-		mat_data_file.write(reinterpret_cast<char*>(&materials_count), sizeof(materials_count));
-
-		for (const auto& mat_data : g_mat_data_map)
-		{
-			MaterialIdData new_data = {
-				.material_name = "",
-				.material_id = mat_data.second,
+			Map64Item map_item = {
+				.key = id,
+				.value = (byte*)new_material_ptr
 			};
-			strcpy_s(new_data.material_name, mat_data.first);
-			mat_data_file.write(reinterpret_cast<char*>(&new_data), sizeof(new_data));
+			hash_map_add(&materials_id_map, map_item);
 		}
 	}
 

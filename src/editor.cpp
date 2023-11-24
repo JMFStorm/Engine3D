@@ -109,7 +109,8 @@ void delete_selected_object()
 s64 add_new_mesh(Mesh new_mesh)
 {
 	s64 new_index = -1;
-	s64 material_index = g_materials_index_map[new_mesh.material->color_texture->file_name];
+	s64 material_index = 0;
+	// s64 material_index = g_materials_index_map[new_mesh.material->color_texture->file_name];
 	g_selected_texture_item = material_index;
 
 	if (new_mesh.mesh_type == MeshType::Cube)
@@ -183,8 +184,9 @@ void select_object_index(ObjectType type, s64 index)
 	if (is_primitive(type))
 	{
 		Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
-		auto selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
-		g_selected_texture_item = selected_texture_name;
+		int texture_name_index = 0;
+		// char* selected_texture_name = g_materials_index_map[mesh_ptr->material->color_texture->file_name];
+		g_selected_texture_item = texture_name_index;
 	}
 	else if (type == ObjectType::Pointlight) g_transform_mode.mode = TransformMode::Translate;
 }

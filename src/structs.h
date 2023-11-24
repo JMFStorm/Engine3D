@@ -19,12 +19,13 @@ typedef struct Texture {
 typedef struct Material {
 	Texture* color_texture;
 	Texture* specular_texture;
+	s64 id;
 	f32 specular_mult;
 	f32 shininess;
 } Material;
 
 typedef struct MaterialData {
-	s64 material_id;
+	s64 id;
 	f32 specular_mult;
 	f32 shininess;
 } MaterialData;

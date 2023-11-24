@@ -1,5 +1,5 @@
 materials/
-- bricks_reclaimed
-- tiles_slate_square
-- wood_floor_ash_white
-- zellige_squares
+- 100000 bricks_reclaimed
+- 100001 tiles_slate_square
+- 100002 wood_floor_ash_white
+- 100003 zellige_squares

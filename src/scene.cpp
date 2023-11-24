@@ -4,6 +4,7 @@
 #include <filesystem>
 
 #include "j_assert.h"
+#include "j_map.h"
 #include "structs.h"
 #include "globals.h"
 #include "utils.h"
@@ -12,12 +13,10 @@
 
 MeshData mesh_serialize(Mesh* mesh)
 {
-	s64 material_id = g_mat_data_map[mesh->material->color_texture->file_name];
-
 	MeshData data = {
 		.transforms = mesh->transforms,
 		.mesh_type = mesh->mesh_type,
-		.material_id = material_id,
+		.material_id = mesh->material->id,
 		.uv_multiplier = mesh->uv_multiplier,
 	};
 	return data;
@@ -25,9 +24,7 @@ MeshData mesh_serialize(Mesh* mesh)
 
 Mesh mesh_deserialize(MeshData data)
 {
-	char* material_name = g_mat_data_map_inverse[data.material_id];
-	s64 material_index = g_materials_index_map[material_name];
-	Material* material_ptr = (Material*)j_array_get(&g_materials, material_index);
+	Material* material_ptr = (Material*)hash_map_get(&materials_id_map, data.material_id);
 
 	Mesh mesh = {
 		.transforms = data.transforms,
@@ -69,10 +66,11 @@ SpotlightSerialized spotlight_serialize(Spotlight spotlight)
 
 MaterialData material_serialize(Material material)
 {
-	s64 material_id = g_mat_data_map[material.color_texture->file_name];
+	s64 material_id = 0;
+	// s64 material_id = g_mat_data_map[material.color_texture->file_name];
 
 	MaterialData m_data = {
-		.material_id = material_id,
+		.id = material_id,
 		.specular_mult = material.specular_mult,
 		.shininess = material.shininess
 	};
@@ -85,7 +83,7 @@ void save_material(Material material)
 
 	char filename[FILENAME_LEN] = { 0 };
 	strcpy_s(filename, material.color_texture->file_name);
-	str_trim_file_ext(filename);
+	str_trim_from_char(filename, '.');
 
 	char filepath[FILE_PATH_LEN] = { 0 };
 	sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename);
@@ -249,12 +247,14 @@ void load_scene(char* filepath)
 
 void save_all()
 {
+	/*
 	for (int i = 0; i < g_materials.items_count; i++)
 	{
 		Material to_save = *(Material*)j_array_get(&g_materials, i);
 		save_material(to_save);
 		printf("Saved material: %s\n", to_save.color_texture->file_name);
 	}
+	*/
 
 	char used_filepath[FILE_PATH_LEN] = {};
 

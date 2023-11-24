@@ -2,13 +2,13 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include <unordered_map>
 
 #include "j_array.h"
-#include "types.h"
 #include "j_buffers.h"
+#include "j_map.h"
 #include "j_strings.h"
 #include "structs.h"
+#include "types.h"
 
 extern bool DEBUG_SHADOWMAP;
 
@@ -20,10 +20,6 @@ extern GameMetrics g_game_metrics;
 extern GameInputsU g_inputs;
 extern FrameData g_frame_data;
 
-extern std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_mat_data_map;
-extern std::unordered_map<char*, s64, CharPtrHash, CharPtrEqual> g_materials_index_map;
-extern std::unordered_map<s64, char*> g_mat_data_map_inverse;
-
 extern MemoryBuffer g_temp_memory;
 extern MemoryBuffer g_materials_memory;
 extern MemoryBuffer g_scene_planes_memory;
@@ -32,6 +28,9 @@ extern MemoryBuffer g_scene_pointlights_memory;
 extern MemoryBuffer g_scene_spotlights_memory;
 extern MemoryBuffer g_texture_memory;
 extern MemoryBuffer g_material_names_memory;
+
+extern MemoryBuffer materials_id_map_memory;
+extern Map64 materials_id_map;
 
 extern JStringArray g_material_names;
 extern TransformationMode g_transform_mode;
