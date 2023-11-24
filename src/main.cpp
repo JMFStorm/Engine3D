@@ -1,9 +1,6 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
 #include <ft2build.h>
 #include FT_FREETYPE_H  
 
@@ -32,50 +29,11 @@
 #include "j_strings.h"
 #include "j_render.h"
 #include "j_imgui.h"
-
-static bool g_use_linear_texture_filtering = false;
-static bool g_generate_texture_mipmaps = false;
-static bool g_load_texture_sRGB = false;
+#include "j_files.h"
 
 Framebuffer g_editor_framebuffer;
 Texture pointlight_texture;
 Texture spotlight_texture;
-
-int load_image_into_texture_id(const char* image_path)
-{
-	unsigned int texture;
-	int x, y, n;
-
-	stbi_set_flip_vertically_on_load(true);
-	byte* data = stbi_load(image_path, &x, &y, &n, 0);
-	ASSERT_TRUE(data != NULL, "Load texture");
-	ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
-
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-	GLint filtering_mode = g_use_linear_texture_filtering ? GL_LINEAR : GL_NEAREST;
-	GLint mipmap_filtering_mode = g_use_linear_texture_filtering ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST;
-
-	if (g_generate_texture_mipmaps) glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mipmap_filtering_mode);
-	else glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filtering_mode);
-
-	GLint use_format = n == 3 ? GL_RGB : GL_RGBA;
-	GLint internal_format;
-
-	if (g_load_texture_sRGB) internal_format = n == 3 ? GL_SRGB : GL_SRGB_ALPHA;
-	else internal_format = n == 3 ? GL_RGB : GL_RGBA;
-
-	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, use_format, GL_UNSIGNED_BYTE, data);
-
-	if (g_generate_texture_mipmaps) glGenerateMipmap(GL_TEXTURE_2D);
-
-	stbi_image_free(data);
-	return texture;
-}
 
 void load_font(FontData* font_data, int font_height_px, const char* font_path)
 {
@@ -453,21 +411,20 @@ int main(int argc, char* argv[])
 		glBindTexture(GL_TEXTURE_2D_ARRAY, g_texture_arr_01);
 		glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_SRGB8, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 24);
 
-		byte* texture_data;
-		int x, y, n;
-		stbi_set_flip_vertically_on_load(true);
+		flip_vertical_image_load(true);
 
-		texture_data = stbi_load("G:\\projects\\game\\Engine3D\\resources\\materials\\zellige_squares.png", &x, &y, &n, 0);
-		ASSERT_TRUE(texture_data != NULL, "Load texture");
-		ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
-		glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
-		stbi_image_free(texture_data);
+		ImageData im_data =  load_image_data(const_cast<char*>("G:\\projects\\game\\Engine3D\\resources\\materials\\zellige_squares.png"));
+		ASSERT_TRUE(im_data.channels == 3 || im_data.channels == 4, "Image format is RGB or RGBA");
 
-		texture_data = stbi_load("G:\\projects\\game\\Engine3D\\resources\\materials\\wood_floor_ash_white.png", &x, &y, &n, 0);
-		ASSERT_TRUE(texture_data != NULL, "Load texture");
-		ASSERT_TRUE(n == 3 || n == 4, "Image format is RGB or RGBA");
-		glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 1, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
-		stbi_image_free(texture_data);
+		glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, im_data.image_data);
+
+		free_loaded_image(im_data);
+
+		im_data = load_image_data(const_cast<char*>("G:\\projects\\game\\Engine3D\\resources\\materials\\wood_floor_ash_white.png"));
+		ASSERT_TRUE(im_data.channels == 3 || im_data.channels == 4, "Image format is RGB or RGBA");
+
+		glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 1, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, im_data.image_data);
+		free_loaded_image(im_data);
 
 		glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 	}

@@ -222,3 +222,10 @@ typedef struct Scene {
 	JArray pointlights;
 	JArray spotlights;
 } Scene;
+
+typedef struct ImageData {
+	s32 width_px;
+	s32 height_px;
+	s32 channels;
+	byte* image_data;
+} ImageData;

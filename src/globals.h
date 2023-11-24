@@ -75,3 +75,7 @@ extern unsigned int g_simple_rect_offset_vbo;
 extern unsigned int g_simple_rect_tex_index_vbo;
 
 extern GLuint g_texture_arr_01;
+
+extern bool g_use_linear_texture_filtering;
+extern bool g_generate_texture_mipmaps;
+extern bool g_load_texture_sRGB;

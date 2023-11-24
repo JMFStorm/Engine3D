@@ -1,9 +1,8 @@
 TODOS:
 Internals
-- Malloc replace for stb_image
 - ttf load from stb
-- cpp unordered map replacement
 - cpp fileread replacement
+- cpp unordered map replacement
 
 Features
 - read from assets_manifest

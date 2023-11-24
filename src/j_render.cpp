@@ -1192,3 +1192,40 @@ void draw_skybox()
 	glDrawArrays(GL_TRIANGLES, 0, 36);
 	glDepthMask(GL_TRUE);
 }
+
+int load_image_into_texture_id(char* image_path)
+{
+	unsigned int texture;
+	flip_vertical_image_load(true);
+	ImageData im_data = load_image_data(image_path);
+
+	ASSERT_TRUE(im_data.channels == 3 || im_data.channels == 4, "Image format is RGB or RGBA");
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	GLint filtering_mode = g_use_linear_texture_filtering ? GL_LINEAR : GL_NEAREST;
+
+	GLint mipmap_filtering_mode = g_use_linear_texture_filtering
+		? GL_LINEAR_MIPMAP_LINEAR
+		: GL_NEAREST_MIPMAP_NEAREST;
+
+	if (g_generate_texture_mipmaps) glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mipmap_filtering_mode);
+	else glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filtering_mode);
+
+	GLint use_format = im_data.channels == 3 ? GL_RGB : GL_RGBA;
+	GLint internal_format;
+
+	if (g_load_texture_sRGB) internal_format = im_data.channels == 3 ? GL_SRGB : GL_SRGB_ALPHA;
+	else internal_format = im_data.channels == 3 ? GL_RGB : GL_RGBA;
+
+	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, im_data.width_px, im_data.height_px, 0, use_format, GL_UNSIGNED_BYTE, im_data.image_data);
+
+	if (g_generate_texture_mipmaps) glGenerateMipmap(GL_TEXTURE_2D);
+
+	free_loaded_image(im_data);
+	return texture;
+}
