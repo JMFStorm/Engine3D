@@ -30,7 +30,7 @@ extern MemoryBuffer g_texture_memory;
 extern MemoryBuffer g_material_names_memory;
 
 extern MemoryBuffer materials_id_map_memory;
-extern Map64 materials_id_map;
+extern JMap materials_id_map;
 
 extern JStringArray g_material_names;
 extern TransformationMode g_transform_mode;

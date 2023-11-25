@@ -1,11 +1,11 @@
 TODOS:
 Internals
+- save materials
+- hash material name => index
 - ttf load from stb
 - cpp fileread replacement
-- cpp unordered map replacement
 
 Features
-- read from assets_manifest
 - sharpening
 - skybox on/off
 - shadow map for planes

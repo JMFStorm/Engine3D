@@ -24,8 +24,7 @@ MeshData mesh_serialize(Mesh* mesh)
 
 Mesh mesh_deserialize(MeshData data)
 {
-	Material* material_ptr = (Material*)hash_map_get(&materials_id_map, data.material_id);
-
+	Material* material_ptr = (Material*)jmap_get_k_s64(&materials_id_map, data.material_id);
 	Mesh mesh = {
 		.transforms = data.transforms,
 		.material = material_ptr,

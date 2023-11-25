@@ -508,7 +508,7 @@ void init_memory_buffers()
 	s64 sizeof_material_id_elem = sizeof(char*) + sizeof(s64);
 	s64 sizeof_materials_id_map = (sizeof_material_id_elem) * MATERIALS_ID_MAP_CAPACITY;
 	memory_buffer_mallocate(&materials_id_map_memory, sizeof_materials_id_map, const_cast<char*>("Material ids hashmap"));
-	materials_id_map = hash_map_init(MATERIALS_ID_MAP_CAPACITY, sizeof_material_id_elem, materials_id_map_memory.memory);
+	materials_id_map = jmap_init(MATERIALS_ID_MAP_CAPACITY, sizeof_material_id_elem, materials_id_map_memory.memory);
 }
 
 glm::vec3 get_camera_ray_from_scene_px(int x, int y)

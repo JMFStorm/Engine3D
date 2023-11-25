@@ -12,7 +12,7 @@ GameInputsU g_inputs = {};
 FrameData g_frame_data = {};
 
 MemoryBuffer materials_id_map_memory = {};
-Map64 materials_id_map = {};
+JMap materials_id_map = {};
 
 MemoryBuffer g_temp_memory = {};
 MemoryBuffer g_ui_text_vertex_buffer = {};

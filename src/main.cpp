@@ -332,13 +332,13 @@ int main(int argc, char* argv[])
 			new_material.color_texture = color_texture_prt;
 			new_material.specular_texture = specular_texture_ptr;
 			new_material.id = id;
-			Material* new_material_ptr = (Material*)j_array_add(&g_materials, (byte*)&new_material);
 
-			Map64Item map_item = {
+			Material* new_material_ptr = (Material*)j_array_add(&g_materials, (byte*)&new_material);
+			JMapItem_S64_Ptr map_item = {
 				.key = id,
 				.value = (byte*)new_material_ptr
 			};
-			hash_map_add(&materials_id_map, map_item);
+			jmap_add(&materials_id_map, map_item);
 		}
 	}
 
