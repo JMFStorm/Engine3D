@@ -110,7 +110,7 @@ s64 add_new_mesh(Mesh new_mesh)
 {
 	s64 new_index = -1;
 	s64 material_index = 0;
-	g_selected_texture_item = jmap_get_k_str(&material_indexes_map, new_mesh.material->color_texture->file_name);
+	g_selected_texture_item = jmap_get_k_str(&material_indexes_map, new_mesh.material->name);
 
 	if (new_mesh.mesh_type == MeshType::Cube)
 	{
@@ -182,7 +182,7 @@ void select_object_index(ObjectType type, s64 index)
 	if (is_primitive(type))
 	{
 		Mesh* mesh_ptr = (Mesh*)get_selected_object_ptr();
-		g_selected_texture_item = jmap_get_k_str(&material_indexes_map, mesh_ptr->material->color_texture->file_name);
+		g_selected_texture_item = jmap_get_k_str(&material_indexes_map, mesh_ptr->material->name);
 	}
 	else if (type == ObjectType::Pointlight) g_transform_mode.mode = TransformMode::Translate;
 }

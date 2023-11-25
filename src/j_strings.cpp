@@ -22,6 +22,7 @@ char* j_strings_add(JStringArray* strings, char* char_ptr)
 	char* str_ptr = &strings->data[index];
 	memcpy(str_ptr, char_ptr, str_len);
 	strings->current_chars += str_len;
+	strings->strings_count++;
 
 	return str_ptr;
 }

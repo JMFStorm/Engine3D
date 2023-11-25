@@ -12,11 +12,11 @@ typedef struct Transforms {
 } Transforms;
 
 typedef struct Texture {
-	char file_name[FILENAME_LEN];
 	s64 gpu_id;
 } Texture;
 
 typedef struct Material {
+	char* name;
 	Texture* color_texture;
 	Texture* specular_texture;
 	s64 id;

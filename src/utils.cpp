@@ -590,18 +590,8 @@ PostProcessingSettings post_processings_init()
 Texture texture_load_from_filepath(char* path)
 {
 	int texture_id = load_image_into_texture_id(path);
-	char* file_name = strrchr(path, '\\');
-	file_name++;
-
-	str_trim_from_char(file_name, '.');
-	ASSERT_TRUE(file_name, "Filename from file path");
-	s64 name_len = strlen(file_name);
-
 	Texture texture = {
-		.file_name = "",
 		.gpu_id = texture_id,
 	};
-
-	memcpy(texture.file_name, file_name, name_len);
 	return texture;
 }

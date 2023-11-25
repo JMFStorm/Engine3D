@@ -66,8 +66,6 @@ SpotlightSerialized spotlight_serialize(Spotlight spotlight)
 MaterialData material_serialize(Material material)
 {
 	s64 material_id = 0;
-	// s64 material_id = g_mat_data_map[material.color_texture->file_name];
-
 	MaterialData m_data = {
 		.id = material_id,
 		.specular_mult = material.specular_mult,
@@ -81,7 +79,7 @@ void save_material(Material material)
 	MaterialData m_data = material_serialize(material);
 
 	char filename[FILENAME_LEN] = { 0 };
-	strcpy_s(filename, material.color_texture->file_name);
+	strcpy_s(filename, material.name);
 	str_trim_from_char(filename, '.');
 
 	char filepath[FILE_PATH_LEN] = { 0 };
