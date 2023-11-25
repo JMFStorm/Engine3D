@@ -15,9 +15,13 @@ void memory_buffer_mallocate(MemoryBuffer* buffer, s64 size_in_bytes, char* name
 
 MemoryBuffer memory_buffer_suballocate(MemoryBuffer* buffer, s64 size_in_bytes)
 {
-	ASSERT_TRUE(
-		buffer->size + size_in_bytes <= buffer->size - buffer->used_sub_allocation_capacity,
-		"Arena has size of suballocation");
+	s64 new_size = buffer->used_sub_allocation_capacity + size_in_bytes;
+
+	if (buffer->size < new_size)
+	{
+		printf("ERROR: %s: tried allocating %lld/%lld kb.\n", buffer->name, new_size, buffer->size);
+		ASSERT_TRUE(false, "Arena has size for suballocation");
+	}
 
 	s64 memory_index = sizeof(byte) * buffer->used_sub_allocation_capacity;
 	byte* sub_alloc_mem_start = &buffer->memory[memory_index];
@@ -35,7 +39,7 @@ MemoryBuffer memory_buffer_suballocate(MemoryBuffer* buffer, s64 size_in_bytes)
 void memory_buffer_wipe(MemoryBuffer* buffer)
 {
 	memset(buffer->memory, 0x00, buffer->size);
-	printf("Buffer '%s' wiped to zero.\n", buffer->name);
+	buffer->used_sub_allocation_capacity = 0;
 }
 
 void memory_buffer_free(MemoryBuffer* buffer)

@@ -4,7 +4,34 @@
 #include "j_assert.h"
 #include "utils.h"
 
+void* stb_malloc_impl(int size)
+{
+	MemoryBuffer buffer = memory_buffer_suballocate(&g_temp_memory, size);
+	return buffer.memory;
+}
+
+void* stb_realloc_impl(void* ptr, int size)
+{
+	if (ptr == 0)
+	{
+		MemoryBuffer buffer = memory_buffer_suballocate(&g_temp_memory, size);
+		return buffer.memory;
+	}
+
+	MemoryBuffer buffer = memory_buffer_suballocate(&g_temp_memory, size);
+	return buffer.memory;
+}
+
+void stb_free_impl(void* ptr)
+{
+}
+
 #define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#define STBI_ONLY_JPEG
+#define STBI_MALLOC(sz)           stb_malloc_impl(sz)
+#define STBI_REALLOC(p,newsz)     stb_realloc_impl(p,newsz)
+#define STBI_FREE(p)              stb_free_impl(p)
 #include "stb_image.h"
 
 void read_file_to_memory(const char* file_path, MemoryBuffer* buffer)
@@ -40,4 +67,5 @@ ImageData load_image_data(char* image_path)
 void free_loaded_image(ImageData data)
 {
 	stbi_image_free(data.image_data);
+	memory_buffer_wipe(&g_temp_memory);
 }

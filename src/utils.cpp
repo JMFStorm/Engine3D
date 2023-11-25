@@ -481,7 +481,7 @@ void init_framebuffer_resize(unsigned int* framebuffer_texture_id, unsigned int*
 
 void init_memory_buffers()
 {
-	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Permanent temp memory"));
+	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(25), const_cast<char*>("Permanent temp memory"));
 
 	// Scene objects
 	{

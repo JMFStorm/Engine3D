@@ -8,7 +8,6 @@
 #include "constants.h"
 #include "utils.h"
 #include "editor.h"
-#include <stb_image.h>
 
 bool check_shader_compile_error(GLuint shader)
 {
@@ -1150,16 +1149,13 @@ unsigned int load_cubemap()
 		"G:\\projects\\game\\Engine3D\\resources\\skybox\\back.jpg",
 	};
 
-	int width, height, nrChannels;
-	stbi_set_flip_vertically_on_load(false);
+	flip_vertical_image_load(false);
 
 	for (unsigned int i = 0; i < cube_faces; i++)
 	{
-		unsigned char* data = stbi_load(cubemaps[i], &width, &height, &nrChannels, 0);
-		ASSERT_TRUE(data, "Image load");
-
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-		stbi_image_free(data);
+		ImageData data = load_image_data(const_cast<char*>(cubemaps[i]));
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, data.width_px, data.height_px, 0, GL_RGB, GL_UNSIGNED_BYTE, data.image_data);
+		free_loaded_image(data);
 	}
 
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

@@ -1,9 +1,7 @@
 TODOS:
 Internals
-- save materials
-- hash material name => index
+- save materials into manifest
 - ttf load from stb
-- cpp fileread replacement
 
 Features
 - sharpening
