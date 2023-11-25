@@ -14,6 +14,9 @@ FrameData g_frame_data = {};
 MemoryBuffer materials_id_map_memory = {};
 JMap materials_id_map = {};
 
+MemoryBuffer material_indexes_map_memory = {};
+JMap material_indexes_map = {};
+
 MemoryBuffer g_temp_memory = {};
 MemoryBuffer g_ui_text_vertex_buffer = {};
 MemoryBuffer g_materials_memory = {};

@@ -483,32 +483,43 @@ void init_memory_buffers()
 {
 	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(5), const_cast<char*>("Permanent temp memory"));
 
-	memory_buffer_mallocate(&g_scene_planes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene plane meshes"));
-	g_scene.planes = j_array_init(SCENE_PLANES_MAX_COUNT, sizeof(Mesh), g_scene_planes_memory.memory);
+	// Scene objects
+	{
+		memory_buffer_mallocate(&g_scene_planes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene plane meshes"));
+		g_scene.planes = j_array_init(SCENE_PLANES_MAX_COUNT, sizeof(Mesh), g_scene_planes_memory.memory);
 
-	memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene 3D meshes"));
-	g_scene.meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), g_scene_meshes_memory.memory);
+		memory_buffer_mallocate(&g_scene_meshes_memory, sizeof(Mesh) * SCENE_MESHES_MAX_COUNT, const_cast<char*>("Scene 3D meshes"));
+		g_scene.meshes = j_array_init(SCENE_MESHES_MAX_COUNT, sizeof(Mesh), g_scene_meshes_memory.memory);
 
-	memory_buffer_mallocate(&g_scene_pointlights_memory, sizeof(Pointlight) * SCENE_POINTLIGHTS_MAX_COUNT, const_cast<char*>("Scene pointlights"));
-	g_scene.pointlights = j_array_init(SCENE_POINTLIGHTS_MAX_COUNT, sizeof(Pointlight), g_scene_pointlights_memory.memory);
+		memory_buffer_mallocate(&g_scene_pointlights_memory, sizeof(Pointlight) * SCENE_POINTLIGHTS_MAX_COUNT, const_cast<char*>("Scene pointlights"));
+		g_scene.pointlights = j_array_init(SCENE_POINTLIGHTS_MAX_COUNT, sizeof(Pointlight), g_scene_pointlights_memory.memory);
 
-	memory_buffer_mallocate(&g_scene_spotlights_memory, sizeof(Spotlight) * SCENE_SPOTLIGHTS_MAX_COUNT, const_cast<char*>("Scene spotlights"));
-	g_scene.spotlights = j_array_init(SCENE_SPOTLIGHTS_MAX_COUNT, sizeof(Spotlight), g_scene_spotlights_memory.memory);
+		memory_buffer_mallocate(&g_scene_spotlights_memory, sizeof(Spotlight) * SCENE_SPOTLIGHTS_MAX_COUNT, const_cast<char*>("Scene spotlights"));
+		g_scene.spotlights = j_array_init(SCENE_SPOTLIGHTS_MAX_COUNT, sizeof(Spotlight), g_scene_spotlights_memory.memory);
 
-	memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
-	g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), g_texture_memory.memory);
+		memory_buffer_mallocate(&g_texture_memory, sizeof(Texture) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Textures"));
+		g_textures = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Texture), g_texture_memory.memory);
 
-	memory_buffer_mallocate(&g_materials_memory, sizeof(Material) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Materials"));
-	g_materials = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Material), g_materials_memory.memory);
+		memory_buffer_mallocate(&g_materials_memory, sizeof(Material) * SCENE_TEXTURES_MAX_COUNT, const_cast<char*>("Materials"));
+		g_materials = j_array_init(SCENE_TEXTURES_MAX_COUNT, sizeof(Material), g_materials_memory.memory);
+	}
 
+	// Material names string list
 	constexpr const s64 material_names_arr_size = FILENAME_LEN * SCENE_TEXTURES_MAX_COUNT;
 	memory_buffer_mallocate(&g_material_names_memory, material_names_arr_size, const_cast<char*>("Material strings"));
 	g_material_names = j_strings_init(material_names_arr_size, (char*)g_material_names_memory.memory);
 
+	// material_id - material_ptr map
 	s64 sizeof_material_id_elem = sizeof(char*) + sizeof(s64);
 	s64 sizeof_materials_id_map = (sizeof_material_id_elem) * MATERIALS_ID_MAP_CAPACITY;
-	memory_buffer_mallocate(&materials_id_map_memory, sizeof_materials_id_map, const_cast<char*>("Material ids hashmap"));
+	memory_buffer_mallocate(&materials_id_map_memory, sizeof_materials_id_map, const_cast<char*>("Material ids map"));
 	materials_id_map = jmap_init(MATERIALS_ID_MAP_CAPACITY, sizeof_material_id_elem, materials_id_map_memory.memory);
+
+	// material_name - material_index map
+	s64 sizeof_material_index_elem = sizeof(char*) + sizeof(s64);
+	s64 sizeof_material_indexes_map = sizeof_material_index_elem * MATERIALS_INDEXES_MAP_CAPACITY;
+	memory_buffer_mallocate(&material_indexes_map_memory, sizeof_materials_id_map, const_cast<char*>("Material indexes map"));
+	material_indexes_map = jmap_init(MATERIALS_INDEXES_MAP_CAPACITY, sizeof_material_id_elem, material_indexes_map_memory.memory);
 }
 
 glm::vec3 get_camera_ray_from_scene_px(int x, int y)

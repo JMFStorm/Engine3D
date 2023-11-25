@@ -334,11 +334,18 @@ int main(int argc, char* argv[])
 			new_material.id = id;
 
 			Material* new_material_ptr = (Material*)j_array_add(&g_materials, (byte*)&new_material);
-			JMapItem_S64_Ptr map_item = {
+
+			JMapItem_S64_Ptr mat_id_item = {
 				.key = id,
 				.value = (byte*)new_material_ptr
 			};
-			jmap_add(&materials_id_map, map_item);
+			JMapItem_Str_S64 mat_name_index_item = {
+				.key = new_material_ptr->color_texture->file_name,
+				.value = i
+			};
+
+			jmap_add(&materials_id_map, mat_id_item);
+			jmap_add(&material_indexes_map, mat_name_index_item);
 		}
 	}
 

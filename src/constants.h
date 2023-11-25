@@ -18,6 +18,7 @@ constexpr const s64 SCENE_PLANES_MAX_COUNT = 100;
 constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
 
 constexpr const s64 MATERIALS_ID_MAP_CAPACITY = 64;
+constexpr const s64 MATERIALS_INDEXES_MAP_CAPACITY = 64;
 
 constexpr const s64 TEXTURE_SIZE_1K = 1024;
 
