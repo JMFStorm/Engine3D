@@ -6,7 +6,7 @@
 
 void* stb_malloc_impl(int size)
 {
-	MemoryBuffer buffer = memory_buffer_suballocate(&g_temp_memory, size);
+	MemoryBuffer buffer = memory_buffer_suballocate(&TEMP_MEMORY, size);
 	return buffer.memory;
 }
 
@@ -14,11 +14,11 @@ void* stb_realloc_impl(void* ptr, int size)
 {
 	if (ptr == 0)
 	{
-		MemoryBuffer buffer = memory_buffer_suballocate(&g_temp_memory, size);
+		MemoryBuffer buffer = memory_buffer_suballocate(&TEMP_MEMORY, size);
 		return buffer.memory;
 	}
 
-	MemoryBuffer buffer = memory_buffer_suballocate(&g_temp_memory, size);
+	MemoryBuffer buffer = memory_buffer_suballocate(&TEMP_MEMORY, size);
 	return buffer.memory;
 }
 
@@ -67,5 +67,5 @@ ImageData load_image_data(char* image_path)
 void free_loaded_image(ImageData data)
 {
 	stbi_image_free(data.image_data);
-	memory_buffer_wipe(&g_temp_memory);
+	memory_buffer_wipe(&TEMP_MEMORY);
 }

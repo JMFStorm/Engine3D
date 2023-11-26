@@ -479,9 +479,19 @@ void init_framebuffer_resize(unsigned int* framebuffer_texture_id, unsigned int*
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void allocate_temp_memory(s64 bytes)
+{
+	memory_buffer_mallocate(&TEMP_MEMORY, MEGABYTES(25), const_cast<char*>("Temp memory"));
+}
+
+void deallocate_temp_memory()
+{
+	memory_buffer_free(&TEMP_MEMORY);
+}
+
 void init_memory_buffers()
 {
-	memory_buffer_mallocate(&g_temp_memory, MEGABYTES(25), const_cast<char*>("Permanent temp memory"));
+	allocate_temp_memory(MEGABYTES(25));
 
 	// Scene objects
 	{

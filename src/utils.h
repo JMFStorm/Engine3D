@@ -155,3 +155,7 @@ s64 get_materials_from_manifest(Material materials[], s64 max_items);
 void load_material_textures(Material materials[], s64 materials_count);
 
 void load_materials_into_memory(Material materials[], s64 materials_count);
+
+void allocate_temp_memory(s64 bytes);
+
+void deallocate_temp_memory();

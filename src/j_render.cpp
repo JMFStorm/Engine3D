@@ -672,8 +672,8 @@ void init_all_shaders()
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_fs.glsl";
 
 		g_simple_rect_shader = simple_shader_init();
-		g_simple_rect_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		
+		g_simple_rect_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
+
 		unsigned int rect_vertex_vbo;
 		glGenVertexArrays(1, &g_simple_rect_shader.vao);
 		glGenBuffers(1, &rect_vertex_vbo);
@@ -689,7 +689,7 @@ void init_all_shaders()
 			-0.25f, -0.25f, 0.0f,  0.0f, 0.0f, // bottom left
 			 0.25f, -0.25f, 0.0f,  1.0f, 0.0f, // bottom right
 			-0.25f,  0.25f, 0.0f,  0.0f, 1.0f, // top left
-								   
+
 			-0.25f,  0.25f, 0.0f,  0.0f, 1.0f, // top left
 			 0.25f, -0.25f, 0.0f,  1.0f, 0.0f, // bottom right
 			 0.25f,  0.25f, 0.0f,  1.0f, 1.0f  // top right
@@ -728,13 +728,13 @@ void init_all_shaders()
 	}
 
 	// Skybox
-	{		
+	{
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/skybox_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/skybox_fs.glsl";
 
 		g_skybox_shader = simple_shader_init();
 
-		g_skybox_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_skybox_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
 		{
 			glGenVertexArrays(1, &g_skybox_shader.vao);
 			glGenBuffers(1, &g_skybox_shader.vbo);
@@ -802,7 +802,7 @@ void init_all_shaders()
 
 		g_billboard_shader = simple_shader_init();
 
-		g_billboard_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_billboard_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
 		{
 			glGenVertexArrays(1, &g_billboard_shader.vao);
 			glGenBuffers(1, &g_billboard_shader.vbo);
@@ -842,8 +842,8 @@ void init_all_shaders()
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/ui_text_fs.glsl";
 
-		g_ui_text_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
-		
+		g_ui_text_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
+
 		glGenVertexArrays(1, &g_ui_text_shader.vao);
 		glGenBuffers(1, &g_ui_text_shader.vbo);
 
@@ -860,7 +860,7 @@ void init_all_shaders()
 		// UV attribute
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 		glEnableVertexAttribArray(1);
-		
+
 	}
 
 	// Init mesh shader
@@ -868,7 +868,7 @@ void init_all_shaders()
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/mesh_fs.glsl";
 
-		g_mesh_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_mesh_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
 		{
 			glGenVertexArrays(1, &g_mesh_shader.vao);
 			glBindVertexArray(g_mesh_shader.vao);
@@ -898,7 +898,7 @@ void init_all_shaders()
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/wireframe_fs.glsl";
 
-		g_wireframe_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_wireframe_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
 
 		glGenVertexArrays(1, &g_wireframe_shader.vao);
 		glBindVertexArray(g_wireframe_shader.vao);
@@ -919,7 +919,7 @@ void init_all_shaders()
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/line_fs.glsl";
 
-		g_line_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_line_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
 
 		glGenVertexArrays(1, &g_line_shader.vao);
 		glBindVertexArray(g_line_shader.vao);
@@ -946,7 +946,7 @@ void init_all_shaders()
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/framebuffer_fs.glsl";
 
-		g_scene_framebuffer_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_scene_framebuffer_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
 
 		glGenVertexArrays(1, &g_scene_framebuffer_shader.vao);
 		glGenBuffers(1, &g_scene_framebuffer_shader.vbo);
@@ -976,7 +976,7 @@ void init_all_shaders()
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_fs.glsl";
 
-		g_shdow_map_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_shdow_map_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
 
 		glGenVertexArrays(1, &g_shdow_map_shader.vao);
 		glGenBuffers(1, &g_shdow_map_shader.vbo);
@@ -993,7 +993,7 @@ void init_all_shaders()
 		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_vs.glsl";
 		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/shadow_map_debug_fs.glsl";
 
-		g_shdow_map_debug_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &g_temp_memory);
+		g_shdow_map_debug_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
 
 		unsigned int vbo;
 		glGenVertexArrays(1, &g_shdow_map_debug_shader.vao);

@@ -79,9 +79,9 @@ void load_font(FontData* font_data, int font_height_px, const char* font_path)
 	}
 
 	int bitmap_size = bitmap_width * bitmap_height;
-	ASSERT_TRUE(bitmap_size < g_temp_memory.size, "Font bitmap buffer fits");
+	ASSERT_TRUE(bitmap_size < TEMP_MEMORY.size, "Font bitmap buffer fits");
 
-	byte* bitmap_memory = g_temp_memory.memory;
+	byte* bitmap_memory = TEMP_MEMORY.memory;
 
 	// Add spacebar
 	{
@@ -345,6 +345,7 @@ int main(int argc, char* argv[])
 	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
 	new_scene();
+	deallocate_temp_memory();
 
 	while (!glfwWindowShouldClose(g_window))
 	{

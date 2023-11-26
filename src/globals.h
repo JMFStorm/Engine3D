@@ -20,7 +20,8 @@ extern GameMetrics g_game_metrics;
 extern GameInputsU g_inputs;
 extern FrameData g_frame_data;
 
-extern MemoryBuffer g_temp_memory;
+extern MemoryBuffer TEMP_MEMORY;
+
 extern MemoryBuffer g_materials_memory;
 extern MemoryBuffer g_scene_planes_memory;
 extern MemoryBuffer g_scene_meshes_memory;

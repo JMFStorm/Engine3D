@@ -17,7 +17,8 @@ JMap materials_id_map = {};
 MemoryBuffer material_indexes_map_memory = {};
 JMap material_indexes_map = {};
 
-MemoryBuffer g_temp_memory = {};
+MemoryBuffer TEMP_MEMORY = {};
+
 MemoryBuffer g_ui_text_vertex_buffer = {};
 MemoryBuffer g_materials_memory = {};
 MemoryBuffer g_scene_planes_memory = {};
