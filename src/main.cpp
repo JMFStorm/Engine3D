@@ -314,10 +314,10 @@ int main(int argc, char* argv[])
 
 	g_pp_settings = post_processings_init();
 
-	// Load assets
+	// Load materials
 	{
 		FILE* file;
-		int success = fopen_s(&file, ASSETS_MANIFEST_PATH, "r");
+		int success = fopen_s(&file, MATERIALS_MANIFEST_PATH, "r");
 		ASSERT_TRUE(success == 0, "File opened");
 
 		char line_buffer[256];
@@ -332,12 +332,10 @@ int main(int argc, char* argv[])
 
 			if (strcmp(line_buffer, "materials/\n") == 0)
 			{
-				g_material_names = j_strings_init(2048, (char*)g_material_names_memory.memory);
-
 				for (;;)
 				{
 					got_line = fgets(line_buffer, sizeof(line_buffer), file) != NULL;
-					if (got_line == NULL) break;
+					if (got_line == NULL || line_buffer[0] == '\n') break;
 
 					Material mat = get_material_from_asset_line(line_buffer);
 					materials[materials_count] = mat;

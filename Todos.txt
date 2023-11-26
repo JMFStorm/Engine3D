@@ -1,6 +1,5 @@
 TODOS:
 Internals
-- save materials into manifest
 - ttf load from stb
 
 Features

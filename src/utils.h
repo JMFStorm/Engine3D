@@ -135,3 +135,15 @@ bool is_primitive(ObjectType type);
 PostProcessingSettings post_processings_init();
 
 Texture texture_load_from_filepath(char* path);
+
+MeshData mesh_serialize(Mesh* mesh);
+
+Mesh mesh_deserialize(MeshData data);
+
+MaterialData material_serialize(Material material);
+
+Material material_deserialize(MaterialData mat_data);
+
+Spotlight spotlight_deserialize(SpotlightSerialized serialized);
+
+SpotlightSerialized spotlight_serialize(Spotlight spotlight);

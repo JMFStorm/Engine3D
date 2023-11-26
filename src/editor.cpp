@@ -1,9 +1,10 @@
 #include "editor.h"
-#include <glm/gtc/matrix_inverse.hpp>
 #include "globals.h"
+#include <glm/gtc/matrix_inverse.hpp>
+#include <fstream>
 #include "j_assert.h"
-#include "utils.h"
 #include "j_render.h"
+#include "utils.h"
 
 TransformMode get_curr_transformation_mode()
 {
@@ -523,4 +524,57 @@ void draw_selection_arrows(glm::vec3 position)
 		append_line(position, end_z, glm::vec3(0.0f, 0.0f, 1.0f));
 		draw_lines_ontop(14.0f);
 	}
+}
+
+void save_materials()
+{
+	FILE* file;
+	int success = fopen_s(&file, MATERIALS_MANIFEST_PATH, "r+");
+	ASSERT_TRUE(success == 0, "File opened");
+
+	char line_buffer[256];
+
+	s64 materials_count = 0;
+	Material* materials_in_assets[32] = {};
+
+	for (;;)
+	{
+		int got_line = fgets(line_buffer, sizeof(line_buffer), file) != NULL;
+		if (got_line == NULL) break;
+
+		if (strcmp(line_buffer, "materials/\n") == 0)
+		{
+			for (;;)
+			{
+				got_line = fgets(line_buffer, sizeof(line_buffer), file) != NULL;
+				if (got_line == NULL) break;
+
+				char* mat_id = strstr(line_buffer, "id=");
+				mat_id = &mat_id[3];
+				str_trim_from_char(mat_id, ' ');
+
+				s64 id;
+				bool got_id = sscanf_s(mat_id, "%lld", &id) == 1;
+				ASSERT_TRUE(got_id, "Material id as s64");
+
+				Material* current_mat = (Material*)jmap_get_k_s64(&materials_id_map, id);
+
+				// Write material line
+				materials_in_assets[materials_count] = current_mat;
+				materials_count++;
+			}
+		}
+	}
+
+	fseek(file, 0, SEEK_SET);
+	fprintf(file, "materials/\n");
+
+	for (int i = 0; i < materials_count; i++)
+	{
+		Material* current_mat = materials_in_assets[i];
+		fprintf(file, "id=%lld shine=%.1f specular_mult=%.1f name=%s\n",
+			current_mat->id, current_mat->shininess, current_mat->specular_mult, current_mat->name);
+	}
+
+	fclose(file);
 }

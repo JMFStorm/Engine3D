@@ -11,99 +11,6 @@
 #include "j_platform.h"
 #include "editor.h"
 
-MeshData mesh_serialize(Mesh* mesh)
-{
-	MeshData data = {
-		.transforms = mesh->transforms,
-		.mesh_type = mesh->mesh_type,
-		.material_id = mesh->material->id,
-		.uv_multiplier = mesh->uv_multiplier,
-	};
-	return data;
-}
-
-Mesh mesh_deserialize(MeshData data)
-{
-	Material* material_ptr = (Material*)jmap_get_k_s64(&materials_id_map, data.material_id);
-	Mesh mesh = {
-		.transforms = data.transforms,
-		.material = material_ptr,
-		.mesh_type = data.mesh_type,
-		.uv_multiplier = data.uv_multiplier,
-	};
-	return mesh;
-}
-
-Spotlight spotlight_deserialize(SpotlightSerialized serialized)
-{
-	Spotlight spotlight = {
-		.shadow_map = init_spotlight_shadow_map(),
-		.transforms = serialized.transforms,
-		.diffuse = serialized.diffuse,
-		.specular = serialized.specular,
-		.range = serialized.range,
-		.fov = serialized.fov,
-		.outer_cutoff_fov = serialized.outer_cutoff_fov,
-		.is_on = serialized.is_on,
-	};
-	return spotlight;
-}
-
-SpotlightSerialized spotlight_serialize(Spotlight spotlight)
-{
-	SpotlightSerialized serialized = {
-		.transforms = spotlight.transforms,
-		.diffuse = spotlight.diffuse,
-		.specular = spotlight.specular,
-		.range = spotlight.range,
-		.fov = spotlight.fov,
-		.outer_cutoff_fov = spotlight.outer_cutoff_fov,
-		.is_on = spotlight.is_on,
-	};
-	return serialized;
-}
-
-MaterialData material_serialize(Material material)
-{
-	s64 material_id = 0;
-	MaterialData m_data = {
-		.id = material_id,
-		.specular_mult = material.specular_mult,
-		.shininess = material.shininess
-	};
-	return m_data;
-}
-
-void save_material(Material material)
-{
-	MaterialData m_data = material_serialize(material);
-
-	char filename[FILENAME_LEN] = { 0 };
-	strcpy_s(filename, material.name);
-	str_trim_from_char(filename, '.');
-
-	char filepath[FILE_PATH_LEN] = { 0 };
-	sprintf_s(filepath, "%s\\%s.jmat", g_materials_dir_path, filename);
-
-	std::ofstream output_mat_file(filepath, std::ios::binary | std::ios::trunc);
-	ASSERT_TRUE(output_mat_file.is_open(), ".jmat file opened");
-
-	output_mat_file.write(".jmat", 5);
-	output_mat_file.write(reinterpret_cast<char*>(&m_data), sizeof(m_data));
-	output_mat_file.close();
-}
-
-Material material_deserialize(MaterialData mat_data)
-{
-	Material mat = {
-		.color_texture = nullptr,
-		.specular_texture = nullptr,
-		.specular_mult = mat_data.specular_mult,
-		.shininess = mat_data.shininess,
-	};
-	return mat;
-}
-
 void save_scene(char* filepath)
 {
 	std::ofstream output_file(filepath, std::ios::binary);
@@ -244,15 +151,7 @@ void load_scene(char* filepath)
 
 void save_all()
 {
-	// TODO: save materials
-	/*
-	for (int i = 0; i < g_materials.items_count; i++)
-	{
-		Material to_save = *(Material*)j_array_get(&g_materials, i);
-		save_material(to_save);
-		printf("Saved material: %s\n", to_save.color_texture->file_name);
-	}
-	*/
+	save_materials();
 
 	char used_filepath[FILE_PATH_LEN] = {};
 

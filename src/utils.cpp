@@ -595,3 +595,76 @@ Texture texture_load_from_filepath(char* path)
 	};
 	return texture;
 }
+
+MeshData mesh_serialize(Mesh* mesh)
+{
+	MeshData data = {
+		.transforms = mesh->transforms,
+		.mesh_type = mesh->mesh_type,
+		.material_id = mesh->material->id,
+		.uv_multiplier = mesh->uv_multiplier,
+	};
+	return data;
+}
+
+Mesh mesh_deserialize(MeshData data)
+{
+	Material* material_ptr = (Material*)jmap_get_k_s64(&materials_id_map, data.material_id);
+	Mesh mesh = {
+		.transforms = data.transforms,
+		.material = material_ptr,
+		.mesh_type = data.mesh_type,
+		.uv_multiplier = data.uv_multiplier,
+	};
+	return mesh;
+}
+
+Spotlight spotlight_deserialize(SpotlightSerialized serialized)
+{
+	Spotlight spotlight = {
+		.shadow_map = init_spotlight_shadow_map(),
+		.transforms = serialized.transforms,
+		.diffuse = serialized.diffuse,
+		.specular = serialized.specular,
+		.range = serialized.range,
+		.fov = serialized.fov,
+		.outer_cutoff_fov = serialized.outer_cutoff_fov,
+		.is_on = serialized.is_on,
+	};
+	return spotlight;
+}
+
+SpotlightSerialized spotlight_serialize(Spotlight spotlight)
+{
+	SpotlightSerialized serialized = {
+		.transforms = spotlight.transforms,
+		.diffuse = spotlight.diffuse,
+		.specular = spotlight.specular,
+		.range = spotlight.range,
+		.fov = spotlight.fov,
+		.outer_cutoff_fov = spotlight.outer_cutoff_fov,
+		.is_on = spotlight.is_on,
+	};
+	return serialized;
+}
+
+MaterialData material_serialize(Material material)
+{
+	MaterialData m_data = {
+		.id = material.id,
+		.specular_mult = material.specular_mult,
+		.shininess = material.shininess
+	};
+	return m_data;
+}
+
+Material material_deserialize(MaterialData mat_data)
+{
+	Material mat = {
+		.color_texture = nullptr,
+		.specular_texture = nullptr,
+		.specular_mult = mat_data.specular_mult,
+		.shininess = mat_data.shininess,
+	};
+	return mat;
+}

@@ -29,7 +29,7 @@ char* j_strings_add(JStringArray* strings, char* char_ptr)
 
 bool str_trim_from_char(char* str, char c)
 {
-	char* last_dot = strrchr(str, c);
+	char* last_dot = strchr(str, c);
 	if (last_dot == nullptr) return false;
 	*last_dot = '\0';
 	return true;

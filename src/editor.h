@@ -50,3 +50,5 @@ inline bool has_object_selection()
 {
 	return g_selected_object.type != ObjectType::None;
 }
+
+void save_materials();

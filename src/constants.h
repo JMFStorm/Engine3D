@@ -2,10 +2,9 @@
 
 #include "types.h"
 
-constexpr const char* ASSETS_MANIFEST_PATH = "G:\\projects\\game\\Engine3D\\resources\\assets_manifest_2.txt";
-constexpr const char* MATERIALS_DIR_PATH = "G:\\projects\\game\\Engine3D\\resources\\materials\\";
+constexpr const char* MATERIALS_MANIFEST_PATH = "G:\\projects\\game\\Engine3D\\resources\\materials\\materials_manifest.txt";
 
-constexpr const char* g_materials_dir_path = "G:\\projects\\game\\Engine3D\\resources\\materials";
+constexpr const char* MATERIALS_DIR_PATH = "G:\\projects\\game\\Engine3D\\resources\\materials\\";
 
 constexpr const char* g_debug_font_path = "G:\\projects\\game\\Engine3D\\resources\\fonts\\Inter-Regular.ttf";
 constexpr const char* pointlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\billboards\\pointlight_billboard.png";
