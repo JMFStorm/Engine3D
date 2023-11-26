@@ -1,5 +1,5 @@
 materials/
-id=100000 shine=32.0 specular_mult=1.0 name=bricks_reclaimed
+id=100000 shine=40.0 specular_mult=1.0 name=bricks_reclaimed
 id=100001 shine=64.0 specular_mult=1.0 name=tiles_slate_square
 id=100002 shine=64.0 specular_mult=1.0 name=wood_floor_ash_white
 id=100003 shine=48.0 specular_mult=1.0 name=zellige_squares

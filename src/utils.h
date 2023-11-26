@@ -147,3 +147,11 @@ Material material_deserialize(MaterialData mat_data);
 Spotlight spotlight_deserialize(SpotlightSerialized serialized);
 
 SpotlightSerialized spotlight_serialize(Spotlight spotlight);
+
+Material get_material_from_asset_line(char* line);
+
+s64 get_materials_from_manifest(Material materials[], s64 max_items);
+
+void load_material_textures(Material materials[], s64 materials_count);
+
+void load_materials_into_memory(Material materials[], s64 materials_count);

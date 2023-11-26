@@ -547,7 +547,7 @@ void save_materials()
 			for (;;)
 			{
 				got_line = fgets(line_buffer, sizeof(line_buffer), file) != NULL;
-				if (got_line == NULL) break;
+				if (str_is_empty_newline(line_buffer)) break;
 
 				char* mat_id = strstr(line_buffer, "id=");
 				mat_id = &mat_id[3];

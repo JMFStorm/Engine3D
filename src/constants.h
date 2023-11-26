@@ -3,8 +3,11 @@
 #include "types.h"
 
 constexpr const char* MATERIALS_MANIFEST_PATH = "G:\\projects\\game\\Engine3D\\resources\\materials\\materials_manifest.txt";
-
 constexpr const char* MATERIALS_DIR_PATH = "G:\\projects\\game\\Engine3D\\resources\\materials\\";
+
+constexpr const s64 MATERIALS_MAX_COUNT = 64;
+constexpr const s64 MATERIALS_INDEXES_MAP_CAPACITY = MATERIALS_MAX_COUNT;
+constexpr const s64 MATERIALS_ID_MAP_CAPACITY = MATERIALS_MAX_COUNT;
 
 constexpr const char* g_debug_font_path = "G:\\projects\\game\\Engine3D\\resources\\fonts\\Inter-Regular.ttf";
 constexpr const char* pointlight_image_path = "G:\\projects\\game\\Engine3D\\resources\\billboards\\pointlight_billboard.png";
@@ -15,9 +18,6 @@ constexpr const s64 SCENE_SPOTLIGHTS_MAX_COUNT = 100;
 constexpr const s64 SCENE_TEXTURES_MAX_COUNT = 100;
 constexpr const s64 SCENE_PLANES_MAX_COUNT = 100;
 constexpr const s64 SCENE_MESHES_MAX_COUNT = 100;
-
-constexpr const s64 MATERIALS_ID_MAP_CAPACITY = 64;
-constexpr const s64 MATERIALS_INDEXES_MAP_CAPACITY = 64;
 
 constexpr const s64 TEXTURE_SIZE_1K = 1024;
 

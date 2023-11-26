@@ -41,3 +41,8 @@ char* str_get_file_ext(char* str)
 	if (last_dot == nullptr) return nullptr;
 	return last_dot;
 }
+
+bool str_is_empty_newline(char* str)
+{
+	return str == NULL || str[0] == '\n';
+}

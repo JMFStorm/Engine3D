@@ -214,52 +214,6 @@ void set_button_state(GLFWwindow* window, ButtonState* button)
 	button->is_down = key_state == GLFW_PRESS;
 }
 
-Material get_material_from_asset_line(char* line)
-{
-	char* endptr;
-	char* next_token; char* token;
-
-	// Material id
-	token = strtok_s(line, " ", &next_token);
-	bool is_id = (strncmp(token, "id=", 3) == 0);
-	ASSERT_TRUE(is_id, "Material id");
-	long material_id = strtol(&token[3], &endptr, 10);
-
-	// Material shine
-	token = strtok_s(NULL, " ", &next_token);
-	bool is_shine = (strncmp(token, "shine=", 6) == 0);
-	ASSERT_TRUE(is_shine, "Material shine");
-
-	float material_shine = 0.0f;
-	bool got_shine = sscanf_s(&token[6], "%f", &material_shine) == 1;
-	ASSERT_TRUE(got_shine, "Material shine as float");
-
-	// Material specular multiplier
-	token = strtok_s(NULL, " ", &next_token);
-	bool is_spec = (strncmp(token, "specular_mult=", 14) == 0);
-	ASSERT_TRUE(is_spec, "Material specular mult");
-
-	float specular_mult = 0.0f;
-	bool got_spec = sscanf_s(&token[14], "%f", &specular_mult) == 1;
-	ASSERT_TRUE(got_spec, "Specular mult as float");
-
-	// Material name
-	token = strtok_s(NULL, " ", &next_token);
-	bool is_name = (strncmp(token, "name=", 5) == 0);
-	ASSERT_TRUE(is_name, "Material name");
-
-	char* material_name = &token[5];
-	str_trim_from_char(material_name, '\n');
-	char* str_ptr = j_strings_add(&g_material_names, material_name);
-
-	Material material = {};
-	material.name = str_ptr;
-	material.id = material_id;
-	material.shininess = material_shine;
-	material.specular_mult = specular_mult;
-	return material;
-}
-
 int main(int argc, char* argv[])
 {
 	init_memory_buffers();
@@ -314,73 +268,10 @@ int main(int argc, char* argv[])
 
 	g_pp_settings = post_processings_init();
 
-	// Load materials
-	{
-		FILE* file;
-		int success = fopen_s(&file, MATERIALS_MANIFEST_PATH, "r");
-		ASSERT_TRUE(success == 0, "File opened");
-
-		char line_buffer[256];
-		char* material_str_names[32] = {};
-		s64 materials_count = 0;
-		Material materials[32] = {};
-
-		for (;;)
-		{
-			int got_line = fgets(line_buffer, sizeof(line_buffer), file) != NULL;
-			if (got_line == NULL) break;
-
-			if (strcmp(line_buffer, "materials/\n") == 0)
-			{
-				for (;;)
-				{
-					got_line = fgets(line_buffer, sizeof(line_buffer), file) != NULL;
-					if (got_line == NULL || line_buffer[0] == '\n') break;
-
-					Material mat = get_material_from_asset_line(line_buffer);
-					materials[materials_count] = mat;
-					material_str_names[materials_count] = mat.name;
-					materials_count++;
-				}
-			}
-		}
-
-		fclose(file);
-
-		for (int i = 0; i < materials_count; i++)
-		{
-			char filepath[FILE_PATH_LEN] = {};
-
-			sprintf_s(filepath, "%s%s%s", MATERIALS_DIR_PATH, material_str_names[i], const_cast<char*>(".png"));
-			g_load_texture_sRGB = true;
-			Texture color_texture = texture_load_from_filepath(filepath);
-
-			sprintf_s(filepath, "%s%s%s", MATERIALS_DIR_PATH, material_str_names[i], const_cast<char*>("_specular.png"));
-			g_load_texture_sRGB = false;
-			Texture specular_texture = texture_load_from_filepath(filepath);
-
-			Texture* color_texture_prt    = (Texture*)j_array_add(&g_textures, (byte*)&color_texture);
-			Texture* specular_texture_ptr = (Texture*)j_array_add(&g_textures, (byte*)&specular_texture);
-
-			Material new_material = materials[i];
-			new_material.color_texture = color_texture_prt;
-			new_material.specular_texture = specular_texture_ptr;
-
-			Material* new_material_ptr = (Material*)j_array_add(&g_materials, (byte*)&new_material);
-
-			JMapItem_S64_Ptr mat_id_item = {
-				.key = new_material.id,
-				.value = (byte*)new_material_ptr
-			};
-			JMapItem_Str_S64 mat_name_index_item = {
-				.key = new_material_ptr->name,
-				.value = i
-			};
-
-			jmap_add(&materials_id_map, mat_id_item);
-			jmap_add(&material_indexes_map, mat_name_index_item);
-		}
-	}
+	Material materials[MATERIALS_MAX_COUNT] = {};
+	s64 materials_count = get_materials_from_manifest(materials, MATERIALS_MAX_COUNT);
+	load_material_textures(materials, materials_count);
+	load_materials_into_memory(materials, materials_count);
 
 	// Texture array (test)
 	{
