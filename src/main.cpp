@@ -680,10 +680,10 @@ int main(int argc, char* argv[])
 		{
 			glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
 			glEnable(GL_DEPTH_TEST);
-			glClearColor(0.34f, 0.44f, 0.42f, 1.0f);
+			glClearColor(0.2f, 0.31f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			draw_skybox();
+			if (g_user_settings.use_skybox) draw_skybox();
 
 			// Coordinate lines
 			append_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));

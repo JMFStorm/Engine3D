@@ -55,10 +55,11 @@ SimpleShader g_scene_framebuffer_shader = {};
 Framebuffer g_scene_framebuffer = {};
 
 UserSettings g_user_settings = {
+	.world_ambient = glm::vec3(0.075f),
 	.window_size_px = { 1900, 1200 },
 	.transform_clip = 0.25f,
 	.transform_rotation_clip = 15.0f,
-	.world_ambient = glm::vec3(0.075f),
+	.use_skybox = false,
 };
 
 s64 g_rects_buffered = 0;

@@ -192,10 +192,11 @@ typedef struct FontData {
 } FontData;
 
 typedef struct UserSettings {
-	int window_size_px[2];
-	float transform_clip;
-	float transform_rotation_clip;
 	glm::vec3 world_ambient;
+	s32 window_size_px[2];
+	f32 transform_clip;
+	f32 transform_rotation_clip;
+	bool use_skybox;
 } UserSettings;
 
 typedef struct MaterialIdData {

@@ -1,10 +1,8 @@
-TODOS:
 Internals
-- ttf load from stb
+- on minimize don't crash
 
 Features
-- sharpening
 - skybox on/off
+- sharpening
 - shadow map for planes
 - popup text for scene save
-

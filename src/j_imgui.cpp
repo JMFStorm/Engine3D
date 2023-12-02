@@ -192,6 +192,7 @@ void right_hand_editor_panel()
 
 	ImGui::Text("Scene settings");
 	ImGui::ColorEdit3("Global ambient", &g_user_settings.world_ambient[0], 0);
+	ImGui::Checkbox("Skybox", &g_user_settings.use_skybox);
 
 	ImGui::Text("Game window");
 	ImGui::InputInt2("Screen width px", &g_user_settings.window_size_px[0]);
