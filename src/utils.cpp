@@ -406,10 +406,6 @@ void print_debug_texts()
 {
 	char debug_str[256];
 
-	sprintf_s(debug_str, "ABCDE abcde defkhijkl");
-	append_ui_text(&g_debug_font, debug_str, 1.5f, 100.0f);
-
-/*
 	sprintf_s(debug_str, "FPS: %d", g_game_metrics.fps);
 	append_ui_text(&g_debug_font, debug_str, 0.5f, 100.0f);
 
@@ -447,7 +443,6 @@ void print_debug_texts()
 
 	sprintf_s(debug_str, transform_mode_debug_str_format, t_mode);
 	append_ui_text(&g_debug_font, debug_str, 0.5f, 2.0f);
-*/
 	draw_ui_text(&g_debug_font, 0.9f, 0.9f, 0.9f);
 }
 

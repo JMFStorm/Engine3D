@@ -186,9 +186,9 @@ typedef struct CharData {
 
 typedef struct FontData {
 	std::array<CharData, 96> char_data = { 0 };
-	s32 texture_id;
-	s32 font_height_px;
-	f32 font_scale;
+	int texture_id;
+	float font_scale;
+	int font_height_px;
 } FontData;
 
 typedef struct UserSettings {

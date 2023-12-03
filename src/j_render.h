@@ -40,5 +40,3 @@ void append_simple_rect(glm::vec2 offset, glm::vec3 color, int texture_index);
 void draw_simple_rects();
 
 int load_image_into_texture_id(char* image_path);
-
-void draw_rect(int texture_id);
