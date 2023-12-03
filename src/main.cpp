@@ -1,4 +1,4 @@
-#include <GL/glew.h>
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 #include <iostream>
@@ -13,6 +13,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/euler_angles.hpp>
 
+#include "j_imgui.h"
 #include "globals.h"
 #include "editor.h"
 #include "main.h"
@@ -24,7 +25,6 @@
 #include "j_assert.h"
 #include "j_buffers.h"
 #include "j_files.h"
-#include "j_imgui.h"
 #include "j_map.h"
 #include "j_render.h"
 #include "j_strings.h"
@@ -101,8 +101,8 @@ int main(int argc, char* argv[])
 		glfwSetFramebufferSizeCallback(g_window, framebuffer_size_callback);
 		glfwSetCursorPosCallback(g_window, mouse_move_callback);
 
-		int glew_init_result = glewInit();
-		assert(glew_init_result == GLEW_OK);
+		int glad_init_success = gladLoadGL();
+		assert(glad_init_success);
 	}
 
 	init_imgui();
@@ -141,30 +141,6 @@ int main(int argc, char* argv[])
 	s64 materials_count = get_materials_from_manifest(materials, MATERIALS_MAX_COUNT);
 	load_material_textures(materials, materials_count);
 	load_materials_into_memory(materials, materials_count);
-
-	// Texture array (test)
-	{
-		glGenTextures(1, &g_texture_arr_01);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, g_texture_arr_01);
-		glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_SRGB8, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 24);
-
-		flip_vertical_image_load(true);
-
-		ImageData im_data =  load_image_data(const_cast<char*>("G:\\projects\\game\\Engine3D\\resources\\materials\\zellige_squares.png"));
-		ASSERT_TRUE(im_data.channels == 3 || im_data.channels == 4, "Image format is RGB or RGBA");
-
-		glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, im_data.image_data);
-
-		free_loaded_image(im_data);
-
-		im_data = load_image_data(const_cast<char*>("G:\\projects\\game\\Engine3D\\resources\\materials\\wood_floor_ash_white.png"));
-		ASSERT_TRUE(im_data.channels == 3 || im_data.channels == 4, "Image format is RGB or RGBA");
-
-		glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 1, TEXTURE_SIZE_1K, TEXTURE_SIZE_1K, 1, GL_RGB, GL_UNSIGNED_BYTE, im_data.image_data);
-		free_loaded_image(im_data);
-
-		glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-	}
 
 	// Load core textures
 	{

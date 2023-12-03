@@ -1,5 +1,7 @@
 #pragma once
-#include <GL/glew.h>
+
+#include <glad/glad.h>
+
 #include "j_buffers.h"
 #include "structs.h"
 

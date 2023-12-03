@@ -1,7 +1,9 @@
 #include "editor.h"
-#include "globals.h"
+
 #include <glm/gtc/matrix_inverse.hpp>
 #include <fstream>
+
+#include "globals.h"
 #include "j_assert.h"
 #include "j_render.h"
 #include "utils.h"

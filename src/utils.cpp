@@ -4,7 +4,6 @@
 #include <iostream>
 #include <fstream>
 #include <glm/glm.hpp>
-#include <GL/glew.h>
 
 #include "j_assert.h"
 #include "j_buffers.h"

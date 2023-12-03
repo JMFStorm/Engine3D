@@ -1,11 +1,10 @@
 #include "jfont.h"
 
-#include <assert.h>
-#include <GL/glew.h>
-
+#include "j_assert.h"
 #include "globals.h"
 #include "utils.h"
 
+#include <glad/glad.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H  
 

@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
 #include "j_assert.h"
 #include "j_files.h"
 #include "globals.h"
@@ -625,36 +626,6 @@ void draw_lines_ontop(float thickness)
 	glEnable(GL_DEPTH_TEST);
 }
 
-void append_simple_rect(glm::vec2 offset, glm::vec3 color, int texture_index)
-{
-	float offsets[2] = { offset.x, offset.y };
-	s64 bytes_offset = g_rects_buffered * sizeof(offsets);
-	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_offset_vbo);
-	glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(offsets), offsets);
-
-	bytes_offset = g_rects_buffered * sizeof(int);
-	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_tex_index_vbo);
-	glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(int), &texture_index);
-
-	g_rects_buffered++;
-}
-
-void draw_simple_rects()
-{
-	glUseProgram(g_simple_rect_shader.id);
-	glBindVertexArray(g_simple_rect_shader.vao);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, g_texture_arr_01);
-	glDrawArraysInstanced(GL_TRIANGLES, 0, 6, g_rects_buffered);
-
-	g_rects_buffered = 0;
-	g_frame_data.draw_calls++;
-
-	glUseProgram(0);
-	glBindVertexArray(0);
-}
-
 void init_all_shaders()
 {
 	// View & Projection UBO
@@ -664,67 +635,6 @@ void init_all_shaders()
 		glBufferData(GL_UNIFORM_BUFFER, SIZEOF_VIEW_MATRICES, NULL, GL_STATIC_DRAW);
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, g_view_proj_ubo, 0, SIZEOF_VIEW_MATRICES);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	}
-
-	// Init simple rect shader
-	{
-		const char* vertex_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_vs.glsl";
-		const char* fragment_shader_path = "G:/projects/game/Engine3D/resources/shaders/simple_reactangle_fs.glsl";
-
-		g_simple_rect_shader = simple_shader_init();
-		g_simple_rect_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
-
-		unsigned int rect_vertex_vbo;
-		glGenVertexArrays(1, &g_simple_rect_shader.vao);
-		glGenBuffers(1, &rect_vertex_vbo);
-		glGenBuffers(1, &g_simple_rect_offset_vbo);
-		glGenBuffers(1, &g_simple_rect_tex_index_vbo);
-
-		glBindVertexArray(g_simple_rect_shader.vao);
-		glBindBuffer(GL_ARRAY_BUFFER, rect_vertex_vbo);
-
-		float vertices[] =
-		{
-			// Coords			   // UVs
-			-0.25f, -0.25f, 0.0f,  0.0f, 0.0f, // bottom left
-			 0.25f, -0.25f, 0.0f,  1.0f, 0.0f, // bottom right
-			-0.25f,  0.25f, 0.0f,  0.0f, 1.0f, // top left
-
-			-0.25f,  0.25f, 0.0f,  0.0f, 1.0f, // top left
-			 0.25f, -0.25f, 0.0f,  1.0f, 0.0f, // bottom right
-			 0.25f,  0.25f, 0.0f,  1.0f, 1.0f  // top right
-		};
-
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-		// Coord attribute
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(0);
-
-		// UV attribute
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-		glEnableVertexAttribArray(1);
-
-		// Offset VBO
-		glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_offset_vbo);
-		int offsets_size = sizeof(float) * 2 * 100;
-		glBufferData(GL_ARRAY_BUFFER, offsets_size, nullptr, GL_DYNAMIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(2);
-		glVertexAttribDivisor(2, 1);
-
-		// Texture index VBO
-		glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_tex_index_vbo);
-		offsets_size = sizeof(int) * 100;
-		glBufferData(GL_ARRAY_BUFFER, offsets_size, nullptr, GL_DYNAMIC_DRAW);
-
-		glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(int), (void*)0);
-		glEnableVertexAttribArray(3);
-		glVertexAttribDivisor(3, 1);
-
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindVertexArray(0);
 	}
 
 	// Skybox

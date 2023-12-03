@@ -1,8 +1,8 @@
 #include "j_imgui.h"
 
-#include <GL/glew.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
+
 #include "globals.h"
 #include "utils.h"
 #include "editor.h"

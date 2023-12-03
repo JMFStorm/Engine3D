@@ -73,11 +73,6 @@ PostProcessingSettings g_pp_settings = {};
 unsigned int g_skybox_cubemap = 0;
 unsigned int g_view_proj_ubo = 0;
 
-unsigned int g_simple_rect_offset_vbo = 0;
-unsigned int g_simple_rect_tex_index_vbo = 0;
-
-GLuint g_texture_arr_01 = 0;
-
 bool g_use_linear_texture_filtering = false;
 bool g_generate_texture_mipmaps = false;
 bool g_load_texture_sRGB = false;

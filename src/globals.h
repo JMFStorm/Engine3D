@@ -1,7 +1,8 @@
 #pragma once
 
-#include <GL/glew.h>
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <glad/glad.h>
 
 #include "j_array.h"
 #include "j_buffers.h"
@@ -73,11 +74,6 @@ extern PostProcessingSettings g_pp_settings;
 
 extern unsigned int g_skybox_cubemap;
 extern unsigned int g_view_proj_ubo;
-
-extern unsigned int g_simple_rect_offset_vbo;
-extern unsigned int g_simple_rect_tex_index_vbo;
-
-extern GLuint g_texture_arr_01;
 
 extern bool g_use_linear_texture_filtering;
 extern bool g_generate_texture_mipmaps;
