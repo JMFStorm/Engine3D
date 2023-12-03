@@ -121,6 +121,8 @@ glm::vec3 get_normal_for_axis(Axis axis)
 	case Axis::Y: return glm::vec3(0, 1.0f, 0);
 	case Axis::Z: return glm::vec3(0, 0, 1.0f);
 	}
+
+	return glm::vec3(0);
 }
 
 glm::vec3 get_vec_for_smallest_dot_product(glm::vec3 direction_compare, glm::vec3* normals, int elements)

@@ -179,3 +179,40 @@ void new_scene()
 	j_array_empty(&g_scene.spotlights);
 	memset(g_scene.filepath, 0, 256);
 }
+
+void try_get_mouse_selection(s32 xpos, s32 ypos)
+{
+	glm::vec3 ray_origin = g_scene_camera.position;
+	glm::vec3 ray_direction = get_camera_ray_from_scene_px(xpos, ypos);
+
+	s64 object_types_count = 4;
+	s64 object_index[4] = { -1, -1, -1, -1 };
+	f32 closest_dist[4] = {};
+	object_index[0] = get_mesh_selection_index(&g_scene.planes, &closest_dist[0], ray_origin, ray_direction);
+	object_index[1] = get_mesh_selection_index(&g_scene.meshes, &closest_dist[1], ray_origin, ray_direction);
+	object_index[2] = get_pointlight_selection_index(&g_scene.pointlights, &closest_dist[2], ray_origin, ray_direction);
+	object_index[3] = get_spotlight_selection_index(&g_scene.spotlights, &closest_dist[3], ray_origin, ray_direction);
+	ObjectType selected_type = ObjectType::None;
+	s64 closest_obj_index = -1;
+	f32 closest_dist_result = std::numeric_limits<float>::max();
+
+	bool got_selection = false;
+	ObjectType select_types[] = { ObjectType::Plane, ObjectType::Cube, ObjectType::Pointlight, ObjectType::Spotlight };
+
+	for (int i = 0; i < object_types_count; i++)
+	{
+		s64 current_index = object_index[i];
+		f32 current_dist = closest_dist[i];
+
+		if (current_index != -1 && current_dist < closest_dist_result)
+		{
+			closest_dist_result = current_dist;
+			closest_obj_index = current_index;
+			selected_type = select_types[i];
+			got_selection = true;
+		}
+	}
+
+	if (got_selection) select_object_index(selected_type, closest_obj_index);
+	else deselect_selection();
+}

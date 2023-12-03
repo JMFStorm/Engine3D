@@ -90,6 +90,8 @@ Transforms* get_selected_object_transforms()
 	}
 
 	ASSERT_TRUE(false, "Selected object tranform is of known type");
+	Transforms* compiler_dummy = nullptr;
+	return compiler_dummy;
 }
 
 void delete_on_object_index(JArray* jarray_ptr, s64 jarray_index)
@@ -194,7 +196,7 @@ void deselect_selection()
 	g_selected_object.type = ObjectType::None;
 }
 
-bool clicked_scene_space(int x, int y)
+bool mouse_in_scene_space(s32 x, s32 y)
 {
 	return x < g_game_metrics.scene_width_px && y < g_game_metrics.scene_height_px;
 }

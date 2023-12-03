@@ -45,7 +45,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer.id);
 	init_framebuffer_resize(&g_editor_framebuffer.texture_gpu_id, &g_editor_framebuffer.renderbuffer);
 
-	if (0 <= get_allocated_temp_memory()) allocate_temp_memory(MEGABYTES(1));
+	if (get_allocated_temp_memory() <= 0) allocate_temp_memory(MEGABYTES(1));
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, (float)height);
 	load_font(&g_debug_font, font_height_px, g_debug_font_path);
 	deallocate_temp_memory();
@@ -167,7 +167,6 @@ int main(int argc, char* argv[])
 		g_skybox_cubemap = load_cubemap();
 	}
 
-	deallocate_temp_memory();
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 
 	// Init framebuffers
@@ -190,6 +189,7 @@ int main(int argc, char* argv[])
 
 	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
+	deallocate_temp_memory();
 	new_scene();
 
 	while (!glfwWindowShouldClose(g_window))
@@ -253,48 +253,14 @@ int main(int argc, char* argv[])
 		if (g_inputs.as_struct.mouse1.pressed)
 		{
 			g_frame_data.mouse_clicked = true;
-
-			if (clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y))
-			{
-				glm::vec3 ray_origin = g_scene_camera.position;
-				glm::vec3 ray_direction = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
-
-				s64 object_types_count = 4;
-				ObjectType select_types[] = { ObjectType::Plane, ObjectType::Cube, ObjectType::Pointlight, ObjectType::Spotlight };
-				s64 object_index[4] = { -1, -1, -1, -1 };
-				f32 closest_dist[4] = {};
-
-				object_index[0] = get_mesh_selection_index(&g_scene.planes, &closest_dist[0], ray_origin, ray_direction);
-				object_index[1] = get_mesh_selection_index(&g_scene.meshes, &closest_dist[1], ray_origin, ray_direction);
-				object_index[2] = get_pointlight_selection_index(&g_scene.pointlights, &closest_dist[2], ray_origin, ray_direction);
-				object_index[3] = get_spotlight_selection_index(&g_scene.spotlights, &closest_dist[3], ray_origin, ray_direction);
-
-				ObjectType selected_type = ObjectType::None;
-				s64 closest_obj_index = -1;
-				f32 closest_dist_result = std::numeric_limits<float>::max();
-				bool got_selection = false;
-
-				for (int i = 0; i < object_types_count; i++)
-				{
-					s64 current_index = object_index[i];
-					f32 current_dist = closest_dist[i];
-
-					if (current_index != -1 && current_dist < closest_dist_result)
-					{
-						closest_dist_result = current_dist;
-						closest_obj_index = current_index;
-						selected_type = select_types[i];
-						got_selection = true;
-					}
-				}
-
-				if (got_selection) select_object_index(selected_type, closest_obj_index);
-				else deselect_selection();
-			}
+			s32 xpos = (s32)g_frame_data.mouse_x;
+			s32 ypos = (s32)g_frame_data.mouse_y;
+			bool scene_click = mouse_in_scene_space(xpos, ypos);
+			if (scene_click) try_get_mouse_selection(xpos, ypos);
 		}
 
 		bool camera_mode_start = g_inputs.as_struct.mouse2.pressed
-			&& clicked_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y);
+			&& mouse_in_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y);
 
 		// Check camero move mode
 		if (camera_mode_start) g_camera_move_mode = true;

@@ -30,7 +30,7 @@ void select_object_index(ObjectType type, s64 index);
 
 void deselect_selection();
 
-bool clicked_scene_space(int x, int y);
+bool mouse_in_scene_space(s32 x, s32 y);
 
 bool get_cube_selection(Mesh* cube, float* select_dist, glm::vec3 ray_o, glm::vec3 ray_dir);
 
