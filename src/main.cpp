@@ -15,6 +15,7 @@
 
 #include "globals.h"
 #include "editor.h"
+#include "main.h"
 #include "structs.h"
 #include "scene.h"
 #include "utils.h"
@@ -31,6 +32,12 @@
 Framebuffer g_editor_framebuffer;
 Texture pointlight_texture;
 Texture spotlight_texture;
+
+void enable_cursor(bool enable)
+{
+	int use = enable ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED;
+	glfwSetInputMode(g_window, GLFW_CURSOR, use);
+}
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -266,53 +273,7 @@ int main(int argc, char* argv[])
 		if (camera_mode_start) g_camera_move_mode = true;
 		else if (!g_inputs.as_struct.mouse2.is_down) g_camera_move_mode = false;
 
-		// Handle camera mode mode
-		if (g_camera_move_mode)
-		{
-			glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-			g_frame_data.mouse_move_x *= g_scene_camera.look_sensitivity;
-			g_frame_data.mouse_move_y *= g_scene_camera.look_sensitivity;
-
-			g_scene_camera.yaw += g_frame_data.mouse_move_x;
-			g_scene_camera.pitch += g_frame_data.mouse_move_y;
-
-			if (g_scene_camera.pitch > 89.0f)
-			{
-				g_scene_camera.pitch = 89.0f;
-			}
-			else if (g_scene_camera.pitch < -89.0f)
-			{
-				g_scene_camera.pitch = -89.0f;
-			}
-
-			glm::vec3 new_camera_front;
-			new_camera_front.x = cos(glm::radians(g_scene_camera.yaw)) * cos(glm::radians(g_scene_camera.pitch));
-			new_camera_front.y = sin(glm::radians(g_scene_camera.pitch));
-			new_camera_front.z = sin(glm::radians(g_scene_camera.yaw)) * cos(glm::radians(g_scene_camera.pitch));
-
-			g_scene_camera.front_vec = glm::normalize(new_camera_front);
-
-			float speed_mult = g_scene_camera.move_speed * g_frame_data.deltatime;
-
-			if (g_inputs.as_struct.w.is_down)
-			{
-				g_scene_camera.position += speed_mult * g_scene_camera.front_vec;
-			}
-			if (g_inputs.as_struct.s.is_down)
-			{
-				g_scene_camera.position -= speed_mult * g_scene_camera.front_vec;
-			}
-			if (g_inputs.as_struct.a.is_down)
-			{
-				g_scene_camera.position -= glm::normalize(glm::cross(g_scene_camera.front_vec, g_scene_camera.up_vec)) * speed_mult;
-			}
-			if (g_inputs.as_struct.d.is_down)
-			{
-				g_scene_camera.position += glm::normalize(glm::cross(g_scene_camera.front_vec, g_scene_camera.up_vec)) * speed_mult;
-			}
-		}
-		else glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		handle_camera_move_mode();
 
 		// Duplicate / Delete object
 		if (has_object_selection())

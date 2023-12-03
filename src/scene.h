@@ -11,3 +11,5 @@ void save_all();
 void new_scene();
 
 void try_get_mouse_selection(s32 xpos, s32 ypos);
+
+void handle_camera_move_mode();
