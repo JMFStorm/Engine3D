@@ -802,3 +802,30 @@ void load_materials_into_memory(Material materials[], s64 materials_count)
 		jmap_add(&material_indexes_map, mat_name_index_item);
 	}
 }
+
+void load_core_textures()
+{
+	g_use_linear_texture_filtering = true;
+	g_generate_texture_mipmaps = true;
+	g_load_texture_sRGB = false;
+
+	char path_str[FILE_PATH_LEN] = { 0 };
+	strcpy_s(path_str, pointlight_image_path);
+	pointlight_texture = texture_load_from_filepath(path_str);
+
+	strcpy_s(path_str, spotlight_image_path);
+	spotlight_texture = texture_load_from_filepath(path_str);
+
+	g_skybox_cubemap = load_cubemap();
+}
+
+void init_framebuffers()
+{
+	glGenFramebuffers(1, &g_scene_framebuffer.id);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
+	init_framebuffer_resize(&g_scene_framebuffer.texture_gpu_id, &g_scene_framebuffer.renderbuffer);
+
+	glGenFramebuffers(1, &editor_framebuffer.id);
+	glBindFramebuffer(GL_FRAMEBUFFER, editor_framebuffer.id);
+	init_framebuffer_resize(&editor_framebuffer.texture_gpu_id, &editor_framebuffer.renderbuffer);
+}

@@ -4,7 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "j_assert.h"
-#include "j_files.h"
+#include "jfiles.h"
 #include "globals.h"
 #include "constants.h"
 #include "utils.h"

@@ -10,3 +10,5 @@ void flip_vertical_image_load(bool flip);
 ImageData load_image_data(char* image_path);
 
 void free_loaded_image(ImageData data);
+
+s16* load_ogg_file(char* filename, int* get_channels, int* get_sample_rate, int* num_of_samples);

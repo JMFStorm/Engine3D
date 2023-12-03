@@ -78,3 +78,7 @@ extern unsigned int g_view_proj_ubo;
 extern bool g_use_linear_texture_filtering;
 extern bool g_generate_texture_mipmaps;
 extern bool g_load_texture_sRGB;
+
+extern Framebuffer editor_framebuffer;
+extern Texture pointlight_texture;
+extern Texture spotlight_texture;

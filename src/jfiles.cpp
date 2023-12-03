@@ -1,4 +1,4 @@
-#include "j_files.h"
+#include "jfiles.h"
 
 #include <fstream>
 #include "j_assert.h"
@@ -68,4 +68,32 @@ void free_loaded_image(ImageData data)
 {
 	stbi_image_free(data.image_data);
 	memory_buffer_wipe(&TEMP_MEMORY);
+}
+
+#include "stb_vorbis.h"
+
+s16* load_ogg_file(char* filename, int* get_channels, int* get_sample_rate, int* num_of_samples)
+{
+	FILE* file = fopen(filename, "rb");
+    assert(file);
+
+    fseek(file, 0, SEEK_END);
+    size_t file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    assert(file_size < TEMP_MEMORY.size);
+
+    s64 read_bytes = fread(TEMP_MEMORY.memory, 1, file_size, file);
+    assert(read_bytes == file_size);
+    fclose(file);
+
+    s16* output;
+   	int samples_decoded = stb_vorbis_decode_memory(TEMP_MEMORY.memory, file_size, get_channels, get_sample_rate, &output);
+   	// decode an entire file and output the data interleaved into a malloc()ed
+	// buffer stored in *output. The return value is the number of samples
+	// decoded, or -1 if the file could not be opened or was not an ogg vorbis file.
+	// When you're done with it, just free() the pointer returned in *output.
+
+   	assert(0 < samples_decoded);
+   	*num_of_samples = samples_decoded;
+    return output;
 }

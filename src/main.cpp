@@ -1,10 +1,6 @@
-#define GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h>
-
-#include "stb_vorbis.h"
-
 #include <AL/al.h>
 #include <AL/alc.h>
+
 #include <iostream>
 #include <filesystem>
 #include <fstream>
@@ -28,44 +24,11 @@
 #include "j_array.h"
 #include "j_assert.h"
 #include "j_buffers.h"
-#include "j_files.h"
+#include "jfiles.h"
+#include "jinput.h"
 #include "j_map.h"
 #include "j_render.h"
 #include "j_strings.h"
-
-Framebuffer g_editor_framebuffer;
-Texture pointlight_texture;
-Texture spotlight_texture;
-
-s16* load_ogg_file(char* filename, int* get_channels, int* get_sample_rate, int* num_of_samples)
-{
-	FILE* file = fopen(filename, "rb");
-    assert(file);
-
-    fseek(file, 0, SEEK_END);
-    size_t file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    assert(file_size < TEMP_MEMORY.size);
-
-    s64 read_bytes = fread(TEMP_MEMORY.memory, 1, file_size, file);
-    assert(read_bytes == file_size);
-
-    *num_of_samples = 0; // ehlp?
-
-    fclose(file);
-
-    s16* output;
-   	int samples_decoded = stb_vorbis_decode_memory(TEMP_MEMORY.memory, file_size, get_channels, get_sample_rate, &output);
-   	// decode an entire file and output the data interleaved into a malloc()ed
-	// buffer stored in *output. The return value is the number of samples
-	// decoded, or -1 if the file could not be opened or was not an ogg vorbis file.
-	// When you're done with it, just free() the pointer returned in *output.
-
-   	assert(0 < samples_decoded);
-   	*num_of_samples = samples_decoded;
-    return output;
-}
-
 
 void init_openal()
 {
@@ -113,6 +76,20 @@ void update_mouse_loc()
 	g_frame_data.mouse_y = (f32)ypos;
 }
 
+void init_window_and_context()
+{
+	int glfw_init_result = glfwInit();
+	assert(glfw_init_result == GLFW_TRUE);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	g_window = glfwCreateWindow(640, 400, "JMF Engine3D", NULL, NULL);
+	assert(g_window);
+	glfwMakeContextCurrent(g_window);
+	glfwSetFramebufferSizeCallback(g_window, framebuffer_size_callback);
+	glfwSetCursorPosCallback(g_window, mouse_move_callback);
+	int glad_init_success = gladLoadGL();
+	assert(glad_init_success);
+}
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	resize_windows_area_settings(width, height);
@@ -122,9 +99,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
 	init_framebuffer_resize(&g_scene_framebuffer.texture_gpu_id, &g_scene_framebuffer.renderbuffer);
 
-	glGenFramebuffers(1, &g_editor_framebuffer.id);
-	glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer.id);
-	init_framebuffer_resize(&g_editor_framebuffer.texture_gpu_id, &g_editor_framebuffer.renderbuffer);
+	glGenFramebuffers(1, &editor_framebuffer.id);
+	glBindFramebuffer(GL_FRAMEBUFFER, editor_framebuffer.id);
+	init_framebuffer_resize(&editor_framebuffer.texture_gpu_id, &editor_framebuffer.renderbuffer);
 
 	if (get_allocated_temp_memory() <= 0) allocate_temp_memory(MEGABYTES(1));
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, (float)height);
@@ -154,90 +131,24 @@ int main(int argc, char* argv[])
 	init_memory_buffers();
 
 	init_openal();
-
-	// Init window and context
-	{
-		int glfw_init_result = glfwInit();
-		assert(glfw_init_result == GLFW_TRUE);
-
-		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-		g_window = glfwCreateWindow(640, 400, "JMF Engine3D", NULL, NULL);
-		assert(g_window);
-
-		glfwMakeContextCurrent(g_window);
-		glfwSetFramebufferSizeCallback(g_window, framebuffer_size_callback);
-		glfwSetCursorPosCallback(g_window, mouse_move_callback);
-
-		int glad_init_success = gladLoadGL();
-		assert(glad_init_success);
-	}
+	init_window_and_context();
 
 	init_imgui();
-
-	// Init game inputs
-	{
-		g_inputs.as_struct.mouse1 = ButtonState{ .key = GLFW_MOUSE_BUTTON_1 };
-		g_inputs.as_struct.mouse2 = ButtonState{ .key = GLFW_MOUSE_BUTTON_2 };
-
-		g_inputs.as_struct.q = ButtonState{ .key = GLFW_KEY_Q };
-		g_inputs.as_struct.w = ButtonState{ .key = GLFW_KEY_W };
-		g_inputs.as_struct.e = ButtonState{ .key = GLFW_KEY_E };
-		g_inputs.as_struct.r = ButtonState{ .key = GLFW_KEY_R };
-		g_inputs.as_struct.a = ButtonState{ .key = GLFW_KEY_A };
-		g_inputs.as_struct.s = ButtonState{ .key = GLFW_KEY_S };
-		g_inputs.as_struct.d = ButtonState{ .key = GLFW_KEY_D };
-		g_inputs.as_struct.f = ButtonState{ .key = GLFW_KEY_F };
-		g_inputs.as_struct.z = ButtonState{ .key = GLFW_KEY_Z };
-		g_inputs.as_struct.x = ButtonState{ .key = GLFW_KEY_X };
-		g_inputs.as_struct.c = ButtonState{ .key = GLFW_KEY_C };
-		g_inputs.as_struct.v = ButtonState{ .key = GLFW_KEY_V };
-		g_inputs.as_struct.y = ButtonState{ .key = GLFW_KEY_Y };
-		g_inputs.as_struct.esc = ButtonState{ .key = GLFW_KEY_ESCAPE };
-		g_inputs.as_struct.plus = ButtonState{ .key = GLFW_KEY_KP_ADD };
-		g_inputs.as_struct.minus = ButtonState{ .key = GLFW_KEY_KP_SUBTRACT };
-		g_inputs.as_struct.del = ButtonState{ .key = GLFW_KEY_DELETE };
-		g_inputs.as_struct.left_ctrl = ButtonState{ .key = GLFW_KEY_LEFT_CONTROL };
-		g_inputs.as_struct.space = ButtonState{ .key = GLFW_KEY_SPACE };
-	}
-
 	init_all_shaders();
 
 	g_pp_settings = post_processings_init();
+	g_inputs.as_struct = init_game_inputs();
 
 	Material materials[MATERIALS_MAX_COUNT] = {};
 	s64 materials_count = get_materials_from_manifest(materials, MATERIALS_MAX_COUNT);
 	load_material_textures(materials, materials_count);
 	load_materials_into_memory(materials, materials_count);
 
-	// Load core textures
-	{
-		g_use_linear_texture_filtering = true;
-		g_generate_texture_mipmaps = true;
-		g_load_texture_sRGB = false;
-
-		char path_str[FILE_PATH_LEN] = { 0 };
-		strcpy_s(path_str, pointlight_image_path);
-		pointlight_texture = texture_load_from_filepath(path_str);
-
-		strcpy_s(path_str, spotlight_image_path);
-		spotlight_texture = texture_load_from_filepath(path_str);
-
-		g_skybox_cubemap = load_cubemap();
-	}
+	load_core_textures();
 
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
 
-	// Init framebuffers
-	{
-		glGenFramebuffers(1, &g_scene_framebuffer.id);
-		glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
-		init_framebuffer_resize(&g_scene_framebuffer.texture_gpu_id, &g_scene_framebuffer.renderbuffer);
-
-		glGenFramebuffers(1, &g_editor_framebuffer.id);
-		glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer.id);
-		init_framebuffer_resize(&g_editor_framebuffer.texture_gpu_id, &g_editor_framebuffer.renderbuffer);
-	}
+	init_framebuffers();
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
@@ -542,7 +453,7 @@ int main(int argc, char* argv[])
 
 		// Editor framebuffer
 		{
-			glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer.id);
+			glBindFramebuffer(GL_FRAMEBUFFER, editor_framebuffer.id);
 			glEnable(GL_DEPTH_TEST);
 			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -634,7 +545,7 @@ int main(int argc, char* argv[])
 
 			glUniform1i(inversion_loc, false);
 			glUniform1i(blur_loc, false);
-			glBindTexture(GL_TEXTURE_2D, g_editor_framebuffer.texture_gpu_id);
+			glBindTexture(GL_TEXTURE_2D, editor_framebuffer.texture_gpu_id);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 			glEnable(GL_DEPTH_TEST);
 		}

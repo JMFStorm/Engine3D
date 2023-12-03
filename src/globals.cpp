@@ -76,3 +76,7 @@ unsigned int g_view_proj_ubo = 0;
 bool g_use_linear_texture_filtering = false;
 bool g_generate_texture_mipmaps = false;
 bool g_load_texture_sRGB = false;
+
+Framebuffer editor_framebuffer = {};
+Texture pointlight_texture = {};
+Texture spotlight_texture = {};
