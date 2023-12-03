@@ -39,6 +39,14 @@ void enable_cursor(bool enable)
 	glfwSetInputMode(g_window, GLFW_CURSOR, use);
 }
 
+void update_mouse_loc()
+{
+	double xpos, ypos;
+	glfwGetCursorPos(g_window, &xpos, &ypos);
+	g_frame_data.mouse_x = (f32)xpos;
+	g_frame_data.mouse_y = (f32)ypos;
+}
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	resize_windows_area_settings(width, height);
@@ -202,10 +210,10 @@ int main(int argc, char* argv[])
 	while (!glfwWindowShouldClose(g_window))
 	{
 		glfwPollEvents();
-
 		imgui_new_frame();
-
 		right_hand_editor_panel();
+
+		update_mouse_loc();
 
 		// Register inputs
 		{
@@ -235,12 +243,6 @@ int main(int argc, char* argv[])
 		g_game_metrics.game_time = glfwGetTime();
 		g_frame_data.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time);
 
-		double xpos, ypos;
-		glfwGetCursorPos(g_window, &xpos, &ypos);
-
-		g_frame_data.mouse_x = xpos;
-		g_frame_data.mouse_y = ypos;
-
 		s64 current_game_second = (s64)g_game_metrics.game_time;
 
 		if (0 < current_game_second - g_game_metrics.fps_prev_second)
@@ -260,10 +262,8 @@ int main(int argc, char* argv[])
 		if (g_inputs.as_struct.mouse1.pressed)
 		{
 			g_frame_data.mouse_clicked = true;
-			s32 xpos = (s32)g_frame_data.mouse_x;
-			s32 ypos = (s32)g_frame_data.mouse_y;
-			bool scene_click = mouse_in_scene_space(xpos, ypos);
-			if (scene_click) try_get_mouse_selection(xpos, ypos);
+			bool scene_click = mouse_in_scene_space(g_frame_data.mouse_x, g_frame_data.mouse_y);
+			if (scene_click) try_get_mouse_selection(g_frame_data.mouse_x, g_frame_data.mouse_y);
 		}
 
 		bool camera_mode_start = g_inputs.as_struct.mouse2.pressed
@@ -297,7 +297,7 @@ int main(int argc, char* argv[])
 		else if (g_transform_mode.is_active)
 		{
 			glm::vec3 intersection_point;
-			g_transform_mode.transform_ray = get_camera_ray_from_scene_px((int)xpos, (int)ypos);
+			g_transform_mode.transform_ray = get_camera_ray_from_scene_px(g_frame_data.mouse_x, g_frame_data.mouse_y);
 
 			Transforms* selected_t_ptr = get_selected_object_transforms();
 
