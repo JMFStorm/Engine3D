@@ -1,8 +1,7 @@
 Internals
-- on minimize don't crash
+- get next cursor screen loc on append_ui_text()
 
 Features
-- skybox on/off
 - sharpening
 - shadow map for planes
 - popup text for scene save

@@ -481,7 +481,12 @@ void init_framebuffer_resize(unsigned int* framebuffer_texture_id, unsigned int*
 
 void allocate_temp_memory(s64 bytes)
 {
-	memory_buffer_mallocate(&TEMP_MEMORY, MEGABYTES(25), const_cast<char*>("Temp memory"));
+	memory_buffer_mallocate(&TEMP_MEMORY, bytes, const_cast<char*>("Temp memory"));
+}
+
+s64 get_allocated_temp_memory()
+{
+	return TEMP_MEMORY.size;
 }
 
 void deallocate_temp_memory()

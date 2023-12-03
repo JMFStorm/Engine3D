@@ -158,4 +158,6 @@ void load_materials_into_memory(Material materials[], s64 materials_count);
 
 void allocate_temp_memory(s64 bytes);
 
+s64 get_allocated_temp_memory();
+
 void deallocate_temp_memory();
