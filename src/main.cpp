@@ -1,9 +1,6 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include <ft2build.h>
-#include FT_FREETYPE_H  
-
 #include <array>
 #include <iostream>
 #include <filesystem>
@@ -22,6 +19,7 @@
 #include "structs.h"
 #include "scene.h"
 #include "utils.h"
+#include "jfont.h"
 #include "j_array.h"
 #include "j_assert.h"
 #include "j_buffers.h"
@@ -34,149 +32,6 @@
 Framebuffer g_editor_framebuffer;
 Texture pointlight_texture;
 Texture spotlight_texture;
-
-void load_font(FontData* font_data, int font_height_px, const char* font_path)
-{
-	FT_Library ft_lib;
-	FT_Face ft_face;
-
-	FT_Error init_ft_err = FT_Init_FreeType(&ft_lib);
-	ASSERT_TRUE(init_ft_err == 0, "Init FreeType Library");
-
-	FT_Error new_face_err = FT_New_Face(ft_lib, font_path, 0, &ft_face);
-	ASSERT_TRUE(new_face_err == 0, "Load FreeType font face");
-
-	FT_Set_Pixel_Sizes(ft_face, 0, font_height_px);
-	font_data->font_height_px = font_height_px;
-
-	unsigned int bitmap_width = 0;
-	unsigned int bitmap_height = 0;
-
-	constexpr int starting_char = 33; // ('!')
-	constexpr int last_char = 128;
-
-	int spacebar_width = font_height_px / 4;
-
-	// Add spacebar
-	bitmap_width += spacebar_width;
-
-	for (int c = starting_char; c < last_char; c++)
-	{
-		char character = static_cast<char>(c);
-
-		FT_Error load_char_err = FT_Load_Char(ft_face, character, FT_LOAD_RENDER);
-		ASSERT_TRUE(load_char_err == 0, "Load FreeType Glyph");
-
-		unsigned int glyph_width = ft_face->glyph->bitmap.width;
-		unsigned int glyph_height = ft_face->glyph->bitmap.rows;
-
-		if (bitmap_height < glyph_height)
-		{
-			bitmap_height = glyph_height;
-		}
-
-		bitmap_width += glyph_width;
-	}
-
-	int bitmap_size = bitmap_width * bitmap_height;
-	ASSERT_TRUE(bitmap_size < TEMP_MEMORY.size, "Font bitmap buffer fits");
-
-	byte* bitmap_memory = TEMP_MEMORY.memory;
-
-	// Add spacebar
-	{
-		for (int y = 0; y < bitmap_height; y++)
-		{
-			int src_index = ((bitmap_height - 1) * spacebar_width) - y * spacebar_width;
-			int dest_index = y * bitmap_width;
-			memset(&bitmap_memory[dest_index], 0x00, spacebar_width);
-		}
-
-		CharData new_char_data = { 0 };
-		new_char_data.character = static_cast<char>(' ');
-		new_char_data.width = spacebar_width;
-		new_char_data.advance = spacebar_width;
-		new_char_data.height = font_height_px;
-		new_char_data.UV_x0 = 0.0f;
-		new_char_data.UV_y0 = 1.0f;
-		new_char_data.UV_x1 = normalize_value(spacebar_width, bitmap_width, 1.0f);
-		new_char_data.UV_y1 = 1.0f;
-		font_data->char_data[0] = new_char_data;
-	}
-
-	int bitmap_x_offset = spacebar_width;
-	int char_data_index = 1;
-
-	for (int c = starting_char; c < last_char; c++)
-	{
-		int character = c;
-
-		FT_Error load_char_err = FT_Load_Char(ft_face, character, FT_LOAD_RENDER);
-		ASSERT_TRUE(load_char_err == 0, "Load FreeType Glyph");
-
-		unsigned int glyph_width = ft_face->glyph->bitmap.width;
-		unsigned int glyph_height = ft_face->glyph->bitmap.rows;
-
-		int x_offset = ft_face->glyph->bitmap_left;
-		int y_offset = ft_face->glyph->bitmap_top - ft_face->glyph->bitmap.rows;
-
-		for (int y = 0; y < glyph_height; y++)
-		{
-			int src_index = ((glyph_height - 1) * glyph_width) - y * glyph_width;
-			int dest_index = y * bitmap_width + bitmap_x_offset;
-			memcpy(&bitmap_memory[dest_index], &ft_face->glyph->bitmap.buffer[src_index], glyph_width);
-		}
-
-		// To advance cursors for next glyph
-		// bitshift by 6 to get value in pixels
-		// (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
-		// (note that advance is number of 1/64 pixels)
-		int advance = (ft_face->glyph->advance.x >> 6);
-
-		CharData new_char_data = { 0 };
-		new_char_data.character = static_cast<char>(c);
-
-		new_char_data.width = glyph_width;
-		new_char_data.height = glyph_height;
-		new_char_data.x_offset = x_offset;
-		new_char_data.y_offset = y_offset;
-		new_char_data.advance = advance;
-
-		float atlas_width = static_cast<float>(bitmap_width);
-		float atlas_height = static_cast<float>(bitmap_height);
-
-		new_char_data.UV_x0 = normalize_value(bitmap_x_offset, atlas_width, 1.0f);
-		new_char_data.UV_y0 = normalize_value(0.0f, atlas_height, 1.0f);
-
-		float x1 = bitmap_x_offset + glyph_width;
-		new_char_data.UV_x1 = normalize_value(x1, atlas_width, 1.0f);
-		new_char_data.UV_y1 = normalize_value(glyph_height, atlas_height, 1.0f);
-
-		font_data->char_data[char_data_index++] = new_char_data;
-
-		bitmap_x_offset += glyph_width;
-	}
-
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-	GLuint prev_texture = font_data->texture_id;
-	glDeleteTextures(1, &prev_texture);
-
-	GLuint new_texture;
-	glGenTextures(1, &new_texture);
-
-	font_data->texture_id = static_cast<int>(new_texture);
-	glBindTexture(GL_TEXTURE_2D, font_data->texture_id);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap_width, bitmap_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, bitmap_memory);
-
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-}
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -191,8 +46,11 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	glBindFramebuffer(GL_FRAMEBUFFER, g_editor_framebuffer.id);
 	init_framebuffer_resize(&g_editor_framebuffer.texture_gpu_id, &g_editor_framebuffer.renderbuffer);
 
+	g_use_linear_texture_filtering = false;
+	g_generate_texture_mipmaps = false;
+	g_load_texture_sRGB = false;
 	int font_height_px = normalize_value(debug_font_vh, 100.0f, (float)height);
-	load_font(&g_debug_font, font_height_px, g_debug_font_path);
+	load_font(&g_debug_font, font_height_px, const_cast<char*>(g_debug_font_path));
 }
 
 void mouse_move_callback(GLFWwindow* window, double xposIn, double yposIn)
@@ -311,15 +169,6 @@ int main(int argc, char* argv[])
 		spotlight_texture = texture_load_from_filepath(path_str);
 
 		g_skybox_cubemap = load_cubemap();
-	}
-
-	// Load fonts
-	{
-		g_use_linear_texture_filtering = false;
-		g_generate_texture_mipmaps = false;
-		g_load_texture_sRGB = false;
-		int font_height_px = normalize_value(debug_font_vh, 100.0f, g_game_metrics.game_height_px);
-		load_font(&g_debug_font, font_height_px, g_debug_font_path);
 	}
 
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
@@ -824,6 +673,8 @@ int main(int argc, char* argv[])
 		}
 
 		if (DEBUG_SHADOWMAP && g_selected_object.type == ObjectType::Spotlight) draw_selected_shadow_map();
+
+		draw_rect(g_debug_font.texture_id);
 
 		print_debug_texts();
 

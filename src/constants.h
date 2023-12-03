@@ -38,4 +38,4 @@ constexpr const u64 SHADOW_MAP_HEIGHT = 1024;
 
 constexpr const f32 SHADOW_MAP_NEAR_PLANE = 0.25f;
 
-constexpr const float debug_font_vh = 1.0f;
+constexpr const float debug_font_vh = 2.0f;

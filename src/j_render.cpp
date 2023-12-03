@@ -625,30 +625,29 @@ void draw_lines_ontop(float thickness)
 	glEnable(GL_DEPTH_TEST);
 }
 
-void append_simple_rect(glm::vec2 offset, glm::vec3 color, int texture_index)
-{
-	float offsets[2] = { offset.x, offset.y };
-	s64 bytes_offset = g_rects_buffered * sizeof(offsets);
-	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_offset_vbo);
-	glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(offsets), offsets);
-
-	bytes_offset = g_rects_buffered * sizeof(int);
-	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_tex_index_vbo);
-	glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(int), &texture_index);
-
-	g_rects_buffered++;
-}
-
-void draw_simple_rects()
+void draw_rect(int texture_id)
 {
 	glUseProgram(g_simple_rect_shader.id);
 	glBindVertexArray(g_simple_rect_shader.vao);
+	glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_shader.vbo);
+
+	float vertices[] =
+	{
+		// Coords			   // UVs
+		-0.95f, -0.05f, 0.0f,  0.0f, 0.0f, // bottom left
+		 0.95f, -0.05f, 0.0f,  1.0f, 0.0f, // bottom right
+		-0.95f,  0.05f, 0.0f,  0.0f, 1.0f, // top left
+
+		-0.95f,  0.05f, 0.0f,  0.0f, 1.0f, // top left
+		 0.95f, -0.05f, 0.0f,  1.0f, 0.0f, // bottom right
+		 0.95f,  0.05f, 0.0f,  1.0f, 1.0f  // top right
+	};
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, g_texture_arr_01);
-	glDrawArraysInstanced(GL_TRIANGLES, 0, 6, g_rects_buffered);
-
-	g_rects_buffered = 0;
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
 	g_frame_data.draw_calls++;
 
 	glUseProgram(0);
@@ -674,54 +673,19 @@ void init_all_shaders()
 		g_simple_rect_shader = simple_shader_init();
 		g_simple_rect_shader.id = compile_shader(vertex_shader_path, fragment_shader_path, &TEMP_MEMORY);
 
-		unsigned int rect_vertex_vbo;
 		glGenVertexArrays(1, &g_simple_rect_shader.vao);
-		glGenBuffers(1, &rect_vertex_vbo);
-		glGenBuffers(1, &g_simple_rect_offset_vbo);
-		glGenBuffers(1, &g_simple_rect_tex_index_vbo);
+		glGenBuffers(1, &g_simple_rect_shader.vbo);
 
 		glBindVertexArray(g_simple_rect_shader.vao);
-		glBindBuffer(GL_ARRAY_BUFFER, rect_vertex_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_shader.vbo);
 
-		float vertices[] =
-		{
-			// Coords			   // UVs
-			-0.25f, -0.25f, 0.0f,  0.0f, 0.0f, // bottom left
-			 0.25f, -0.25f, 0.0f,  1.0f, 0.0f, // bottom right
-			-0.25f,  0.25f, 0.0f,  0.0f, 1.0f, // top left
-
-			-0.25f,  0.25f, 0.0f,  0.0f, 1.0f, // top left
-			 0.25f, -0.25f, 0.0f,  1.0f, 0.0f, // bottom right
-			 0.25f,  0.25f, 0.0f,  1.0f, 1.0f  // top right
-		};
-
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-		// Coord attribute
+		// Coord attribute 0
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
 
-		// UV attribute
+		// UV attribute 1
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 		glEnableVertexAttribArray(1);
-
-		// Offset VBO
-		glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_offset_vbo);
-		int offsets_size = sizeof(float) * 2 * 100;
-		glBufferData(GL_ARRAY_BUFFER, offsets_size, nullptr, GL_DYNAMIC_DRAW);
-
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(2);
-		glVertexAttribDivisor(2, 1);
-
-		// Texture index VBO
-		glBindBuffer(GL_ARRAY_BUFFER, g_simple_rect_tex_index_vbo);
-		offsets_size = sizeof(int) * 100;
-		glBufferData(GL_ARRAY_BUFFER, offsets_size, nullptr, GL_DYNAMIC_DRAW);
-
-		glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(int), (void*)0);
-		glEnableVertexAttribArray(3);
-		glVertexAttribDivisor(3, 1);
 
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindVertexArray(0);
@@ -1079,14 +1043,13 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 		int char_height_px = current.height;
 		int char_width_px = current.width;
 
-		int x_start = vw_into_screen_px(pos_x_vw, g_game_metrics.scene_width_px) + current.x_offset + text_offset_x_px;
-		int char_y_offset = current.y_offset;
-		int y_start = vh_into_screen_px(pos_y_vh, g_game_metrics.scene_height_px) + text_offset_y_px - line_height_px + char_y_offset;
+		int x_start = vw_into_screen_px(pos_x_vw, g_game_metrics.scene_width_px)  + current.x_offset + text_offset_x_px;
+		int y_start = vh_into_screen_px(pos_y_vh, g_game_metrics.scene_height_px) + current.y_offset + text_offset_y_px;
 
 		float x0 = normalize_screen_px_to_ndc(x_start, g_game_metrics.scene_width_px);
 		float y0 = normalize_screen_px_to_ndc(y_start, g_game_metrics.scene_height_px);
 
-		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px, g_game_metrics.scene_width_px);
+		float x1 = normalize_screen_px_to_ndc(x_start + char_width_px,  g_game_metrics.scene_width_px);
 		float y1 = normalize_screen_px_to_ndc(y_start + char_height_px, g_game_metrics.scene_height_px);
 
 		float vertices[UI_CHAR_VERTICIES] =
@@ -1105,7 +1068,7 @@ void append_ui_text(FontData* font_data, char* text, float pos_x_vw, float pos_y
 		glBufferSubData(GL_ARRAY_BUFFER, bytes_offset, sizeof(vertices), vertices);
 
 		g_ui_chars_buffered++;
-		text_offset_x_px += current.advance;
+		text_offset_x_px += current.width + current.x_offset; // current.advance;
 		text++;
 	}
 
