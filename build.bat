@@ -16,9 +16,9 @@ set IMGUI_FILES=imgui\*.cpp
 
 set NODEFAULTS=/NODEFAULTLIB:MSVCRT
 set BUILD_FLAGS=/DEBUG /INCREMENTAL
-set LINKED_LIBRARIES=glfw3.lib freetype.lib kernel32.lib gdi32.lib shell32.lib Comdlg32.lib opengl32.lib
+set LINKED_LIBRARIES=glfw3.lib freetype.lib OpenAL32.lib kernel32.lib shell32.lib opengl32.lib Comdlg32.lib gdi32.lib
 
-REM NEEDED(?) => winspool.lib ole32.lib oleaut32.lib uuid.lib advapi32.lib user32.lib opengl32.lib
+REM NEEDED(?) => winspool.lib ole32.lib oleaut32.lib uuid.lib advapi32.lib user32.lib 
 
 cl /Fo.\debug\obj\ /std:c++20 /EHsc /Zi /Od /MTd /MP %SOURCE_FILES% src/glad.c %IMGUI_FILES% /I%INCLUDE_DIR% /link %BUILD_FLAGS% /OUT:debug/Engine3D_debug.exe %NODEFAULTS% /LIBPATH:%LIB_DIR% %LINKED_LIBRARIES%
 

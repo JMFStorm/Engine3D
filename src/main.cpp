@@ -1,6 +1,8 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include <AL/al.h>
+#include <AL/alc.h>
 #include <iostream>
 #include <filesystem>
 #include <fstream>
@@ -29,9 +31,60 @@
 #include "j_render.h"
 #include "j_strings.h"
 
+#include "stb_vorbis.c"
+
 Framebuffer g_editor_framebuffer;
 Texture pointlight_texture;
 Texture spotlight_texture;
+
+s16* load_ogg_file(char* filename)
+{
+	FILE* file = fopen(filename, "rb");
+    assert(file);
+
+    stb_vorbis_info info;
+    stb_vorbis* vorbis = stb_vorbis_open_file(file, 0, 0, 0);
+    info = stb_vorbis_get_info(vorbis);
+
+    int numChannels = info.channels;
+    int sampleRate = info.sample_rate;
+    int numSamples = numChannels * numSamples * sizeof(short);
+
+    s16* output;
+   	int numSamplesDecoded = stb_vorbis_get_samples_short_interleaved(vorbis, numChannels, output, numSamples);
+
+    stb_vorbis_close(vorbis);
+    fclose(file);
+    return output;
+}
+
+
+void init_openal()
+{
+	ALCdevice* openal_device = alcOpenDevice(nullptr);
+	assert(openal_device);
+
+    ALCcontext* openal_context = alcCreateContext(openal_device, nullptr);
+    assert(openal_context);
+
+    alcMakeContextCurrent(openal_context);
+
+    s16* ogg_data = load_ogg_file(const_cast<char*>("G:\\projects\\game\\Engine3D\\resources\\sounds\\No.ogg"));
+
+    ALuint buffer;
+    alGenBuffers(1, &buffer);
+
+	ALsizei frequency = 44100;
+    ALsizei size = frequency * 2;  // 2 bytes per sample for 16-bit PCM
+    ALenum format = AL_FORMAT_MONO16;
+
+    alBufferData(buffer, format, nullptr, size, frequency);
+
+    ALuint source;
+    alGenSources(1, &source);
+    alSourcei(source, AL_BUFFER, buffer);
+    alSourcePlay(source);
+}
 
 void enable_cursor(bool enable)
 {
@@ -86,6 +139,8 @@ void set_button_state(GLFWwindow* window, ButtonState* button)
 int main(int argc, char* argv[])
 {
 	init_memory_buffers();
+
+	// init_openal();
 
 	// Init window and context
 	{
