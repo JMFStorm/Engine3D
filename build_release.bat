@@ -7,11 +7,11 @@ if not defined VC_ENV_SET (
 
 setlocal
 
-set SOURCE_DIR=src
 set INCLUDE_DIR=include
 set LIB_DIR=lib
 
-set SOURCE_FILES=%SOURCE_DIR%\*.cpp
+set SOURCE_FILES=src\*.cpp
+set C_FILES=src/*.c
 set IMGUI_FILES=imgui\*.cpp
 
 set NODEFAULTS=/NODEFAULTLIB:MSVCRT

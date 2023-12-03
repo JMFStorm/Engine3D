@@ -1,6 +1,8 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include "stb_vorbis.h"
+
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <iostream>
@@ -31,30 +33,36 @@
 #include "j_render.h"
 #include "j_strings.h"
 
-#include "stb_vorbis.c"
-
 Framebuffer g_editor_framebuffer;
 Texture pointlight_texture;
 Texture spotlight_texture;
 
-s16* load_ogg_file(char* filename)
+s16* load_ogg_file(char* filename, int* get_channels, int* get_sample_rate, int* num_of_samples)
 {
 	FILE* file = fopen(filename, "rb");
     assert(file);
 
-    stb_vorbis_info info;
-    stb_vorbis* vorbis = stb_vorbis_open_file(file, 0, 0, 0);
-    info = stb_vorbis_get_info(vorbis);
+    fseek(file, 0, SEEK_END);
+    size_t file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    assert(file_size < TEMP_MEMORY.size);
 
-    int numChannels = info.channels;
-    int sampleRate = info.sample_rate;
-    int numSamples = numChannels * numSamples * sizeof(short);
+    s64 read_bytes = fread(TEMP_MEMORY.memory, 1, file_size, file);
+    assert(read_bytes == file_size);
+
+    *num_of_samples = 0; // ehlp?
+
+    fclose(file);
 
     s16* output;
-   	int numSamplesDecoded = stb_vorbis_get_samples_short_interleaved(vorbis, numChannels, output, numSamples);
+   	int samples_decoded = stb_vorbis_decode_memory(TEMP_MEMORY.memory, file_size, get_channels, get_sample_rate, &output);
+   	// decode an entire file and output the data interleaved into a malloc()ed
+	// buffer stored in *output. The return value is the number of samples
+	// decoded, or -1 if the file could not be opened or was not an ogg vorbis file.
+	// When you're done with it, just free() the pointer returned in *output.
 
-    stb_vorbis_close(vorbis);
-    fclose(file);
+   	assert(0 < samples_decoded);
+   	*num_of_samples = samples_decoded;
     return output;
 }
 
@@ -69,16 +77,21 @@ void init_openal()
 
     alcMakeContextCurrent(openal_context);
 
-    s16* ogg_data = load_ogg_file(const_cast<char*>("G:\\projects\\game\\Engine3D\\resources\\sounds\\No.ogg"));
+    int channels, sample_rate, num_of_samples;
+
+    s16* ogg_sound_data = load_ogg_file(
+    	const_cast<char*>("G:\\projects\\game\\Engine3D\\resources\\sounds\\No.ogg"),
+    	&channels, &sample_rate, &num_of_samples);
 
     ALuint buffer;
     alGenBuffers(1, &buffer);
 
-	ALsizei frequency = 44100;
-    ALsizei size = frequency * 2;  // 2 bytes per sample for 16-bit PCM
-    ALenum format = AL_FORMAT_MONO16;
+	ALsizei frequency = sample_rate;
+    ALsizei size = num_of_samples * channels * sizeof(s16);
+    ALenum format = (channels == 1) ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16;
 
-    alBufferData(buffer, format, nullptr, size, frequency);
+    alBufferData(buffer, format, ogg_sound_data, size, frequency);
+    free(ogg_sound_data);
 
     ALuint source;
     alGenSources(1, &source);
@@ -140,7 +153,7 @@ int main(int argc, char* argv[])
 {
 	init_memory_buffers();
 
-	// init_openal();
+	init_openal();
 
 	// Init window and context
 	{
