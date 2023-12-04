@@ -1,10 +1,6 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
-#include <iostream>
-#include <filesystem>
-#include <fstream>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
