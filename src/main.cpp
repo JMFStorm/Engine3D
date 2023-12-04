@@ -1,22 +1,14 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/matrix_inverse.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/euler_angles.hpp>
-
-#include "j_imgui.h"
-#include "globals.h"
 #include "editor.h"
+#include "globals.h"
 #include "main.h"
-#include "structs.h"
 #include "scene.h"
+#include "structs.h"
 #include "utils.h"
 #include "jfont.h"
+#include "j_imgui.h"
 #include "j_array.h"
 #include "j_assert.h"
 #include "j_buffers.h"
