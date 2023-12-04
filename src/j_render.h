@@ -42,3 +42,13 @@ void append_simple_rect(glm::vec2 offset, glm::vec3 color, int texture_index);
 void draw_simple_rects();
 
 int load_image_into_texture_id(char* image_path);
+
+void update_ubos();
+
+void draw_shadow_map_framebuffers();
+
+void draw_scene_framebuffer();
+
+void draw_editor_framebuffer();
+
+void draw_main_framebuffer();

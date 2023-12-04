@@ -145,10 +145,9 @@ int main(int argc, char* argv[])
 	load_materials_into_memory(materials, materials_count);
 
 	load_core_textures();
+	init_framebuffers();
 
 	glfwSetWindowSize(g_window, g_user_settings.window_size_px[0], g_user_settings.window_size_px[1]);
-
-	init_framebuffers();
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
@@ -164,56 +163,24 @@ int main(int argc, char* argv[])
 
 	while (!glfwWindowShouldClose(g_window))
 	{
+		// -------------
+		// Inputs
+
 		glfwPollEvents();
 		imgui_new_frame();
 		right_hand_editor_panel();
 
 		update_mouse_loc();
+		register_frame_inputs();
+		update_frame_data();
 
-		// Register inputs
-		{
-			int key_state;
-			int buttons_count = sizeof(g_inputs) / sizeof(ButtonState);
-			g_frame_data.mouse_clicked = false;
+		// -------------
+		// Logics
 
-			if (glfwGetKey(g_window, g_inputs.as_struct.esc.key) == GLFW_PRESS) glfwSetWindowShouldClose(g_window, true);
-
-			key_state = glfwGetMouseButton(g_window, g_inputs.as_struct.mouse1.key);
-			g_inputs.as_struct.mouse1.pressed = !g_inputs.as_struct.mouse1.is_down && key_state == GLFW_PRESS;
-			g_inputs.as_struct.mouse1.is_down = key_state == GLFW_PRESS;
-
-			key_state = glfwGetMouseButton(g_window, g_inputs.as_struct.mouse2.key);
-			g_inputs.as_struct.mouse2.pressed = !g_inputs.as_struct.mouse2.is_down && key_state == GLFW_PRESS;
-			g_inputs.as_struct.mouse2.is_down = key_state == GLFW_PRESS;
-
-			for (int i = 2; i < buttons_count - 1; i++) // Skip first two mouse buttons
-			{
-				ButtonState* button = &g_inputs.as_array[i];
-				set_button_state(g_window, button);
-			}
-		}
-
-		// Logic
-		g_game_metrics.prev_frame_game_time = g_game_metrics.game_time;
-		g_game_metrics.game_time = glfwGetTime();
-		g_frame_data.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time);
-
-		s64 current_game_second = (s64)g_game_metrics.game_time;
-
-		if (0 < current_game_second - g_game_metrics.fps_prev_second)
-		{
-			g_game_metrics.fps = g_game_metrics.fps_frames;
-			g_game_metrics.fps_frames = 0;
-			g_game_metrics.fps_prev_second = current_game_second;
-		}
-
-		// Save scene
 		if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.s.pressed) save_all();
 
-		// Get tranformation mode
 		if (!g_camera_move_mode) g_transform_mode.mode = get_curr_transformation_mode();
 
-		// Mouse 1 => select object
 		if (g_inputs.as_struct.mouse1.pressed)
 		{
 			g_frame_data.mouse_clicked = true;
@@ -224,20 +191,17 @@ int main(int argc, char* argv[])
 		bool camera_mode_start = g_inputs.as_struct.mouse2.pressed
 			&& mouse_in_scene_space((int)g_frame_data.mouse_x, (int)g_frame_data.mouse_y);
 
-		// Check camero move mode
 		if (camera_mode_start) g_camera_move_mode = true;
 		else if (!g_inputs.as_struct.mouse2.is_down) g_camera_move_mode = false;
 
 		handle_camera_move_mode();
 
-		// Duplicate / Delete object
 		if (has_object_selection())
 		{
 			if (g_inputs.as_struct.del.pressed) delete_selected_object();
 			else if (g_inputs.as_struct.left_ctrl.is_down && g_inputs.as_struct.d.pressed) duplicate_selected_object();
 		}
 
-		// Check transformation mode start
 		if (has_object_selection()
 			&& (g_inputs.as_struct.x.pressed || g_inputs.as_struct.z.pressed || g_inputs.as_struct.c.pressed))
 		{
@@ -248,315 +212,24 @@ int main(int argc, char* argv[])
 		{
 			g_transform_mode.is_active = false;
 		}
-		// Handle transformation mode
-		else if (g_transform_mode.is_active)
-		{
-			glm::vec3 intersection_point;
-			g_transform_mode.transform_ray = get_camera_ray_from_scene_px(g_frame_data.mouse_x, g_frame_data.mouse_y);
-
-			Transforms* selected_t_ptr = get_selected_object_transforms();
-
-			bool intersection = calculate_plane_ray_intersection(
-				g_transform_mode.transform_plane_normal,
-				selected_t_ptr->translation,
-				g_scene_camera.position,
-				g_transform_mode.transform_ray,
-				intersection_point);
-
-			g_transform_mode.new_intersection_point = intersection_point;
-
-			if (intersection && g_transform_mode.mode == TransformMode::Translate)
-			{
-				glm::vec3 travel_dist = intersection_point - g_transform_mode.prev_intersection_point;
-				vec3_add_for_axis(g_transform_mode.new_tranformation, travel_dist, g_transform_mode.axis);
-				g_transform_mode.prev_intersection_point = intersection_point;
-
-				if (0.0f < g_user_settings.transform_clip)
-					selected_t_ptr->translation = clip_vec3(g_transform_mode.new_tranformation, g_user_settings.transform_clip);
-				else selected_t_ptr->translation = g_transform_mode.new_tranformation;
-			}
-			else if (intersection && g_transform_mode.mode == TransformMode::Scale)
-			{
-				glm::mat4 rotation_mat4 = get_rotation_matrix(selected_t_ptr->rotation);
-				glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
-
-				used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
-				glm::vec3 point_on_scale_plane = closest_point_on_plane(g_transform_mode.new_intersection_point, selected_t_ptr->translation, used_normal);
-				g_transform_mode.new_intersection_point = point_on_scale_plane;
-
-				// Reverse the rotation by applying the inverse rotation matrix to the vector
-				glm::vec3 reversedVector  = glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
-				glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_transform_mode.prev_intersection_point, 1.0f);
-
-				glm::vec3 travel_dist = reversedVector - reversedVector2;
-				g_transform_mode.prev_intersection_point = point_on_scale_plane;
-
-				vec3_add_for_axis(g_transform_mode.new_tranformation, travel_dist, g_transform_mode.axis);
-
-				if (0.0f < g_user_settings.transform_clip)
-					selected_t_ptr->scale = clip_vec3(g_transform_mode.new_tranformation, g_user_settings.transform_clip);
-				else selected_t_ptr->scale = g_transform_mode.new_tranformation;
-
-				if (selected_t_ptr->scale.x < 0.01f) selected_t_ptr->scale.x = 0.01f;
-				if (selected_t_ptr->scale.y < 0.01f) selected_t_ptr->scale.y = 0.01f;
-				if (selected_t_ptr->scale.z < 0.01f) selected_t_ptr->scale.z = 0.01f;
-			}
-			else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
-			{
-				auto new_line = g_transform_mode.new_intersection_point - selected_t_ptr->translation;
-
-				if (0.15f < glm::length(new_line))
-				{
-					glm::vec3 prev_rotation_dir = glm::normalize(g_transform_mode.prev_intersection_point - selected_t_ptr->translation);
-					glm::vec3 new_rotation_dir = glm::normalize(new_line);
-
-					g_transform_mode.prev_intersection_point = g_transform_mode.new_intersection_point;
-
-					bool equal = glm::all(glm::equal(prev_rotation_dir, new_rotation_dir));
-
-					if (!equal)
-					{
-						// Calculate the rotation axis using the cross product of the unit vectors
-						glm::vec3 rotation_axis = glm::normalize(glm::cross(prev_rotation_dir, new_rotation_dir));
-
-						// Calculate the rotation angle in radians
-						float angle = glm::acos(glm::dot(glm::normalize(prev_rotation_dir), glm::normalize(new_rotation_dir)));
-
-						glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis);
-						glm::quat rotation_quaternion = rotation_matrix;
-						glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
-
-						if (!(glm::isnan(eulerAngles.x) || glm::isnan(eulerAngles.y) || glm::isnan(eulerAngles.z)))
-						{
-							g_transform_mode.new_tranformation += eulerAngles;
-
-							if (0.0f < g_user_settings.transform_rotation_clip)
-								selected_t_ptr->rotation = clip_vec3(g_transform_mode.new_tranformation, g_user_settings.transform_rotation_clip);
-							else selected_t_ptr->rotation = g_transform_mode.new_tranformation;
-
-							selected_t_ptr->rotation.x = float_modulus_operation(selected_t_ptr->rotation.x, 360.0f);
-							selected_t_ptr->rotation.y = float_modulus_operation(selected_t_ptr->rotation.y, 360.0f);
-							selected_t_ptr->rotation.z = float_modulus_operation(selected_t_ptr->rotation.z, 360.0f);
-						}
-					}
-				}
-			}
-		}
+		else if (g_transform_mode.is_active) handle_tranformation_mode();
 
 		// -------------
 		// Draw OpenGL
 
-		// Update UBOs
-		{
-			glBindBuffer(GL_UNIFORM_BUFFER, g_view_proj_ubo);
+		update_ubos();
 
-			auto projection = get_projection_matrix();
-			auto view = get_view_matrix();
-
-			glBufferSubData(GL_UNIFORM_BUFFER, 0,				  sizeof(glm::mat4), glm::value_ptr(projection));
-			glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-		}
-
-		// Shadow map framebuffers
-		{
-			glUseProgram(g_shdow_map_shader.id);
-			glViewport(0, 0, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
-
-			for (int i = 0; i < g_scene.spotlights.items_count; i++)
-			{
-				Spotlight* spotlight = (Spotlight*)j_array_get(&g_scene.spotlights, i);
-				glm::mat4 light_space_matrix = get_spotlight_light_space_matrix(*spotlight);
-
-				unsigned int light_matrix_loc = glGetUniformLocation(g_shdow_map_shader.id, "lightSpaceMatrix");
-				glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(light_space_matrix));
-
-				glBindFramebuffer(GL_FRAMEBUFFER, spotlight->shadow_map.id);
-				glClear(GL_DEPTH_BUFFER_BIT);
-
-				glUseProgram(g_shdow_map_shader.id);
-				glBindVertexArray(g_shdow_map_shader.vao);
-				glCullFace(GL_BACK);
-
-				// Disable for planes
-				for (int i = 0; i < g_scene.planes.items_count; i++)
-				{
-					Mesh plane = *(Mesh*)j_array_get(&g_scene.planes, i);
-					draw_mesh_shadow_map(&plane, spotlight);
-				}
-
-				glCullFace(GL_FRONT);
-
-				for (int i = 0; i < g_scene.meshes.items_count; i++)
-				{
-					Mesh mesh = *(Mesh*)j_array_get(&g_scene.meshes, i);
-					draw_mesh_shadow_map(&mesh, spotlight);
-				}
-			}
-
-			glUseProgram(0);
-			glBindVertexArray(0);
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			glCullFace(GL_BACK);
-		}
-
-		// Scene framebuffer
-		{
-			glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
-			glEnable(GL_DEPTH_TEST);
-			glClearColor(0.2f, 0.31f, 0.3f, 1.0f);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-			if (g_user_settings.use_skybox) draw_skybox();
-
-			// Coordinate lines
-			append_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-			append_line(glm::vec3(0.0f, -1000.0f, 0.0f), glm::vec3(0.0f, 1000.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			append_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-			draw_lines(1.0f);
-
-			for (int i = 0; i < g_scene.planes.items_count; i++)
-			{
-				Mesh plane = *(Mesh*)j_array_get(&g_scene.planes, i);
-				draw_mesh(&plane);
-			}
-
-			for (int i = 0; i < g_scene.meshes.items_count; i++)
-			{
-				Mesh mesh = *(Mesh*)j_array_get(&g_scene.meshes, i);
-				draw_mesh(&mesh);
-			}
-
-			// Pointlights
-			for (int i = 0; i < g_scene.pointlights.items_count; i++)
-			{
-				auto light = *(Pointlight*)j_array_get(&g_scene.pointlights, i);
-				draw_billboard(light.transforms.translation, pointlight_texture, 0.5f);
-			}
-
-			// Spotlights
-			for (int i = 0; i < g_scene.spotlights.items_count; i++)
-			{
-				auto spotlight = *(Spotlight*)j_array_get(&g_scene.spotlights, i);
-				draw_billboard(spotlight.transforms.translation, spotlight_texture, 0.5f);
-				glm::vec3 sp_dir = get_spotlight_dir(spotlight);
-				append_line(spotlight.transforms.translation, spotlight.transforms.translation + sp_dir, spotlight.diffuse);
-			}
-
-			draw_lines(2.0f);
-
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		}
-
-		// Editor framebuffer
-		{
-			glBindFramebuffer(GL_FRAMEBUFFER, editor_framebuffer.id);
-			glEnable(GL_DEPTH_TEST);
-			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-			// Transformation mode debug lines
-			if (has_object_selection() && g_transform_mode.is_active)
-			{
-				glm::vec3 line_color;
-
-				if (g_transform_mode.axis == Axis::X) line_color = glm::vec3(1.0f, 0.2f, 0.2f);
-				if (g_transform_mode.axis == Axis::Y) line_color = glm::vec3(0.2f, 1.0f, 0.2f);
-				if (g_transform_mode.axis == Axis::Z) line_color = glm::vec3(0.2f, 0.2f, 1.0f);
-
-				if (g_transform_mode.mode == TransformMode::Translate)
-				{
-					append_line(g_transform_mode.new_intersection_point, g_transform_mode.new_tranformation, line_color);
-					draw_lines(1.0f);
-				}
-				else if (g_transform_mode.mode == TransformMode::Rotate)
-				{
-					auto transforms = get_selected_object_transforms();
-					append_line(g_transform_mode.new_intersection_point, transforms->translation, line_color);
-					draw_lines(1.0f);
-				}
-				else if (g_transform_mode.mode == TransformMode::Scale)
-				{
-					auto transforms = get_selected_object_transforms();
-					append_line(g_transform_mode.new_intersection_point, transforms->translation, line_color);
-					draw_lines(1.0f);
-				}
-			}
-
-			// Draw selection
-			if (has_object_selection())
-			{
-				if (is_primitive(g_selected_object.type))
-				{
-					Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
-					draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
-					draw_selection_arrows(selected_mesh->transforms.translation);
-				}
-				else if (g_selected_object.type == ObjectType::Pointlight)
-				{
-					Pointlight* selected_light = (Pointlight*)get_selected_object_ptr();
-					Mesh as_cube = {};
-					as_cube.mesh_type = MeshType::Cube;
-					as_cube.transforms.scale = glm::vec3(0.35f);
-					as_cube.transforms.translation = selected_light->transforms.translation;
-					draw_mesh_wireframe(&as_cube, selected_light->diffuse);
-					draw_selection_arrows(selected_light->transforms.translation);
-				}
-				else if (g_selected_object.type == ObjectType::Spotlight)
-				{
-					Spotlight* selected_light = (Spotlight*)get_selected_object_ptr();
-					Mesh as_cube = {};
-					as_cube.mesh_type = MeshType::Cube;
-					as_cube.transforms.scale = glm::vec3(0.35f);
-					as_cube.transforms.translation = selected_light->transforms.translation;
-					draw_mesh_wireframe(&as_cube, selected_light->diffuse);
-					draw_selection_arrows(selected_light->transforms.translation);
-				}
-			}
-
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		}
-
-		// -------------------
-		// Draw framebuffers
-		{
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			glDisable(GL_DEPTH_TEST);
-			glClear(GL_COLOR_BUFFER_BIT);
-
-			glUseProgram(g_scene_framebuffer_shader.id);
-			glBindVertexArray(g_scene_framebuffer_shader.vao);
-
-			unsigned int inversion_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "use_inversion");
-			unsigned int blur_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "use_blur");
-			unsigned int blur_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "blur_amount");
-			unsigned int gamma_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "gamma_amount");
-
-			glUniform1i(inversion_loc, g_pp_settings.inverse_color);
-			glUniform1i(blur_loc, g_pp_settings.blur_effect);
-			glUniform1f(blur_amount_loc, g_pp_settings.blur_effect_amount);
-			glUniform1f(gamma_amount_loc, g_pp_settings.gamma_amount);
-
-			glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer.texture_gpu_id);
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-
-			glUniform1i(inversion_loc, false);
-			glUniform1i(blur_loc, false);
-			glBindTexture(GL_TEXTURE_2D, editor_framebuffer.texture_gpu_id);
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-			glEnable(GL_DEPTH_TEST);
-		}
+		draw_shadow_map_framebuffers();
+		draw_scene_framebuffer();
+		draw_editor_framebuffer();
+		draw_main_framebuffer();
 
 		if (DEBUG_SHADOWMAP && g_selected_object.type == ObjectType::Spotlight) draw_selected_shadow_map();
 
 		print_debug_texts();
-
 		imgui_end_frame();
-
 		glfwSwapBuffers(g_window);
+
 		g_game_metrics.frames++;
 		g_game_metrics.fps_frames++;
 		g_frame_data.draw_calls = 0;

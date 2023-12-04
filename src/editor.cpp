@@ -582,3 +582,98 @@ void save_materials()
 
 	fclose(file);
 }
+
+
+void handle_tranformation_mode()
+{
+	glm::vec3 intersection_point;
+	g_transform_mode.transform_ray = get_camera_ray_from_scene_px(g_frame_data.mouse_x, g_frame_data.mouse_y);
+
+	Transforms* selected_t_ptr = get_selected_object_transforms();
+
+	bool intersection = calculate_plane_ray_intersection(
+		g_transform_mode.transform_plane_normal,
+		selected_t_ptr->translation,
+		g_scene_camera.position,
+		g_transform_mode.transform_ray,
+		intersection_point);
+
+	g_transform_mode.new_intersection_point = intersection_point;
+
+	if (intersection && g_transform_mode.mode == TransformMode::Translate)
+	{
+		glm::vec3 travel_dist = intersection_point - g_transform_mode.prev_intersection_point;
+		vec3_add_for_axis(g_transform_mode.new_tranformation, travel_dist, g_transform_mode.axis);
+		g_transform_mode.prev_intersection_point = intersection_point;
+
+		if (0.0f < g_user_settings.transform_clip)
+			selected_t_ptr->translation = clip_vec3(g_transform_mode.new_tranformation, g_user_settings.transform_clip);
+		else selected_t_ptr->translation = g_transform_mode.new_tranformation;
+	}
+	else if (intersection && g_transform_mode.mode == TransformMode::Scale)
+	{
+		glm::mat4 rotation_mat4 = get_rotation_matrix(selected_t_ptr->rotation);
+		glm::vec3 used_normal = get_normal_for_axis(g_transform_mode.axis);
+
+		used_normal = rotation_mat4 * glm::vec4(used_normal, 1.0f);
+		glm::vec3 point_on_scale_plane = closest_point_on_plane(g_transform_mode.new_intersection_point, selected_t_ptr->translation, used_normal);
+		g_transform_mode.new_intersection_point = point_on_scale_plane;
+
+		// Reverse the rotation by applying the inverse rotation matrix to the vector
+		glm::vec3 reversedVector  = glm::inverse(rotation_mat4) * glm::vec4(point_on_scale_plane, 1.0f);
+		glm::vec3 reversedVector2 = glm::inverse(rotation_mat4) * glm::vec4(g_transform_mode.prev_intersection_point, 1.0f);
+
+		glm::vec3 travel_dist = reversedVector - reversedVector2;
+		g_transform_mode.prev_intersection_point = point_on_scale_plane;
+
+		vec3_add_for_axis(g_transform_mode.new_tranformation, travel_dist, g_transform_mode.axis);
+
+		if (0.0f < g_user_settings.transform_clip)
+			selected_t_ptr->scale = clip_vec3(g_transform_mode.new_tranformation, g_user_settings.transform_clip);
+		else selected_t_ptr->scale = g_transform_mode.new_tranformation;
+
+		if (selected_t_ptr->scale.x < 0.01f) selected_t_ptr->scale.x = 0.01f;
+		if (selected_t_ptr->scale.y < 0.01f) selected_t_ptr->scale.y = 0.01f;
+		if (selected_t_ptr->scale.z < 0.01f) selected_t_ptr->scale.z = 0.01f;
+	}
+	else if (intersection && g_transform_mode.mode == TransformMode::Rotate)
+	{
+		auto new_line = g_transform_mode.new_intersection_point - selected_t_ptr->translation;
+
+		if (0.15f < glm::length(new_line))
+		{
+			glm::vec3 prev_rotation_dir = glm::normalize(g_transform_mode.prev_intersection_point - selected_t_ptr->translation);
+			glm::vec3 new_rotation_dir = glm::normalize(new_line);
+
+			g_transform_mode.prev_intersection_point = g_transform_mode.new_intersection_point;
+
+			bool equal = glm::all(glm::equal(prev_rotation_dir, new_rotation_dir));
+
+			if (!equal)
+			{
+				// Calculate the rotation axis using the cross product of the unit vectors
+				glm::vec3 rotation_axis = glm::normalize(glm::cross(prev_rotation_dir, new_rotation_dir));
+
+				// Calculate the rotation angle in radians
+				float angle = glm::acos(glm::dot(glm::normalize(prev_rotation_dir), glm::normalize(new_rotation_dir)));
+
+				glm::mat4 rotation_matrix = glm::rotate(glm::mat4(1.0f), angle, rotation_axis);
+				glm::quat rotation_quaternion = rotation_matrix;
+				glm::vec3 eulerAngles = glm::degrees(glm::eulerAngles(rotation_quaternion));
+
+				if (!(glm::isnan(eulerAngles.x) || glm::isnan(eulerAngles.y) || glm::isnan(eulerAngles.z)))
+				{
+					g_transform_mode.new_tranformation += eulerAngles;
+
+					if (0.0f < g_user_settings.transform_rotation_clip)
+						selected_t_ptr->rotation = clip_vec3(g_transform_mode.new_tranformation, g_user_settings.transform_rotation_clip);
+					else selected_t_ptr->rotation = g_transform_mode.new_tranformation;
+
+					selected_t_ptr->rotation.x = float_modulus_operation(selected_t_ptr->rotation.x, 360.0f);
+					selected_t_ptr->rotation.y = float_modulus_operation(selected_t_ptr->rotation.y, 360.0f);
+					selected_t_ptr->rotation.z = float_modulus_operation(selected_t_ptr->rotation.z, 360.0f);
+				}
+			}
+		}
+	}
+}

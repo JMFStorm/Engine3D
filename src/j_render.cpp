@@ -1135,3 +1135,202 @@ int load_image_into_texture_id(char* image_path)
 	free_loaded_image(im_data);
 	return texture;
 }
+
+void update_ubos()
+{
+	glBindBuffer(GL_UNIFORM_BUFFER, g_view_proj_ubo);
+	auto projection = get_projection_matrix();
+	auto view = get_view_matrix();
+	glBufferSubData(GL_UNIFORM_BUFFER, 0,				  sizeof(glm::mat4), glm::value_ptr(projection));
+	glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
+
+void draw_shadow_map_framebuffers()
+{
+	glUseProgram(g_shdow_map_shader.id);
+	glViewport(0, 0, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
+
+	for (int i = 0; i < g_scene.spotlights.items_count; i++)
+	{
+		Spotlight* spotlight = (Spotlight*)j_array_get(&g_scene.spotlights, i);
+		glm::mat4 light_space_matrix = get_spotlight_light_space_matrix(*spotlight);
+
+		unsigned int light_matrix_loc = glGetUniformLocation(g_shdow_map_shader.id, "lightSpaceMatrix");
+		glUniformMatrix4fv(light_matrix_loc, 1, GL_FALSE, glm::value_ptr(light_space_matrix));
+
+		glBindFramebuffer(GL_FRAMEBUFFER, spotlight->shadow_map.id);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(g_shdow_map_shader.id);
+		glBindVertexArray(g_shdow_map_shader.vao);
+		glCullFace(GL_BACK);
+
+		// Disable for planes
+		for (int i = 0; i < g_scene.planes.items_count; i++)
+		{
+			Mesh plane = *(Mesh*)j_array_get(&g_scene.planes, i);
+			draw_mesh_shadow_map(&plane, spotlight);
+		}
+
+		glCullFace(GL_FRONT);
+
+		for (int i = 0; i < g_scene.meshes.items_count; i++)
+		{
+			Mesh mesh = *(Mesh*)j_array_get(&g_scene.meshes, i);
+			draw_mesh_shadow_map(&mesh, spotlight);
+		}
+	}
+
+	glUseProgram(0);
+	glBindVertexArray(0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, g_game_metrics.scene_width_px, g_game_metrics.scene_height_px);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glCullFace(GL_BACK);
+}
+
+void draw_scene_framebuffer()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, g_scene_framebuffer.id);
+	glEnable(GL_DEPTH_TEST);
+	glClearColor(0.2f, 0.31f, 0.3f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	if (g_user_settings.use_skybox) draw_skybox();
+
+	// Coordinate lines
+	append_line(glm::vec3(-1000.0f, 0.0f, 0.0f), glm::vec3(1000.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	append_line(glm::vec3(0.0f, -1000.0f, 0.0f), glm::vec3(0.0f, 1000.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	append_line(glm::vec3(0.0f, 0.0f, -1000.0f), glm::vec3(0.0f, 0.0f, 1000.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	draw_lines(1.0f);
+
+	for (int i = 0; i < g_scene.planes.items_count; i++)
+	{
+		Mesh plane = *(Mesh*)j_array_get(&g_scene.planes, i);
+		draw_mesh(&plane);
+	}
+
+	for (int i = 0; i < g_scene.meshes.items_count; i++)
+	{
+		Mesh mesh = *(Mesh*)j_array_get(&g_scene.meshes, i);
+		draw_mesh(&mesh);
+	}
+
+	// Pointlights
+	for (int i = 0; i < g_scene.pointlights.items_count; i++)
+	{
+		auto light = *(Pointlight*)j_array_get(&g_scene.pointlights, i);
+		draw_billboard(light.transforms.translation, pointlight_texture, 0.5f);
+	}
+
+	// Spotlights
+	for (int i = 0; i < g_scene.spotlights.items_count; i++)
+	{
+		auto spotlight = *(Spotlight*)j_array_get(&g_scene.spotlights, i);
+		draw_billboard(spotlight.transforms.translation, spotlight_texture, 0.5f);
+		glm::vec3 sp_dir = get_spotlight_dir(spotlight);
+		append_line(spotlight.transforms.translation, spotlight.transforms.translation + sp_dir, spotlight.diffuse);
+	}
+
+	draw_lines(2.0f);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void draw_editor_framebuffer()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, editor_framebuffer.id);
+	glEnable(GL_DEPTH_TEST);
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// Transformation mode debug lines
+	if (has_object_selection() && g_transform_mode.is_active)
+	{
+		glm::vec3 line_color;
+
+		if (g_transform_mode.axis == Axis::X) line_color = glm::vec3(1.0f, 0.2f, 0.2f);
+		if (g_transform_mode.axis == Axis::Y) line_color = glm::vec3(0.2f, 1.0f, 0.2f);
+		if (g_transform_mode.axis == Axis::Z) line_color = glm::vec3(0.2f, 0.2f, 1.0f);
+
+		if (g_transform_mode.mode == TransformMode::Translate)
+		{
+			append_line(g_transform_mode.new_intersection_point, g_transform_mode.new_tranformation, line_color);
+			draw_lines(1.0f);
+		}
+		else if (g_transform_mode.mode == TransformMode::Rotate)
+		{
+			auto transforms = get_selected_object_transforms();
+			append_line(g_transform_mode.new_intersection_point, transforms->translation, line_color);
+			draw_lines(1.0f);
+		}
+		else if (g_transform_mode.mode == TransformMode::Scale)
+		{
+			auto transforms = get_selected_object_transforms();
+			append_line(g_transform_mode.new_intersection_point, transforms->translation, line_color);
+			draw_lines(1.0f);
+		}
+	}
+
+	// Draw selection
+	if (has_object_selection())
+	{
+		if (is_primitive(g_selected_object.type))
+		{
+			Mesh* selected_mesh = (Mesh*)get_selected_object_ptr();
+			draw_mesh_wireframe(selected_mesh, glm::vec3(1.0f));
+			draw_selection_arrows(selected_mesh->transforms.translation);
+		}
+		else if (g_selected_object.type == ObjectType::Pointlight)
+		{
+			Pointlight* selected_light = (Pointlight*)get_selected_object_ptr();
+			Mesh as_cube = {};
+			as_cube.mesh_type = MeshType::Cube;
+			as_cube.transforms.scale = glm::vec3(0.35f);
+			as_cube.transforms.translation = selected_light->transforms.translation;
+			draw_mesh_wireframe(&as_cube, selected_light->diffuse);
+			draw_selection_arrows(selected_light->transforms.translation);
+		}
+		else if (g_selected_object.type == ObjectType::Spotlight)
+		{
+			Spotlight* selected_light = (Spotlight*)get_selected_object_ptr();
+			Mesh as_cube = {};
+			as_cube.mesh_type = MeshType::Cube;
+			as_cube.transforms.scale = glm::vec3(0.35f);
+			as_cube.transforms.translation = selected_light->transforms.translation;
+			draw_mesh_wireframe(&as_cube, selected_light->diffuse);
+			draw_selection_arrows(selected_light->transforms.translation);
+		}
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void draw_main_framebuffer()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDisable(GL_DEPTH_TEST);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glUseProgram(g_scene_framebuffer_shader.id);
+	glBindVertexArray(g_scene_framebuffer_shader.vao);
+
+	unsigned int inversion_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "use_inversion");
+	unsigned int blur_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "use_blur");
+	unsigned int blur_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "blur_amount");
+	unsigned int gamma_amount_loc = glGetUniformLocation(g_scene_framebuffer_shader.id, "gamma_amount");
+
+	glUniform1i(inversion_loc, g_pp_settings.inverse_color);
+	glUniform1i(blur_loc, g_pp_settings.blur_effect);
+	glUniform1f(blur_amount_loc, g_pp_settings.blur_effect_amount);
+	glUniform1f(gamma_amount_loc, g_pp_settings.gamma_amount);
+
+	glBindTexture(GL_TEXTURE_2D, g_scene_framebuffer.texture_gpu_id);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+
+	glUniform1i(inversion_loc, false);
+	glUniform1i(blur_loc, false);
+	glBindTexture(GL_TEXTURE_2D, editor_framebuffer.texture_gpu_id);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glEnable(GL_DEPTH_TEST);
+}

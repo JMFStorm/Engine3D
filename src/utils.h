@@ -33,16 +33,8 @@ inline void null_terminate_string(char* string, int str_length)
 
 inline float clamp_float(float value, float min, float max)
 {
-	if (value < min)
-	{
-		return min;
-	}
-
-	if (max < value)
-	{
-		return max;
-	}
-
+	if (value < min) return min;
+	if (max < value) return max;
 	return value;
 }
 
@@ -165,3 +157,7 @@ void deallocate_temp_memory();
 void load_core_textures();
 
 void init_framebuffers();
+
+void update_frame_data();
+
+void register_frame_inputs();

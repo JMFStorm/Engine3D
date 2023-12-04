@@ -52,3 +52,5 @@ inline bool has_object_selection()
 }
 
 void save_materials();
+
+void handle_tranformation_mode();

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <glm/glm.hpp>
 
+#include "main.h"
 #include "j_assert.h"
 #include "j_buffers.h"
 #include "j_render.h"
@@ -828,4 +829,43 @@ void init_framebuffers()
 	glGenFramebuffers(1, &editor_framebuffer.id);
 	glBindFramebuffer(GL_FRAMEBUFFER, editor_framebuffer.id);
 	init_framebuffer_resize(&editor_framebuffer.texture_gpu_id, &editor_framebuffer.renderbuffer);
+}
+
+void update_frame_data()
+{
+	g_game_metrics.prev_frame_game_time = g_game_metrics.game_time;
+	g_game_metrics.game_time = glfwGetTime();
+	g_frame_data.deltatime = (g_game_metrics.game_time - g_game_metrics.prev_frame_game_time);
+
+	s64 current_game_second = (s64)g_game_metrics.game_time;
+
+	if (0 < current_game_second - g_game_metrics.fps_prev_second)
+	{
+		g_game_metrics.fps = g_game_metrics.fps_frames;
+		g_game_metrics.fps_frames = 0;
+		g_game_metrics.fps_prev_second = current_game_second;
+	}
+}
+
+void register_frame_inputs()
+{
+	int key_state;
+	int buttons_count = sizeof(g_inputs) / sizeof(ButtonState);
+	g_frame_data.mouse_clicked = false;
+
+	if (glfwGetKey(g_window, g_inputs.as_struct.esc.key) == GLFW_PRESS) glfwSetWindowShouldClose(g_window, true);
+
+	key_state = glfwGetMouseButton(g_window, g_inputs.as_struct.mouse1.key);
+	g_inputs.as_struct.mouse1.pressed = !g_inputs.as_struct.mouse1.is_down && key_state == GLFW_PRESS;
+	g_inputs.as_struct.mouse1.is_down = key_state == GLFW_PRESS;
+
+	key_state = glfwGetMouseButton(g_window, g_inputs.as_struct.mouse2.key);
+	g_inputs.as_struct.mouse2.pressed = !g_inputs.as_struct.mouse2.is_down && key_state == GLFW_PRESS;
+	g_inputs.as_struct.mouse2.is_down = key_state == GLFW_PRESS;
+
+	for (int i = 2; i < buttons_count - 1; i++) // Skip first two mouse buttons
+	{
+		ButtonState* button = &g_inputs.as_array[i];
+		set_button_state(g_window, button);
+	}
 }
